@@ -1,0 +1,73 @@
+name: Release macOS App
+
+on:
+  push:
+    tags:
+      - "macos-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag (example: macos-v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+    env:
+      TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref }}
+
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install just
+        run: brew install just
+
+      - name: Show tool versions
+        run: |
+          xcodebuild -version
+          swift --version
+          bun --version
+
+      - name: Validate tag format
+        run: |
+          if [[ ! "${TAG_NAME}" =~ ^macos-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag: ${TAG_NAME}. Expected macos-vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+      - name: Ensure tag exists (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git fetch --tags
+          if ! git rev-parse "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
+            echo "Tag ${TAG_NAME} does not exist. Create and push it first."
+            exit 1
+          fi
+
+      - name: Build DMG
+        run: just dmg
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          files: build/dist/MultiCodex.dmg
+          body_path: .github/release-notes-macos.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
