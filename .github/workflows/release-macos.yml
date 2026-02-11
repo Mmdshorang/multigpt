@@ -1,13 +1,13 @@
-name: Release macOS App
+name: Release App
 
 on:
   push:
     tags:
-      - "macos-v*"
+      - "v*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Release tag (example: macos-v0.1.0)"
+        description: "Release tag (example: v0.1.0)"
         required: true
         type: string
 
@@ -46,8 +46,8 @@ jobs:
 
       - name: Validate tag format
         run: |
-          if [[ ! "${TAG_NAME}" =~ ^macos-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid tag: ${TAG_NAME}. Expected macos-vMAJOR.MINOR.PATCH"
+          if [[ ! "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag: ${TAG_NAME}. Expected vMAJOR.MINOR.PATCH"
             exit 1
           fi
 

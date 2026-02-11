@@ -3,24 +3,20 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Kickstart a new MultiCodex macOS release.
+Kickstart a new MultiCodex release.
 
 Usage:
-  scripts/release.sh --version <macos-vX.Y.Z>
   scripts/release.sh --version <vX.Y.Z>
   scripts/release.sh --version <X.Y.Z>
   scripts/release.sh --bump <major|minor|patch>
-  scripts/release.sh <macos-vX.Y.Z>
   scripts/release.sh <vX.Y.Z>
   scripts/release.sh <X.Y.Z>
   scripts/release.sh <major|minor|patch>
 
 Examples:
-  scripts/release.sh --version macos-v0.2.3
   scripts/release.sh --version v0.2.3
   scripts/release.sh --version 0.2.3
   scripts/release.sh --bump patch
-  scripts/release.sh macos-v0.2.3
   scripts/release.sh v0.2.3
   scripts/release.sh 0.2.3
   scripts/release.sh patch
@@ -85,13 +81,20 @@ next_version_from_bump() {
   local bump="$1"
   local latest_tag latest major minor patch
 
-  latest_tag="$(git tag --list 'macos-v*' --sort=-v:refname | head -n1 || true)"
+  latest_tag="$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)"
   if [[ -z "$latest_tag" ]]; then
-    latest_tag="macos-v0.0.0"
+    # Backward-compat: migrate from legacy macos-v tags if present.
+    local legacy_tag
+    legacy_tag="$(git tag --list 'macos-v*' --sort=-v:refname | head -n1 || true)"
+    if [[ "$legacy_tag" =~ ^macos-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+      latest_tag="v${BASH_REMATCH[1]}"
+    else
+      latest_tag="v0.0.0"
+    fi
   fi
 
-  if [[ ! "$latest_tag" =~ ^macos-v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    echo "Error: latest tag '$latest_tag' does not match macos-vMAJOR.MINOR.PATCH"
+  if [[ ! "$latest_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    echo "Error: latest tag '$latest_tag' does not match vMAJOR.MINOR.PATCH"
     exit 1
   fi
 
@@ -118,21 +121,17 @@ next_version_from_bump() {
       ;;
   esac
 
-  echo "macos-v${major}.${minor}.${patch}"
+  echo "v${major}.${minor}.${patch}"
 }
 
 normalize_version_input() {
   local raw="$1"
-  if [[ "$raw" =~ ^macos-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "$raw"
-    return 0
-  fi
   if [[ "$raw" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-    echo "macos-v${BASH_REMATCH[1]}"
+    echo "v${BASH_REMATCH[1]}"
     return 0
   fi
   if [[ "$raw" =~ ^([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-    echo "macos-v${BASH_REMATCH[1]}"
+    echo "v${BASH_REMATCH[1]}"
     return 0
   fi
   return 1
@@ -140,7 +139,7 @@ normalize_version_input() {
 
 if [[ "$mode" == "version" ]]; then
   if ! version="$(normalize_version_input "$input")"; then
-    echo "Error: --version must match one of: macos-vMAJOR.MINOR.PATCH, vMAJOR.MINOR.PATCH, MAJOR.MINOR.PATCH"
+    echo "Error: --version must match one of: vMAJOR.MINOR.PATCH, MAJOR.MINOR.PATCH"
     exit 1
   fi
 elif [[ "$mode" == "bump" ]]; then

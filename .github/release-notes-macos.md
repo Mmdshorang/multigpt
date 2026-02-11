@@ -1,6 +1,6 @@
 ## MultiCodex
 
-Native macOS menu bar app release.
+Native menu bar app release.
 
 ### Install
 

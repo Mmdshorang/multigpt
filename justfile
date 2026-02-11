@@ -14,7 +14,6 @@ app_icon_icns := "Assets/AppIcon.icns"
 _bundle configuration:
     if [[ "{{configuration}}" != "debug" && "{{configuration}}" != "release" ]]; then echo "Invalid configuration: {{configuration}} (use debug|release)"; exit 2; fi
     bun run sync:cli
-    bash scripts/generate-app-icon.sh "{{app_iconset}}" "{{app_icon_icns}}"
     swift build -c "{{configuration}}"
     if [[ ! -x ".build/{{configuration}}/{{app_name}}" ]]; then echo "Expected executable not found: .build/{{configuration}}/{{app_name}}"; exit 1; fi
     if [[ ! -d ".build/{{configuration}}/{{resource_bundle}}" ]]; then echo "Expected resource bundle not found: .build/{{configuration}}/{{resource_bundle}}"; exit 1; fi
@@ -51,8 +50,9 @@ list:
     @echo "  just dmg               Build release DMG"
     @echo "  just ci                Local CI checks"
     @echo "  just doctor            Verify toolchain and bundled CLI"
-    @echo "  just release minor     Create/push macos-v tag"
+    @echo "  just release minor     Create/push v tag"
     @echo "  just kickoff-release   Patch bump + release tag"
+    @echo "  just icons             Regenerate app icon (.icns)"
     @echo "  just clean             Clean build artifacts"
 
 doctor:
@@ -60,10 +60,13 @@ doctor:
     bun --version
     if command -v node >/dev/null 2>&1; then node --version; else echo "node not found in PATH (required at runtime)"; fi
     bun run sync:cli
-    bash scripts/generate-app-icon.sh "{{app_iconset}}" "{{app_icon_icns}}"
     test -f Sources/MultiCodexMenu/Resources/multicodex-cli.js
     test -f "{{app_icon_icns}}"
     @echo "doctor: bundled CLI resource is ready"
+
+icons:
+    bash scripts/generate-app-icon.sh "{{app_iconset}}" "{{app_icon_icns}}"
+    @echo "icons: generated {{app_icon_icns}}"
 
 dev:
     just _bundle debug

@@ -58,12 +58,13 @@ just ci
 just clean
 just kickoff-release
 just release 0.1.0
+just icons
 ```
 
 ## GitHub release (DMG)
 
 - Workflow: `.github/workflows/release-macos.yml`
-- Trigger tag format: `macos-vMAJOR.MINOR.PATCH`
+- Trigger tag format: `vMAJOR.MINOR.PATCH`
 - Release artifact: `build/dist/MultiCodex.dmg`
 
 Create and push a release tag:
