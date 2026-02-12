@@ -80,7 +80,7 @@ struct UsageMenuContentView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("No profiles")
                     .font(.subheadline.weight(.semibold))
-                Text("Add a profile, then run `multicodex run <name> -- codex login`.")
+                Text("Open Settings and choose “Login New Profile” to start setup.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

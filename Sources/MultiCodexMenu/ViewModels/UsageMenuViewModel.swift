@@ -12,15 +12,21 @@ final class UsageMenuViewModel: ObservableObject {
     @Published private(set) var profileActionInFlightName: String?
     @Published private(set) var profileActionMessage: String?
     @Published private(set) var profileActionError: String?
+    @Published private(set) var isUsingTemporaryAuthSandbox = false
+    @Published private(set) var temporaryAuthSandboxHome: String?
     @Published var customNodePath: String
     @Published var resetDisplayMode: ResetDisplayMode
 
     private let cli = MultiCodexCLI()
+    private let fileManager = FileManager.default
     private let defaults = UserDefaults.standard
     private let customNodePathKey = "multicodexMenu.customNodePath"
     private let legacyCustomExecutableKey = "multicodexMenu.customExecutablePath"
     private let resetDisplayModeKey = "multicodexMenu.resetDisplayMode"
+    private let temporaryAuthSandboxEnabledKey = "multicodexMenu.temporaryAuthSandboxEnabled"
+    private let temporaryAuthSandboxHomeKey = "multicodexMenu.temporaryAuthSandboxHome"
     private var refreshLoopTask: Task<Void, Never>?
+    private var didBecomeActiveObserver: NSObjectProtocol?
 
     init() {
         customNodePath =
@@ -29,11 +35,26 @@ final class UsageMenuViewModel: ObservableObject {
             ?? ""
         let rawResetMode = defaults.string(forKey: resetDisplayModeKey)
         resetDisplayMode = ResetDisplayMode(rawValue: rawResetMode ?? "") ?? .relative
+        isUsingTemporaryAuthSandbox = defaults.bool(forKey: temporaryAuthSandboxEnabledKey)
+        temporaryAuthSandboxHome = defaults.string(forKey: temporaryAuthSandboxHomeKey)
         cli.customNodePath = customNodePath.isEmpty ? nil : customNodePath
+        configureSandboxEnvironment()
+        didBecomeActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshLive()
+            }
+        }
         start()
     }
 
     deinit {
+        if let didBecomeActiveObserver {
+            NotificationCenter.default.removeObserver(didBecomeActiveObserver)
+        }
         refreshLoopTask?.cancel()
     }
 
@@ -132,17 +153,20 @@ final class UsageMenuViewModel: ObservableObject {
         }
     }
 
-    func addProfile(named rawName: String) {
-        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else {
-            profileActionError = "Profile name cannot be empty."
-            profileActionMessage = nil
+    func startNewProfileLogin() {
+        guard profileActionInFlightName == nil else {
             return
         }
 
-        runProfileAction(for: name) {
-            _ = try await self.cli.addAccount(name: name)
-            return .success("Added profile \(name).")
+        let generatedName = generateRandomProfileName()
+        do {
+            try cli.openNewProfileLoginInTerminal(newProfileName: generatedName)
+            setProfileFeedback(
+                message: "Opened browser login. After sign-in, profile \(generatedName) will appear (you can rename it anytime).",
+                error: nil
+            )
+        } catch {
+            setProfileFeedback(message: nil, error: error.localizedDescription)
         }
     }
 
@@ -199,7 +223,7 @@ final class UsageMenuViewModel: ObservableObject {
         do {
             try cli.openLoginInTerminal(account: name)
             setProfileFeedback(
-                message: "Opened Terminal login for \(name). Complete login there, then refresh.",
+                message: "Opened Terminal login for \(name). Browser login should start and return you to MultiCodex.",
                 error: nil
             )
         } catch {
@@ -218,11 +242,43 @@ final class UsageMenuViewModel: ObservableObject {
     }
 
     func openMulticodexConfigDirectory() {
-        let root = ProcessInfo.processInfo.environment["MULTICODEX_HOME"]
-            ?? "\(NSHomeDirectory())/.config/multicodex"
-
-        let url = URL(fileURLWithPath: root, isDirectory: true)
+        let url = URL(fileURLWithPath: cli.effectiveMulticodexHomePath(), isDirectory: true)
         NSWorkspace.shared.open(url)
+    }
+
+    func enableTemporaryAuthSandbox() {
+        do {
+            let sandboxHome = try prepareFreshTemporaryAuthSandbox()
+            temporaryAuthSandboxHome = sandboxHome
+            isUsingTemporaryAuthSandbox = true
+            defaults.set(true, forKey: temporaryAuthSandboxEnabledKey)
+            defaults.set(sandboxHome, forKey: temporaryAuthSandboxHomeKey)
+            configureSandboxEnvironment()
+            setProfileFeedback(
+                message: "Temporary auth sandbox enabled at \(sandboxHome).",
+                error: nil
+            )
+            refreshLive()
+        } catch {
+            setProfileFeedback(message: nil, error: "Could not enable temporary auth sandbox: \(error.localizedDescription)")
+        }
+    }
+
+    func resetTemporaryAuthSandbox() {
+        enableTemporaryAuthSandbox()
+    }
+
+    func disableTemporaryAuthSandbox() {
+        isUsingTemporaryAuthSandbox = false
+        defaults.set(false, forKey: temporaryAuthSandboxEnabledKey)
+        configureSandboxEnvironment()
+        setProfileFeedback(message: "Temporary auth sandbox disabled. Using your regular setup.", error: nil)
+        refreshLive()
+    }
+
+    func openTemporaryAuthSandboxDirectory() {
+        guard let sandbox = temporaryAuthSandboxHome, !sandbox.isEmpty else { return }
+        NSWorkspace.shared.open(URL(fileURLWithPath: sandbox, isDirectory: true))
     }
 
     func updateCustomNodePath(_ value: String) {
@@ -342,4 +398,57 @@ final class UsageMenuViewModel: ObservableObject {
         }
     }
 
+    private func configureSandboxEnvironment() {
+        guard isUsingTemporaryAuthSandbox else {
+            cli.sandboxHomeDirectory = nil
+            cli.sandboxMulticodexHomeDirectory = nil
+            return
+        }
+
+        if let sandboxHome = temporaryAuthSandboxHome?.trimmingCharacters(in: .whitespacesAndNewlines), !sandboxHome.isEmpty {
+            do {
+                try ensureSandboxDirectories(homePath: sandboxHome)
+                cli.sandboxHomeDirectory = sandboxHome
+                cli.sandboxMulticodexHomeDirectory = (sandboxHome as NSString).appendingPathComponent(".config/multicodex")
+                return
+            } catch {
+                setProfileFeedback(message: nil, error: "Could not prepare temporary auth sandbox: \(error.localizedDescription)")
+            }
+        }
+
+        isUsingTemporaryAuthSandbox = false
+        defaults.set(false, forKey: temporaryAuthSandboxEnabledKey)
+        cli.sandboxHomeDirectory = nil
+        cli.sandboxMulticodexHomeDirectory = nil
+    }
+
+    private func prepareFreshTemporaryAuthSandbox() throws -> String {
+        let rootURL = fileManager.temporaryDirectory
+            .appendingPathComponent("multicodex-test-\(UUID().uuidString)", isDirectory: true)
+        try ensureSandboxDirectories(homePath: rootURL.path)
+        return rootURL.path
+    }
+
+    private func ensureSandboxDirectories(homePath: String) throws {
+        let homeURL = URL(fileURLWithPath: homePath, isDirectory: true)
+        let codexURL = homeURL.appendingPathComponent(".codex", isDirectory: true)
+        let multicodexURL = homeURL.appendingPathComponent(".config/multicodex", isDirectory: true)
+        try fileManager.createDirectory(at: homeURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: codexURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: multicodexURL, withIntermediateDirectories: true)
+    }
+
+    private func generateRandomProfileName() -> String {
+        let existing = Set(profiles.map(\.name))
+        for _ in 0..<20 {
+            let random = UUID().uuidString
+                .replacingOccurrences(of: "-", with: "")
+                .lowercased()
+            let candidate = "profile-\(random.prefix(6))"
+            if !existing.contains(candidate) {
+                return candidate
+            }
+        }
+        return "profile-\(Int(Date().timeIntervalSince1970))"
+    }
 }

@@ -3,7 +3,6 @@ import SwiftUI
 struct SettingsContentView: View {
     @ObservedObject var viewModel: UsageMenuViewModel
     @State private var nodePathDraft = ""
-    @State private var newProfileName = ""
     @State private var renameDrafts: [String: String] = [:]
 
     var body: some View {
@@ -17,6 +16,7 @@ struct SettingsContentView: View {
                     profilesCard
                     runtimeCard
                     preferencesCard
+                    testSetupCard
                     diagnosticsCard
                 }
                 .padding(16)
@@ -63,16 +63,14 @@ struct SettingsContentView: View {
                 Text("Profiles & Login")
                     .font(.headline)
 
-                HStack(spacing: 8) {
-                    TextField("new-profile", text: $newProfileName)
-                        .textFieldStyle(.roundedBorder)
-
-                    simpleActionButton("Add", symbol: "plus", prominent: true) {
-                        viewModel.addProfile(named: newProfileName)
-                        newProfileName = ""
-                    }
-                    .disabled(newProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isProfileActionRunning)
+                simpleActionButton("Login New Profile", symbol: "person.crop.circle.badge.plus", prominent: true) {
+                    viewModel.startNewProfileLogin()
                 }
+                .disabled(isProfileActionRunning)
+
+                Text("Starts browser login first, then auto-creates a random profile name. You can rename it below.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 if let message = viewModel.profileActionMessage {
                     feedbackRow(message, color: .green)
@@ -248,6 +246,51 @@ struct SettingsContentView: View {
 
                 simpleActionButton("Open multicodex config directory", symbol: "folder.fill") {
                     viewModel.openMulticodexConfigDirectory()
+                }
+            }
+        }
+    }
+
+    private var testSetupCard: some View {
+        SettingsCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Test Setup")
+                    .font(.headline)
+
+                if viewModel.isUsingTemporaryAuthSandbox {
+                    pill("Temporary Auth Sandbox Active", color: .orange)
+
+                    if let sandbox = viewModel.temporaryAuthSandboxHome, !sandbox.isEmpty {
+                        Text(sandbox)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+
+                    HStack(spacing: 8) {
+                        simpleActionButton("Reset Sandbox", symbol: "arrow.clockwise") {
+                            viewModel.resetTemporaryAuthSandbox()
+                        }
+                        .disabled(isProfileActionRunning)
+
+                        simpleActionButton("Open Folder", symbol: "folder") {
+                            viewModel.openTemporaryAuthSandboxDirectory()
+                        }
+
+                        simpleActionButton("Use Real Setup", symbol: "xmark.circle") {
+                            viewModel.disableTemporaryAuthSandbox()
+                        }
+                        .disabled(isProfileActionRunning)
+                    }
+                } else {
+                    Text("Use an isolated temporary directory for auth and profile data while testing setup.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    simpleActionButton("Use Temporary Sandbox", symbol: "testtube.2", prominent: true) {
+                        viewModel.enableTemporaryAuthSandbox()
+                    }
+                    .disabled(isProfileActionRunning)
                 }
             }
         }

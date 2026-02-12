@@ -13,6 +13,8 @@ final class MultiCodexCLI {
     private let fileManager = FileManager.default
 
     var customNodePath: String?
+    var sandboxHomeDirectory: String?
+    var sandboxMulticodexHomeDirectory: String?
     private(set) var resolutionHint: String?
 
     func fetchAccounts() async throws -> AccountsListPayload {
@@ -90,7 +92,7 @@ final class MultiCodexCLI {
     }
 
     func openLoginInTerminal(account name: String) throws {
-        let command = try makeShellCommand(arguments: ["run", name, "--", "login"])
+        let command = try makeTerminalLoginCommand(account: name)
         let escapedCommand = command
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
@@ -111,6 +113,31 @@ final class MultiCodexCLI {
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             throw MultiCodexCLIError(message: "Could not launch Terminal login session (exit \(process.terminationStatus)).")
+        }
+    }
+
+    func openNewProfileLoginInTerminal(newProfileName name: String) throws {
+        let command = try makeTerminalFirstLoginCommand(newProfileName: name)
+        let escapedCommand = command
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = [
+            "-e", "tell application \"Terminal\" to activate",
+            "-e", "tell application \"Terminal\" to do script \"\(escapedCommand)\"",
+        ]
+
+        do {
+            try process.run()
+        } catch {
+            throw MultiCodexCLIError(message: "Could not open Terminal for new profile login: \(error.localizedDescription)")
+        }
+
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw MultiCodexCLIError(message: "Could not launch Terminal new profile login session (exit \(process.terminationStatus)).")
         }
     }
 
@@ -148,6 +175,7 @@ final class MultiCodexCLI {
             if let existingPath = env["PATH"], !existingPath.contains("/opt/homebrew/bin") {
                 env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + existingPath
             }
+            self.applySandboxEnvironment(to: &env)
             process.environment = env
 
             let stdoutPipe = Pipe()
@@ -197,13 +225,141 @@ final class MultiCodexCLI {
         return parts.map(shellQuote).joined(separator: " ")
     }
 
+    private func makeTerminalLoginCommand(account name: String) throws -> String {
+        let useCommand = try makeShellCommand(arguments: ["accounts", "use", name, "--json"])
+        let importCommand = try makeShellCommand(arguments: ["accounts", "import", name, "--json"])
+        let statusCommand = try makeShellCommand(arguments: ["status", name, "--json"])
+        let appName = shellQuote("MultiCodex")
+        let profileName = shellQuote(name)
+
+        // Use codex login directly in Terminal for a native interactive browser flow.
+        return (terminalPreambleLines() + [
+            "echo \"Starting MultiCodex login flow...\"",
+            "echo \"Profile: \(profileName)\"",
+            "\(useCommand)",
+            "USE_EXIT=$?",
+            "if [ \"$USE_EXIT\" -ne 0 ]; then",
+            "  echo \"Failed to prepare profile before login (exit $USE_EXIT).\"",
+            "  open -a \(appName) >/dev/null 2>&1 || true",
+            "  exit $USE_EXIT",
+            "fi",
+            "codex login",
+            "LOGIN_EXIT=$?",
+            "\(importCommand) || true",
+            "\(statusCommand) || true",
+            "if [ \"$LOGIN_EXIT\" -eq 0 ]; then",
+            "  echo \"Login completed.\"",
+            "else",
+            "  echo \"Login failed (exit $LOGIN_EXIT).\"",
+            "fi",
+            "open -a \(appName) >/dev/null 2>&1 || true",
+            "exit $LOGIN_EXIT",
+        ]).joined(separator: "\n")
+    }
+
+    private func makeTerminalFirstLoginCommand(newProfileName name: String) throws -> String {
+        let addCommand = try makeShellCommand(arguments: ["accounts", "add", name, "--json"])
+        let importCommand = try makeShellCommand(arguments: ["accounts", "import", name, "--json"])
+        let useCommand = try makeShellCommand(arguments: ["accounts", "use", name, "--json"])
+        let statusCommand = try makeShellCommand(arguments: ["status", name, "--json"])
+        let appName = shellQuote("MultiCodex")
+        let profileName = shellQuote(name)
+
+        return (terminalPreambleLines() + [
+            "echo \"Starting first-time MultiCodex login...\"",
+            "echo \"You will be able to rename profile \(profileName) later in Settings.\"",
+            "codex login",
+            "LOGIN_EXIT=$?",
+            "if [ \"$LOGIN_EXIT\" -ne 0 ]; then",
+            "  echo \"Login failed (exit $LOGIN_EXIT).\"",
+            "  open -a \(appName) >/dev/null 2>&1 || true",
+            "  exit $LOGIN_EXIT",
+            "fi",
+            "\(addCommand)",
+            "ADD_EXIT=$?",
+            "if [ \"$ADD_EXIT\" -ne 0 ]; then",
+            "  echo \"Login worked, but profile creation failed (exit $ADD_EXIT).\"",
+            "  open -a \(appName) >/dev/null 2>&1 || true",
+            "  exit $ADD_EXIT",
+            "fi",
+            "\(importCommand)",
+            "IMPORT_EXIT=$?",
+            "if [ \"$IMPORT_EXIT\" -ne 0 ]; then",
+            "  echo \"Profile created, but importing auth failed (exit $IMPORT_EXIT).\"",
+            "  open -a \(appName) >/dev/null 2>&1 || true",
+            "  exit $IMPORT_EXIT",
+            "fi",
+            "\(useCommand)",
+            "USE_EXIT=$?",
+            "if [ \"$USE_EXIT\" -ne 0 ]; then",
+            "  echo \"Profile created, but switching failed (exit $USE_EXIT).\"",
+            "  open -a \(appName) >/dev/null 2>&1 || true",
+            "  exit $USE_EXIT",
+            "fi",
+            "\(statusCommand) || true",
+            "echo \"Login complete. New profile: \(profileName)\"",
+            "open -a \(appName) >/dev/null 2>&1 || true",
+            "exit 0",
+        ]).joined(separator: "\n")
+    }
+
     private func resolveCommand() throws -> ResolvedCommand {
         let resolved = try CLIRuntimeResolver.resolveCommand(
             fileManager: fileManager,
             customNodePath: customNodePath
         )
-        resolutionHint = "Bundled CLI: \(resolved.bundledCLIURL.path) | Node: \(resolved.runtime.display)"
+        var hint = "Bundled CLI: \(resolved.bundledCLIURL.path) | Node: \(resolved.runtime.display)"
+        if let home = sandboxHomeDirectory, !home.isEmpty {
+            hint += " | HOME: \(home)"
+        }
+        if let multicodexHome = sandboxMulticodexHomeDirectory, !multicodexHome.isEmpty {
+            hint += " | MULTICODEX_HOME: \(multicodexHome)"
+        }
+        resolutionHint = hint
         return resolved
+    }
+
+    func effectiveMulticodexHomePath() -> String {
+        if let override = sandboxMulticodexHomeDirectory?.trimmingCharacters(in: .whitespacesAndNewlines), !override.isEmpty {
+            return override
+        }
+        if let envOverride = ProcessInfo.processInfo.environment["MULTICODEX_HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines), !envOverride.isEmpty {
+            return envOverride
+        }
+        let home = effectiveHomeDirectory()
+        return "\(home)/.config/multicodex"
+    }
+
+    private func effectiveHomeDirectory() -> String {
+        if let override = sandboxHomeDirectory?.trimmingCharacters(in: .whitespacesAndNewlines), !override.isEmpty {
+            return override
+        }
+        if let envHome = ProcessInfo.processInfo.environment["HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines), !envHome.isEmpty {
+            return envHome
+        }
+        return NSHomeDirectory()
+    }
+
+    private func applySandboxEnvironment(to env: inout [String: String]) {
+        if let home = sandboxHomeDirectory?.trimmingCharacters(in: .whitespacesAndNewlines), !home.isEmpty {
+            env["HOME"] = home
+        }
+        if let multicodexHome = sandboxMulticodexHomeDirectory?.trimmingCharacters(in: .whitespacesAndNewlines), !multicodexHome.isEmpty {
+            env["MULTICODEX_HOME"] = multicodexHome
+        }
+    }
+
+    private func terminalPreambleLines() -> [String] {
+        var lines = [
+            "export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\"",
+        ]
+        if let home = sandboxHomeDirectory?.trimmingCharacters(in: .whitespacesAndNewlines), !home.isEmpty {
+            lines.append("export HOME=\(shellQuote(home))")
+        }
+        if let multicodexHome = sandboxMulticodexHomeDirectory?.trimmingCharacters(in: .whitespacesAndNewlines), !multicodexHome.isEmpty {
+            lines.append("export MULTICODEX_HOME=\(shellQuote(multicodexHome))")
+        }
+        return lines
     }
 
     private func makeCommandError<T>(from envelope: CommandEnvelope<T>, fallback: String) -> Error {
