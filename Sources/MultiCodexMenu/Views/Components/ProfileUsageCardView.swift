@@ -100,10 +100,14 @@ private struct MinimalMetricView: View {
     let resetDisplayMode: ResetDisplayMode
 
     private var tone: Color {
-        let value = metric.usedPercent ?? 0
-        if value >= 95 { return .red }
-        if value >= 80 { return .orange }
-        return .green
+        switch UsageLevel.from(usedPercent: metric.usedPercent) {
+        case .critical:
+            return .red
+        case .warning:
+            return .orange
+        case .normal:
+            return .green
+        }
     }
 
     var body: some View {

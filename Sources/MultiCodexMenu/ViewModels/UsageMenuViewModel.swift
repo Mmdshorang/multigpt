@@ -20,24 +20,27 @@ final class UsageMenuViewModel: ObservableObject {
     private let cli = MultiCodexCLI()
     private let fileManager = FileManager.default
     private let defaults = UserDefaults.standard
-    private let customNodePathKey = "multicodexMenu.customNodePath"
-    private let legacyCustomExecutableKey = "multicodexMenu.customExecutablePath"
-    private let resetDisplayModeKey = "multicodexMenu.resetDisplayMode"
-    private let temporaryAuthSandboxEnabledKey = "multicodexMenu.temporaryAuthSandboxEnabled"
-    private let temporaryAuthSandboxHomeKey = "multicodexMenu.temporaryAuthSandboxHome"
+
+    private enum DefaultsKey {
+        static let customNodePath = "multicodexMenu.customNodePath"
+        static let legacyCustomExecutablePath = "multicodexMenu.customExecutablePath"
+        static let resetDisplayMode = "multicodexMenu.resetDisplayMode"
+        static let temporaryAuthSandboxEnabled = "multicodexMenu.temporaryAuthSandboxEnabled"
+        static let temporaryAuthSandboxHome = "multicodexMenu.temporaryAuthSandboxHome"
+    }
     private var refreshLoopTask: Task<Void, Never>?
     private var didBecomeActiveObserver: NSObjectProtocol?
     private var pendingInteractiveLoginProfile: String?
 
     init() {
         customNodePath =
-            defaults.string(forKey: customNodePathKey)
-            ?? defaults.string(forKey: legacyCustomExecutableKey)
+            defaults.string(forKey: DefaultsKey.customNodePath)
+            ?? defaults.string(forKey: DefaultsKey.legacyCustomExecutablePath)
             ?? ""
-        let rawResetMode = defaults.string(forKey: resetDisplayModeKey)
+        let rawResetMode = defaults.string(forKey: DefaultsKey.resetDisplayMode)
         resetDisplayMode = ResetDisplayMode(rawValue: rawResetMode ?? "") ?? .relative
-        isUsingTemporaryAuthSandbox = defaults.bool(forKey: temporaryAuthSandboxEnabledKey)
-        temporaryAuthSandboxHome = defaults.string(forKey: temporaryAuthSandboxHomeKey)
+        isUsingTemporaryAuthSandbox = defaults.bool(forKey: DefaultsKey.temporaryAuthSandboxEnabled)
+        temporaryAuthSandboxHome = defaults.string(forKey: DefaultsKey.temporaryAuthSandboxHome)
         cli.customNodePath = customNodePath.isEmpty ? nil : customNodePath
         configureSandboxEnvironment()
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
@@ -80,17 +83,14 @@ final class UsageMenuViewModel: ObservableObject {
             return "exclamationmark.triangle.fill"
         }
 
-        guard let usage = currentProfile?.usage.fiveHour.usedPercent else {
+        switch UsageLevel.from(usedPercent: currentProfile?.usage.fiveHour.usedPercent) {
+        case .critical:
+            return "flame.fill"
+        case .warning:
+            return "gauge.with.dots.needle.67percent"
+        case .normal:
             return "person.2.circle"
         }
-
-        if usage >= 95 {
-            return "flame.fill"
-        }
-        if usage >= 80 {
-            return "gauge.with.dots.needle.67percent"
-        }
-        return "person.2.circle"
     }
 
     var subtitle: String {
@@ -120,7 +120,7 @@ final class UsageMenuViewModel: ObservableObject {
             return
         }
 
-        refresh()
+        triggerRefresh(refreshLive: false)
 
         refreshLoopTask = Task {
             while !Task.isCancelled {
@@ -134,15 +134,11 @@ final class UsageMenuViewModel: ObservableObject {
     }
 
     func refresh() {
-        Task {
-            await performRefresh(refreshLive: false)
-        }
+        triggerRefresh(refreshLive: false)
     }
 
     func refreshLive() {
-        Task {
-            await performRefresh(refreshLive: true)
-        }
+        triggerRefresh(refreshLive: true)
     }
 
     func switchToProfile(named name: String) {
@@ -155,21 +151,12 @@ final class UsageMenuViewModel: ObservableObject {
     }
 
     func startNewProfileLogin() {
-        guard profileActionInFlightName == nil else {
-            return
-        }
-
         let generatedName = generateRandomProfileName()
-        do {
-            try cli.openNewProfileLoginInTerminal(newProfileName: generatedName)
-            pendingInteractiveLoginProfile = generatedName
-            setProfileFeedback(
-                message: "Opened browser login. After sign-in, profile \(generatedName) will appear (you can rename it anytime).",
-                error: nil
-            )
-        } catch {
-            pendingInteractiveLoginProfile = nil
-            setProfileFeedback(message: nil, error: error.localizedDescription)
+        beginInteractiveLogin(
+            profileName: generatedName,
+            successMessage: "Opened browser login. After sign-in, profile \(generatedName) will appear (you can rename it anytime)."
+        ) {
+            try self.cli.openNewProfileLoginInTerminal(newProfileName: generatedName)
         }
     }
 
@@ -210,29 +197,16 @@ final class UsageMenuViewModel: ObservableObject {
     func checkLoginStatus(for name: String) {
         runProfileAction(for: name) {
             let status = try await self.cli.fetchStatus(name: name)
-            let summary = status.output.trimmingCharacters(in: .whitespacesAndNewlines)
-            if status.exitCode == 0 {
-                return .success(summary.isEmpty ? "\(name): login status is OK." : "\(name): \(summary)")
-            }
-            return .failure(summary.isEmpty ? "\(name): login check failed." : "\(name): \(summary)")
+            return self.statusOutcome(for: name, status: status, successFallback: "\(name): login status is OK.")
         }
     }
 
     func openLoginInTerminal(for name: String) {
-        guard profileActionInFlightName == nil else {
-            return
-        }
-
-        do {
-            try cli.openLoginInTerminal(account: name)
-            pendingInteractiveLoginProfile = name
-            setProfileFeedback(
-                message: "Opened Terminal login for \(name). Browser login should start and return you to MultiCodex.",
-                error: nil
-            )
-        } catch {
-            pendingInteractiveLoginProfile = nil
-            setProfileFeedback(message: nil, error: error.localizedDescription)
+        beginInteractiveLogin(
+            profileName: name,
+            successMessage: "Opened Terminal login for \(name). Browser login should start and return you to MultiCodex."
+        ) {
+            try self.cli.openLoginInTerminal(account: name)
         }
     }
 
@@ -243,7 +217,7 @@ final class UsageMenuViewModel: ObservableObject {
     func toggleResetDisplayMode() {
         let nextMode = resetDisplayMode.next
         resetDisplayMode = nextMode
-        defaults.set(nextMode.rawValue, forKey: resetDisplayModeKey)
+        defaults.set(nextMode.rawValue, forKey: DefaultsKey.resetDisplayMode)
     }
 
     func openMulticodexConfigDirectory() {
@@ -256,8 +230,8 @@ final class UsageMenuViewModel: ObservableObject {
             let sandboxHome = try prepareFreshTemporaryAuthSandbox()
             temporaryAuthSandboxHome = sandboxHome
             isUsingTemporaryAuthSandbox = true
-            defaults.set(true, forKey: temporaryAuthSandboxEnabledKey)
-            defaults.set(sandboxHome, forKey: temporaryAuthSandboxHomeKey)
+            defaults.set(true, forKey: DefaultsKey.temporaryAuthSandboxEnabled)
+            defaults.set(sandboxHome, forKey: DefaultsKey.temporaryAuthSandboxHome)
             configureSandboxEnvironment()
             setProfileFeedback(
                 message: "Temporary auth sandbox enabled at \(sandboxHome).",
@@ -275,7 +249,7 @@ final class UsageMenuViewModel: ObservableObject {
 
     func disableTemporaryAuthSandbox() {
         isUsingTemporaryAuthSandbox = false
-        defaults.set(false, forKey: temporaryAuthSandboxEnabledKey)
+        defaults.set(false, forKey: DefaultsKey.temporaryAuthSandboxEnabled)
         configureSandboxEnvironment()
         setProfileFeedback(message: "Temporary auth sandbox disabled. Using your regular setup.", error: nil)
         refreshLive()
@@ -290,11 +264,11 @@ final class UsageMenuViewModel: ObservableObject {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         customNodePath = trimmed
         if trimmed.isEmpty {
-            defaults.removeObject(forKey: customNodePathKey)
-            defaults.removeObject(forKey: legacyCustomExecutableKey)
+            defaults.removeObject(forKey: DefaultsKey.customNodePath)
+            defaults.removeObject(forKey: DefaultsKey.legacyCustomExecutablePath)
             cli.customNodePath = nil
         } else {
-            defaults.set(trimmed, forKey: customNodePathKey)
+            defaults.set(trimmed, forKey: DefaultsKey.customNodePath)
             cli.customNodePath = trimmed
         }
         refresh()
@@ -360,6 +334,43 @@ final class UsageMenuViewModel: ObservableObject {
         profileActionError = error
     }
 
+    private func triggerRefresh(refreshLive: Bool) {
+        Task {
+            await performRefresh(refreshLive: refreshLive)
+        }
+    }
+
+    private func beginInteractiveLogin(
+        profileName: String,
+        successMessage: String,
+        openFlow: () throws -> Void
+    ) {
+        guard profileActionInFlightName == nil else {
+            return
+        }
+
+        do {
+            try openFlow()
+            pendingInteractiveLoginProfile = profileName
+            setProfileFeedback(message: successMessage, error: nil)
+        } catch {
+            pendingInteractiveLoginProfile = nil
+            setProfileFeedback(message: nil, error: error.localizedDescription)
+        }
+    }
+
+    private func statusOutcome(
+        for profileName: String,
+        status: AccountStatusPayload,
+        successFallback: String
+    ) -> ProfileActionOutcome {
+        let summary = status.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        if status.exitCode == 0 {
+            return .success(summary.isEmpty ? successFallback : "\(profileName): \(summary)")
+        }
+        return .failure(summary.isEmpty ? "\(profileName): login check failed." : "\(profileName): \(summary)")
+    }
+
     private func runProfileAction(
         for profileName: String,
         operation: @escaping () async throws -> ProfileActionOutcome
@@ -417,14 +428,11 @@ final class UsageMenuViewModel: ObservableObject {
         runProfileAction(for: pendingProfile) {
             _ = try await self.cli.importDefaultAuth(into: pendingProfile)
             let status = try await self.cli.fetchStatus(name: pendingProfile)
-            let summary = status.output.trimmingCharacters(in: .whitespacesAndNewlines)
-            if status.exitCode == 0 {
-                let message = summary.isEmpty
-                    ? "Login synced to \(pendingProfile). You can rename it anytime."
-                    : "\(pendingProfile): \(summary)"
-                return .success(message)
-            }
-            return .failure(summary.isEmpty ? "\(pendingProfile): login check failed." : "\(pendingProfile): \(summary)")
+            return self.statusOutcome(
+                for: pendingProfile,
+                status: status,
+                successFallback: "Login synced to \(pendingProfile). You can rename it anytime."
+            )
         }
     }
 
@@ -447,7 +455,7 @@ final class UsageMenuViewModel: ObservableObject {
         }
 
         isUsingTemporaryAuthSandbox = false
-        defaults.set(false, forKey: temporaryAuthSandboxEnabledKey)
+        defaults.set(false, forKey: DefaultsKey.temporaryAuthSandboxEnabled)
         cli.sandboxHomeDirectory = nil
         cli.sandboxMulticodexHomeDirectory = nil
     }

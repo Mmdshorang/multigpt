@@ -17,6 +17,25 @@ enum PaceStatus: String {
     }
 }
 
+enum UsageLevel {
+    case normal
+    case warning
+    case critical
+
+    static func from(usedPercent: Double?) -> Self {
+        guard let usedPercent else {
+            return .normal
+        }
+        if usedPercent >= 95 {
+            return .critical
+        }
+        if usedPercent >= 80 {
+            return .warning
+        }
+        return .normal
+    }
+}
+
 enum ResetDisplayMode: String, CaseIterable {
     case relative
     case absolute

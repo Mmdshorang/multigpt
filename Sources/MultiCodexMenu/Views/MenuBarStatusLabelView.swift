@@ -32,13 +32,14 @@ private struct TrayMinimalStatusIconView: View {
         if hasError {
             return .orange
         }
-        if severityFraction >= 0.95 {
+        switch UsageLevel.from(usedPercent: severityFraction * 100) {
+        case .critical:
             return .red
-        }
-        if severityFraction >= 0.8 {
+        case .warning:
             return .orange
+        case .normal:
+            return .secondary
         }
-        return .secondary
     }
 
     var body: some View {

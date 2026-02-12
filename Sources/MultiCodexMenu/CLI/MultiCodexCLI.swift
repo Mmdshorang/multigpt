@@ -3,12 +3,16 @@ import Foundation
 
 final class MultiCodexCLI {
     static let limitsCacheTTLSeconds = 300
+    private static let nowFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 
     private struct ProcessResult {
         let exitCode: Int32
         let stdout: String
         let stderr: String
-        let commandDisplay: String
     }
 
     private struct NativeConfig {
@@ -60,6 +64,11 @@ final class MultiCodexCLI {
         let display: String
     }
 
+    private enum ExistingAccountBehavior {
+        case ignore
+        case fail
+    }
+
     private struct PathContext {
         let homeDir: String
         let multicodexHome: String
@@ -102,11 +111,11 @@ final class MultiCodexCLI {
     }
 
     func fetchAccounts() async throws -> AccountsListPayload {
-        return try fetchAccountsNow()
+        try fetchAccountsNow()
     }
 
     func fetchLimits(refreshLive: Bool) async throws -> LimitsPayload {
-        return try fetchLimitsNow(refreshLive: refreshLive)
+        try fetchLimitsNow(refreshLive: refreshLive)
     }
 
     func switchAccount(name: String) async throws {
@@ -114,23 +123,23 @@ final class MultiCodexCLI {
     }
 
     func addAccount(name: String) async throws -> AddAccountPayload {
-        return try addAccountNow(name: name)
+        try addAccountNow(name: name)
     }
 
     func removeAccount(name: String, deleteData: Bool) async throws -> RemoveAccountPayload {
-        return try removeAccountNow(name: name, deleteData: deleteData)
+        try removeAccountNow(name: name, deleteData: deleteData)
     }
 
     func renameAccount(from oldName: String, to newName: String) async throws -> RenameAccountPayload {
-        return try renameAccountNow(from: oldName, to: newName)
+        try renameAccountNow(from: oldName, to: newName)
     }
 
     func importDefaultAuth(into name: String) async throws -> ImportAccountPayload {
-        return try importDefaultAuthNow(into: name)
+        try importDefaultAuthNow(into: name)
     }
 
     func fetchStatus(name: String) async throws -> AccountStatusPayload {
-        return try fetchStatusNow(name: name)
+        try fetchStatusNow(name: name)
     }
 
     func openLoginInTerminal(account name: String) throws {
@@ -147,7 +156,7 @@ final class MultiCodexCLI {
     }
 
     func effectiveMulticodexHomePath() -> String {
-        return currentPaths().multicodexHome
+        currentPaths().multicodexHome
     }
 
     // MARK: - Accounts
@@ -173,39 +182,23 @@ final class MultiCodexCLI {
     }
 
     private func addAccountIfNeededNow(name: String) throws -> AddAccountPayload {
-        let account = normalizeAccountName(name)
-        guard isValidAccountName(account) else {
-            throw MultiCodexCLIError(message: "Invalid account name. Use letters, numbers, underscore, or dash.")
-        }
-
-        let paths = currentPaths()
-        var config = try loadConfig(paths: paths)
-        if config.accounts.contains(account) {
-            return AddAccountPayload(account: account, currentAccount: config.currentAccount)
-        }
-
-        try createDirectory(path: paths.accountDir(account), mode: 0o700)
-        _ = try ensureAccountMeta(account: account, paths: paths)
-
-        config.accounts.insert(account)
-        if config.currentAccount == nil {
-            config.currentAccount = account
-        }
-        try saveConfig(config, paths: paths)
-
-        return AddAccountPayload(account: account, currentAccount: config.currentAccount)
+        try addAccountCore(name: name, onExisting: .ignore)
     }
 
     private func addAccountNow(name: String) throws -> AddAccountPayload {
-        let account = normalizeAccountName(name)
-        guard isValidAccountName(account) else {
-            throw MultiCodexCLIError(message: "Invalid account name. Use letters, numbers, underscore, or dash.")
-        }
+        try addAccountCore(name: name, onExisting: .fail)
+    }
 
+    private func addAccountCore(name: String, onExisting: ExistingAccountBehavior) throws -> AddAccountPayload {
+        let account = try validatedAccountName(name)
         let paths = currentPaths()
         var config = try loadConfig(paths: paths)
+
         if config.accounts.contains(account) {
-            throw MultiCodexCLIError(message: "Account already exists: \(account)")
+            if onExisting == .fail {
+                throw MultiCodexCLIError(message: "Account already exists: \(account)")
+            }
+            return AddAccountPayload(account: account, currentAccount: config.currentAccount)
         }
 
         try createDirectory(path: paths.accountDir(account), mode: 0o700)
@@ -265,11 +258,7 @@ final class MultiCodexCLI {
 
     private func renameAccountNow(from oldName: String, to newName: String) throws -> RenameAccountPayload {
         let source = normalizeAccountName(oldName)
-        let target = normalizeAccountName(newName)
-
-        guard isValidAccountName(target) else {
-            throw MultiCodexCLIError(message: "Invalid account name. Use letters, numbers, underscore, or dash.")
-        }
+        let target = try validatedAccountName(newName)
 
         let paths = currentPaths()
         var config = try loadConfig(paths: paths)
@@ -688,8 +677,7 @@ final class MultiCodexCLI {
         return ProcessResult(
             exitCode: process.terminationStatus,
             stdout: stdout,
-            stderr: stderr,
-            commandDisplay: ([runtime.display] + arguments).joined(separator: " ")
+            stderr: stderr
         )
     }
 
@@ -726,23 +714,17 @@ final class MultiCodexCLI {
     // MARK: - Config, paths, files
 
     private func currentPaths() -> PathContext {
-        let home: String
-        if let override = sandboxHomeDirectory?.trimmingCharacters(in: .whitespacesAndNewlines), !override.isEmpty {
-            home = override
-        } else if let envHome = ProcessInfo.processInfo.environment["HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines), !envHome.isEmpty {
-            home = envHome
-        } else {
-            home = NSHomeDirectory()
-        }
-
-        let multicodexHome: String
-        if let override = sandboxMulticodexHomeDirectory?.trimmingCharacters(in: .whitespacesAndNewlines), !override.isEmpty {
-            multicodexHome = override
-        } else if let envOverride = ProcessInfo.processInfo.environment["MULTICODEX_HOME"]?.trimmingCharacters(in: .whitespacesAndNewlines), !envOverride.isEmpty {
-            multicodexHome = envOverride
-        } else {
-            multicodexHome = (home as NSString).appendingPathComponent(".config/multicodex")
-        }
+        let processEnvironment = ProcessInfo.processInfo.environment
+        let home = firstNonEmptyPath(
+            fallback: NSHomeDirectory(),
+            sandboxHomeDirectory,
+            processEnvironment["HOME"]
+        )
+        let multicodexHome = firstNonEmptyPath(
+            fallback: (home as NSString).appendingPathComponent(".config/multicodex"),
+            sandboxMulticodexHomeDirectory,
+            processEnvironment["MULTICODEX_HOME"]
+        )
 
         return PathContext(homeDir: home, multicodexHome: multicodexHome)
     }
@@ -756,13 +738,7 @@ final class MultiCodexCLI {
             return NativeConfig(currentAccount: nil, accounts: [])
         }
 
-        if let version = json["version"] as? Int, version == 2 {
-            let current = json["currentAccount"] as? String
-            let accountObjects = json["accounts"] as? [String: Any] ?? [:]
-            return NativeConfig(currentAccount: current, accounts: Set(accountObjects.keys))
-        }
-
-        if let version = json["version"] as? Int, version == 1 {
+        if let version = json["version"] as? Int, (version == 1 || version == 2) {
             let current = json["currentAccount"] as? String
             let accountObjects = json["accounts"] as? [String: Any] ?? [:]
             return NativeConfig(currentAccount: current, accounts: Set(accountObjects.keys))
@@ -801,7 +777,9 @@ final class MultiCodexCLI {
         }
 
         let tmp = "\(path).tmp.\(UUID().uuidString)"
-        fileManager.createFile(atPath: tmp, contents: data)
+        guard fileManager.createFile(atPath: tmp, contents: data) else {
+            throw MultiCodexCLIError(message: "Could not create temporary file at \(tmp).")
+        }
         try fileManager.setAttributes([.posixPermissions: NSNumber(value: mode)], ofItemAtPath: tmp)
 
         if fileManager.fileExists(atPath: path) {
@@ -814,6 +792,15 @@ final class MultiCodexCLI {
         if fileManager.fileExists(atPath: path) {
             try fileManager.removeItem(atPath: path)
         }
+    }
+
+    private func firstNonEmptyPath(fallback: String, _ values: String?...) -> String {
+        for value in values {
+            if let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+        return fallback
     }
 
     // MARK: - Meta
@@ -926,25 +913,20 @@ final class MultiCodexCLI {
         let previousAuth = restorePreviousAuth ? readFileIfExists(defaultAuthPath) : nil
 
         try setDefaultAuthFromAccount(account: account, paths: paths)
+        let restoreDefaultAuth = {
+            try self.restoreDefaultAuth(previousAuth, defaultAuthPath: defaultAuthPath)
+        }
 
         do {
             let result = try body()
             try snapshotDefaultAuthToAccount(account: account, paths: paths)
             if restorePreviousAuth {
-                if let previousAuth {
-                    try writeFileAtomic(data: previousAuth, path: defaultAuthPath, mode: 0o600)
-                } else {
-                    try deleteFileIfExists(defaultAuthPath)
-                }
+                try restoreDefaultAuth()
             }
             return result
         } catch {
             if restorePreviousAuth {
-                if let previousAuth {
-                    try? writeFileAtomic(data: previousAuth, path: defaultAuthPath, mode: 0o600)
-                } else {
-                    try? deleteFileIfExists(defaultAuthPath)
-                }
+                try? restoreDefaultAuth()
             }
             throw error
         }
@@ -957,25 +939,33 @@ final class MultiCodexCLI {
     }
 
     private func setDefaultAuthFromAccount(account: String, paths: PathContext) throws {
-        let src = paths.accountAuthPath(account)
-        let dest = paths.defaultCodexAuthPath
-
-        if let data = readFileIfExists(src) {
-            try writeFileAtomic(data: data, path: dest, mode: 0o600)
-        } else {
-            try deleteFileIfExists(dest)
-        }
+        try syncAuthFile(from: paths.accountAuthPath(account), to: paths.defaultCodexAuthPath)
     }
 
     private func snapshotDefaultAuthToAccount(account: String, paths: PathContext) throws {
-        let src = paths.defaultCodexAuthPath
-        let dest = paths.accountAuthPath(account)
+        try syncAuthFile(
+            from: paths.defaultCodexAuthPath,
+            to: paths.accountAuthPath(account),
+            destinationDirectory: paths.accountDir(account)
+        )
+    }
 
-        if let data = readFileIfExists(src) {
-            try createDirectory(path: paths.accountDir(account), mode: 0o700)
-            try writeFileAtomic(data: data, path: dest, mode: 0o600)
+    private func restoreDefaultAuth(_ previousAuth: Data?, defaultAuthPath: String) throws {
+        if let previousAuth {
+            try writeFileAtomic(data: previousAuth, path: defaultAuthPath, mode: 0o600)
         } else {
-            try deleteFileIfExists(dest)
+            try deleteFileIfExists(defaultAuthPath)
+        }
+    }
+
+    private func syncAuthFile(from source: String, to destination: String, destinationDirectory: String? = nil) throws {
+        if let data = readFileIfExists(source) {
+            if let destinationDirectory {
+                try createDirectory(path: destinationDirectory, mode: 0o700)
+            }
+            try writeFileAtomic(data: data, path: destination, mode: 0o600)
+        } else {
+            try deleteFileIfExists(destination)
         }
     }
 
@@ -1020,7 +1010,15 @@ final class MultiCodexCLI {
     // MARK: - Utils
 
     private static func nowISO() -> String {
-        ISO8601DateFormatter().string(from: Date())
+        nowFormatter.string(from: Date())
+    }
+
+    private func validatedAccountName(_ name: String) throws -> String {
+        let account = normalizeAccountName(name)
+        guard isValidAccountName(account) else {
+            throw MultiCodexCLIError(message: "Invalid account name. Use letters, numbers, underscore, or dash.")
+        }
+        return account
     }
 
     private func normalizeAccountName(_ name: String) -> String {

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsContentView: View {
     @ObservedObject var viewModel: UsageMenuViewModel
-    @State private var nodePathDraft = ""
+    @State private var codexPathDraft = ""
     @State private var renameDrafts: [String: String] = [:]
 
     var body: some View {
@@ -25,10 +25,10 @@ struct SettingsContentView: View {
             .scrollIndicators(.hidden)
         }
         .onAppear {
-            nodePathDraft = viewModel.customNodePath
+            codexPathDraft = viewModel.customNodePath
             syncRenameDrafts()
         }
-        .onChange(of: viewModel.customNodePath) { nodePathDraft = $0 }
+        .onChange(of: viewModel.customNodePath) { codexPathDraft = $0 }
         .onChange(of: viewModel.profiles.map(\.name)) { _ in
             syncRenameDrafts()
         }
@@ -181,21 +181,21 @@ struct SettingsContentView: View {
                 Text("Codex Runtime")
                     .font(.headline)
 
-                TextField("/opt/homebrew/bin/codex", text: $nodePathDraft)
+                TextField("/opt/homebrew/bin/codex", text: $codexPathDraft)
                     .textFieldStyle(.roundedBorder)
 
                 HStack(spacing: 8) {
                     simpleActionButton("Save", symbol: "checkmark", prominent: true) {
-                        viewModel.updateCustomNodePath(nodePathDraft)
+                        viewModel.updateCustomNodePath(codexPathDraft)
                     }
-                    .disabled(normalized(nodePathDraft) == viewModel.customNodePath)
+                    .disabled(normalized(codexPathDraft) == viewModel.customNodePath)
 
                     simpleActionButton("Choose", symbol: "folder") {
                         viewModel.chooseCustomNodePath()
                     }
 
                     simpleActionButton("Use Auto", symbol: "sparkles") {
-                        nodePathDraft = ""
+                        codexPathDraft = ""
                         viewModel.clearCustomNodePath()
                     }
                     .disabled(viewModel.customNodePath.isEmpty)
