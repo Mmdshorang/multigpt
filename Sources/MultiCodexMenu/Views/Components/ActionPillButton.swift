@@ -10,18 +10,22 @@ struct ActionPillButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: symbol)
-                .font(.caption.weight(.semibold))
+                .font(.caption.weight(.bold))
                 .labelStyle(.titleAndIcon)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(prominent ? Color.accentColor.opacity(0.9) : Color.secondary.opacity(0.14))
+                        .fill(prominent ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(prominent ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.25), lineWidth: 1)
                 )
                 .foregroundStyle(prominent ? Color.white : Color.primary)
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
-        .opacity(isDisabled ? 0.7 : 1)
+        .opacity(isDisabled ? 0.55 : 1)
     }
 }

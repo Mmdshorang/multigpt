@@ -27,6 +27,7 @@ final class UsageMenuViewModel: ObservableObject {
     private let temporaryAuthSandboxHomeKey = "multicodexMenu.temporaryAuthSandboxHome"
     private var refreshLoopTask: Task<Void, Never>?
     private var didBecomeActiveObserver: NSObjectProtocol?
+    private var pendingInteractiveLoginProfile: String?
 
     init() {
         customNodePath =
@@ -45,7 +46,7 @@ final class UsageMenuViewModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.refreshLive()
+                self?.handleDidBecomeActive()
             }
         }
         start()
@@ -161,11 +162,13 @@ final class UsageMenuViewModel: ObservableObject {
         let generatedName = generateRandomProfileName()
         do {
             try cli.openNewProfileLoginInTerminal(newProfileName: generatedName)
+            pendingInteractiveLoginProfile = generatedName
             setProfileFeedback(
                 message: "Opened browser login. After sign-in, profile \(generatedName) will appear (you can rename it anytime).",
                 error: nil
             )
         } catch {
+            pendingInteractiveLoginProfile = nil
             setProfileFeedback(message: nil, error: error.localizedDescription)
         }
     }
@@ -222,11 +225,13 @@ final class UsageMenuViewModel: ObservableObject {
 
         do {
             try cli.openLoginInTerminal(account: name)
+            pendingInteractiveLoginProfile = name
             setProfileFeedback(
                 message: "Opened Terminal login for \(name). Browser login should start and return you to MultiCodex.",
                 error: nil
             )
         } catch {
+            pendingInteractiveLoginProfile = nil
             setProfileFeedback(message: nil, error: error.localizedDescription)
         }
     }
@@ -305,7 +310,7 @@ final class UsageMenuViewModel: ObservableObject {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.prompt = "Use"
-        panel.message = "Choose the Node executable"
+        panel.message = "Choose the codex executable"
 
         if panel.runModal() == .OK, let path = panel.url?.path {
             updateCustomNodePath(path)
@@ -313,6 +318,10 @@ final class UsageMenuViewModel: ObservableObject {
     }
 
     private func performRefresh(refreshLive: Bool) async {
+        if pendingInteractiveLoginProfile != nil {
+            return
+        }
+
         if isRefreshing {
             return
         }
@@ -395,6 +404,27 @@ final class UsageMenuViewModel: ObservableObject {
                 lastRefreshError = error.localizedDescription
                 cliResolutionHint = cli.resolutionHint
             }
+        }
+    }
+
+    private func handleDidBecomeActive() {
+        guard let pendingProfile = pendingInteractiveLoginProfile else {
+            refreshLive()
+            return
+        }
+
+        pendingInteractiveLoginProfile = nil
+        runProfileAction(for: pendingProfile) {
+            _ = try await self.cli.importDefaultAuth(into: pendingProfile)
+            let status = try await self.cli.fetchStatus(name: pendingProfile)
+            let summary = status.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            if status.exitCode == 0 {
+                let message = summary.isEmpty
+                    ? "Login synced to \(pendingProfile). You can rename it anytime."
+                    : "\(pendingProfile): \(summary)"
+                return .success(message)
+            }
+            return .failure(summary.isEmpty ? "\(pendingProfile): login check failed." : "\(pendingProfile): \(summary)")
         }
     }
 

@@ -178,10 +178,10 @@ struct SettingsContentView: View {
     private var runtimeCard: some View {
         SettingsCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Node Runtime")
+                Text("Codex Runtime")
                     .font(.headline)
 
-                TextField("/opt/homebrew/bin/node", text: $nodePathDraft)
+                TextField("/opt/homebrew/bin/codex", text: $nodePathDraft)
                     .textFieldStyle(.roundedBorder)
 
                 HStack(spacing: 8) {
@@ -201,7 +201,11 @@ struct SettingsContentView: View {
                     .disabled(viewModel.customNodePath.isEmpty)
                 }
 
-                Text("Leave empty to auto-detect Node from env vars, standard install paths, or PATH.")
+                Text("Leave empty to auto-detect codex from standard install paths or PATH.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("Set this only if codex is not found. You can use a full path or command name.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

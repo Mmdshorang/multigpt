@@ -1,6 +1,6 @@
 import Foundation
 
-struct CommandEnvelope<T: Decodable>: Decodable {
+struct CommandEnvelope<T: Codable>: Codable {
     let schemaVersion: Int?
     let command: String?
     let ok: Bool
@@ -8,17 +8,17 @@ struct CommandEnvelope<T: Decodable>: Decodable {
     let error: CommandErrorPayload?
 }
 
-struct CommandErrorPayload: Decodable {
+struct CommandErrorPayload: Codable {
     let message: String
     let code: String?
 }
 
-struct AccountsListPayload: Decodable {
+struct AccountsListPayload: Codable {
     let accounts: [AccountEntry]
     let currentAccount: String?
 }
 
-struct AccountEntry: Decodable, Identifiable {
+struct AccountEntry: Codable, Identifiable {
     let name: String
     let isCurrent: Bool
     let hasAuth: Bool
@@ -28,66 +28,66 @@ struct AccountEntry: Decodable, Identifiable {
     var id: String { name }
 }
 
-struct LimitsPayload: Decodable {
+struct LimitsPayload: Codable {
     let results: [LimitsResult]
     let errors: [LimitsErrorEntry]
 }
 
-struct LimitsResult: Decodable {
+struct LimitsResult: Codable {
     let account: String
     let source: String
     let snapshot: RateLimitSnapshot?
     let ageSec: Int?
 }
 
-struct LimitsErrorEntry: Decodable {
+struct LimitsErrorEntry: Codable {
     let account: String
     let message: String
 }
 
-struct RateLimitSnapshot: Decodable {
+struct RateLimitSnapshot: Codable {
     let primary: RateLimitWindow?
     let secondary: RateLimitWindow?
     let credits: CreditsSnapshot?
 }
 
-struct RateLimitWindow: Decodable, Equatable {
+struct RateLimitWindow: Codable, Equatable {
     let usedPercent: Double?
     let windowDurationMins: Int?
     let resetsAt: Double?
 }
 
-struct CreditsSnapshot: Decodable {
+struct CreditsSnapshot: Codable {
     let hasCredits: Bool?
     let unlimited: Bool?
     let balance: String?
 }
 
-struct SwitchAccountPayload: Decodable {
+struct SwitchAccountPayload: Codable {
     let currentAccount: String
 }
 
-struct AddAccountPayload: Decodable {
+struct AddAccountPayload: Codable {
     let account: String
     let currentAccount: String?
 }
 
-struct RemoveAccountPayload: Decodable {
+struct RemoveAccountPayload: Codable {
     let removedAccount: String
     let currentAccount: String?
 }
 
-struct RenameAccountPayload: Decodable {
+struct RenameAccountPayload: Codable {
     let from: String
     let to: String
     let currentAccount: String?
 }
 
-struct ImportAccountPayload: Decodable {
+struct ImportAccountPayload: Codable {
     let account: String
 }
 
-struct AccountStatusPayload: Decodable {
+struct AccountStatusPayload: Codable {
     let account: String
     let exitCode: Int
     let stdout: String

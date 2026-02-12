@@ -10,13 +10,6 @@ xcuserdata/
 build/
 *.dmg
 
-# Node / Bun
-node_modules/
-bun.lockb
-
-# Embedded generated CLI resource
-Sources/MultiCodexMenu/Resources/multicodex-cli.js
-
 # OS / editor
 .DS_Store
 .vscode/

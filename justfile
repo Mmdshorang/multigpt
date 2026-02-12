@@ -13,18 +13,15 @@ app_icon_icns := "Assets/AppIcon.icns"
 
 _bundle configuration:
     if [[ "{{configuration}}" != "debug" && "{{configuration}}" != "release" ]]; then echo "Invalid configuration: {{configuration}} (use debug|release)"; exit 2; fi
-    bun run sync:cli
     swift build -c "{{configuration}}"
     if [[ ! -x ".build/{{configuration}}/{{app_name}}" ]]; then echo "Expected executable not found: .build/{{configuration}}/{{app_name}}"; exit 1; fi
-    if [[ ! -d ".build/{{configuration}}/{{resource_bundle}}" ]]; then echo "Expected resource bundle not found: .build/{{configuration}}/{{resource_bundle}}"; exit 1; fi
     if [[ ! -f "{{app_icon_icns}}" ]]; then echo "Expected icon not found: {{app_icon_icns}}"; exit 1; fi
     mkdir -p "{{app_bundle}}/Contents/MacOS" "{{app_bundle}}/Contents/Resources"
     if [[ -d "{{app_bundle}}/Contents/MacOS" ]]; then find "{{app_bundle}}/Contents/MacOS" -mindepth 1 -delete; fi
     if [[ -d "{{app_bundle}}/Contents/Resources" ]]; then find "{{app_bundle}}/Contents/Resources" -mindepth 1 -delete; fi
     cp ".build/{{configuration}}/{{app_name}}" "{{app_bundle}}/Contents/MacOS/{{app_name}}"
     chmod +x "{{app_bundle}}/Contents/MacOS/{{app_name}}"
-    if [[ -d "{{app_bundle}}/{{resource_bundle}}" ]]; then find "{{app_bundle}}/{{resource_bundle}}" -mindepth 1 -delete; fi
-    ditto ".build/{{configuration}}/{{resource_bundle}}" "{{app_bundle}}/{{resource_bundle}}"
+    if [[ -d ".build/{{configuration}}/{{resource_bundle}}" ]]; then if [[ -d "{{app_bundle}}/{{resource_bundle}}" ]]; then find "{{app_bundle}}/{{resource_bundle}}" -mindepth 1 -delete; fi; ditto ".build/{{configuration}}/{{resource_bundle}}" "{{app_bundle}}/{{resource_bundle}}"; fi
     rm -f "{{app_bundle}}/Contents/Info.plist"
     printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">' '<plist version="1.0"><dict/></plist>' > "{{app_bundle}}/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string en" "{{app_bundle}}/Contents/Info.plist"
@@ -49,7 +46,7 @@ list:
     @echo "  just dev               Build + run debug app"
     @echo "  just dmg               Build release DMG"
     @echo "  just ci                Local CI checks"
-    @echo "  just doctor            Verify toolchain and bundled CLI"
+    @echo "  just doctor            Verify toolchain and codex runtime"
     @echo "  just release minor     Create/push v tag"
     @echo "  just kickoff-release   Patch bump + release tag"
     @echo "  just icons             Regenerate app icon (.icns)"
@@ -57,12 +54,9 @@ list:
 
 doctor:
     swift --version
-    bun --version
-    if command -v node >/dev/null 2>&1; then node --version; else echo "node not found in PATH (required at runtime)"; fi
-    bun run sync:cli
-    test -f Sources/MultiCodexMenu/Resources/multicodex-cli.js
+    if command -v codex >/dev/null 2>&1; then codex --version; else echo "codex not found in PATH (required at runtime)"; fi
     test -f "{{app_icon_icns}}"
-    @echo "doctor: bundled CLI resource is ready"
+    @echo "doctor: runtime checks passed"
 
 icons:
     bash scripts/generate-app-icon.sh "{{app_iconset}}" "{{app_icon_icns}}"
@@ -85,8 +79,7 @@ dmg:
 ci:
     just doctor
     swift build -c debug
-    bun run test
-    bun run typecheck
+    if [[ -d "Tests" ]]; then swift test; else echo "ci: no Swift tests found"; fi
 
 clean:
     swift package clean || true

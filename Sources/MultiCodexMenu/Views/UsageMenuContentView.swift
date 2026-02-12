@@ -7,23 +7,37 @@ struct UsageMenuContentView: View {
     private let maxVisibleProfiles = 6
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            header
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.08),
+                    Color(nsColor: .windowBackgroundColor),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
 
-            if let current = viewModel.currentProfile {
-                currentStrip(profile: current)
+            VStack(alignment: .leading, spacing: 10) {
+                header
+
+                if viewModel.isUsingTemporaryAuthSandbox {
+                    sandboxBanner
+                }
+
+                if let current = viewModel.currentProfile {
+                    currentStrip(profile: current)
+                }
+
+                if let error = viewModel.lastRefreshError {
+                    errorBanner(message: error)
+                }
+
+                profilesList
+
+                footer
             }
-
-            if let error = viewModel.lastRefreshError {
-                errorBanner(message: error)
-            }
-
-            profilesList
-
-            footer
+            .padding(12)
         }
-        .padding(12)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var header: some View {
@@ -111,6 +125,12 @@ struct UsageMenuContentView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
+            Button("Login New") {
+                viewModel.startNewProfileLogin()
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+
             Button(viewModel.resetDisplayMode.buttonLabel) {
                 viewModel.toggleResetDisplayMode()
             }
@@ -131,6 +151,16 @@ struct UsageMenuContentView: View {
             .buttonStyle(.plain)
             .font(.caption)
         }
+    }
+
+    private var sandboxBanner: some View {
+        Label("Temporary auth sandbox active", systemImage: "testtube.2")
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func errorBanner(message: String) -> some View {

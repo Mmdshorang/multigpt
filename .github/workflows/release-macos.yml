@@ -32,9 +32,6 @@ jobs:
         with:
           xcode-version: latest
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
       - name: Install just
         run: brew install just
 
@@ -42,7 +39,7 @@ jobs:
         run: |
           xcodebuild -version
           swift --version
-          bun --version
+          if command -v codex >/dev/null 2>&1; then codex --version; fi
 
       - name: Validate tag format
         run: |

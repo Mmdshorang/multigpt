@@ -10,5 +10,5 @@ Native menu bar app release.
 
 ### Notes
 
-- This build fetches the latest `multicodex` CLI release source from GitHub and bundles `dist/cli.js` into the app.
-- Node.js must be available on the target machine.
+- This build runs a native Swift core (no bundled JavaScript CLI runtime).
+- `codex` must be available on the target machine.

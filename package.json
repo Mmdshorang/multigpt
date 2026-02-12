@@ -4,10 +4,9 @@
   "version": "0.1.0",
   "description": "Native macOS menu bar app for multicodex",
   "scripts": {
-    "sync:cli": "bash ./scripts/fetch-cli-from-github.sh",
-    "build": "bun run sync:cli && swift build",
-    "typecheck": "bun run sync:cli && swift build",
-    "test": "bun run sync:cli && swift build",
-    "dev": "bun run sync:cli && swift run MultiCodex"
+    "build": "swift build",
+    "typecheck": "swift build",
+    "test": "swift build",
+    "dev": "swift run MultiCodex"
   }
 }
