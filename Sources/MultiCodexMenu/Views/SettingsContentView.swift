@@ -4,6 +4,16 @@ struct SettingsContentView: View {
     @ObservedObject var viewModel: UsageMenuViewModel
     @State private var codexPathDraft = ""
     @State private var renameDrafts: [String: String] = [:]
+    @State private var selectedTab: SettingsTab = .profiles
+    @State private var isDiagnosticsExpanded = false
+
+    private enum SettingsTab: String, CaseIterable, Identifiable {
+        case profiles = "Profiles"
+        case runtime = "Runtime"
+        case advanced = "Advanced"
+
+        var id: String { rawValue }
+    }
 
     var body: some View {
         ZStack {
@@ -13,13 +23,8 @@ struct SettingsContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     headerCard
-                    profilesCard
-                    runtimeCard
-                    preferencesCard
-#if DEBUG
-                    testSetupCard
-#endif
-                    diagnosticsCard
+                    tabSelector
+                    tabContent
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -42,7 +47,7 @@ struct SettingsContentView: View {
                 Text("Settings")
                     .font(.title3.weight(.semibold))
 
-                Text("Manage profiles, login flow, runtime path, and usage preferences.")
+                Text("Manage profiles, runtime setup, and advanced troubleshooting.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -59,20 +64,41 @@ struct SettingsContentView: View {
         }
     }
 
+    private var tabSelector: some View {
+        Picker("Settings Tab", selection: $selectedTab) {
+            ForEach(SettingsTab.allCases) { tab in
+                Text(tab.rawValue).tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .profiles:
+            profilesCard
+        case .runtime:
+            runtimeCard
+            preferencesCard
+        case .advanced:
+            diagnosticsCard
+#if DEBUG
+            testSetupCard
+#endif
+        }
+    }
+
     private var profilesCard: some View {
         SettingsCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Profiles & Login")
+                Text("Profiles")
                     .font(.headline)
 
                 simpleActionButton("Login New Profile", symbol: "person.crop.circle.badge.plus", prominent: true) {
                     viewModel.startNewProfileLogin()
                 }
                 .disabled(isProfileActionRunning)
-
-                Text("Start browser login, then rename the created profile if needed.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
 
                 if let message = viewModel.profileActionMessage {
                     feedbackRow(message, color: .green)
@@ -83,10 +109,7 @@ struct SettingsContentView: View {
                 }
 
                 if viewModel.profiles.isEmpty {
-                    Text("No profiles configured.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
+                    emptyProfilesOnboarding
                 } else {
                     VStack(spacing: 8) {
                         ForEach(viewModel.profiles) { profile in
@@ -98,6 +121,28 @@ struct SettingsContentView: View {
         }
     }
 
+    private var emptyProfilesOnboarding: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("No profiles yet", systemImage: "person.crop.circle.badge.plus")
+                .font(.caption.weight(.semibold))
+
+            Text("Use “Login New Profile” to connect your first account.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 6) {
+                Image(systemName: runtimeStatusSymbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(runtimeStatusColor)
+                Text(runtimeStatusText)
+                    .font(.caption2)
+                    .foregroundStyle(viewModel.isCodexRuntimeAvailable ? .secondary : runtimeStatusColor)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
     private func profileRow(_ profile: ProfileUsage) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -107,9 +152,7 @@ struct SettingsContentView: View {
                 if profile.isCurrent {
                     pill("Current", color: .accentColor)
                 }
-                if !profile.hasAuth {
-                    pill("No auth", color: .orange)
-                }
+                pill(profile.connectionState.label, color: statusColor(for: profile.connectionState))
 
                 Spacer(minLength: 8)
 
@@ -127,7 +170,11 @@ struct SettingsContentView: View {
                     .disabled(isProfileActionRunning)
                 }
 
-                simpleActionButton(profile.hasAuth ? "Login" : "Re-login", symbol: "person.crop.circle.badge.plus", prominent: !profile.hasAuth) {
+                simpleActionButton(
+                    profile.connectionState == .needsLogin ? "Re-login" : "Login",
+                    symbol: "person.crop.circle.badge.plus",
+                    prominent: profile.connectionState == .needsLogin
+                ) {
                     viewModel.openLoginInTerminal(for: profile.name)
                 }
                 .disabled(isProfileActionRunning)
@@ -140,16 +187,6 @@ struct SettingsContentView: View {
                 Menu("More") {
                     Button("Import current auth") {
                         viewModel.importCurrentAuth(into: profile.name)
-                    }
-
-                    Divider()
-
-                    Button("Remove profile", role: .destructive) {
-                        viewModel.removeProfile(named: profile.name, deleteData: false)
-                    }
-
-                    Button("Remove + delete data", role: .destructive) {
-                        viewModel.removeProfile(named: profile.name, deleteData: true)
                     }
                 }
                 .disabled(isProfileActionRunning)
@@ -165,22 +202,53 @@ struct SettingsContentView: View {
                 .disabled(cannotRename(profile.name) || isProfileActionRunning)
             }
 
-            if let status = profile.lastLoginStatusPreview {
-                Text(status)
+            if let hint = profile.connectionHint {
+                Text(hint)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(statusColor(for: profile.connectionState))
                     .lineLimit(2)
             }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Danger Zone", systemImage: "exclamationmark.triangle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.red)
+
+                Text("These actions are permanent and cannot be undone.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 8) {
+                    Button("Remove profile", role: .destructive) {
+                        viewModel.removeProfile(named: profile.name, deleteData: false)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Button("Remove + delete data", role: .destructive) {
+                        viewModel.removeProfile(named: profile.name, deleteData: true)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
+            .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.red.opacity(0.24), lineWidth: 1)
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var runtimeCard: some View {
         SettingsCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Codex Runtime")
+                Text("Runtime")
                     .font(.headline)
 
                 TextField("/opt/homebrew/bin/codex", text: $codexPathDraft)
@@ -203,11 +271,14 @@ struct SettingsContentView: View {
                     .disabled(viewModel.customNodePath.isEmpty)
                 }
 
-                Text("Leave empty to auto-detect codex from standard install paths or PATH.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let probe = viewModel.runtimeProbeSummary {
+                    Text(probe)
+                        .font(.caption2)
+                        .foregroundStyle(viewModel.isCodexRuntimeAvailable ? Color.secondary : Color.orange)
+                        .lineLimit(2)
+                }
 
-                Text("Set this only if codex is not found. You can use a full path or command name.")
+                Text("Leave empty to auto-detect codex from known paths or PATH.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -217,7 +288,7 @@ struct SettingsContentView: View {
     private var preferencesCard: some View {
         SettingsCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Preferences")
+                Text("Display")
                     .font(.headline)
 
                 HStack {
@@ -235,24 +306,27 @@ struct SettingsContentView: View {
 
     private var diagnosticsCard: some View {
         SettingsCard {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Diagnostics")
+            DisclosureGroup(isExpanded: $isDiagnosticsExpanded) {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let hint = viewModel.cliResolutionHint {
+                        Text(hint)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(4)
+                    } else {
+                        Text("Run refresh to capture command resolution details.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    simpleActionButton("Open multicodex config directory", symbol: "folder.fill") {
+                        viewModel.openMulticodexConfigDirectory()
+                    }
+                }
+                .padding(.top, 6)
+            } label: {
+                Label("Troubleshooting & Diagnostics", systemImage: "wrench.and.screwdriver")
                     .font(.headline)
-
-                if let hint = viewModel.cliResolutionHint {
-                    Text(hint)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                } else {
-                    Text("Run a refresh to see command resolution details.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                simpleActionButton("Open multicodex config directory", symbol: "folder.fill") {
-                    viewModel.openMulticodexConfigDirectory()
-                }
             }
         }
     }
@@ -327,6 +401,30 @@ struct SettingsContentView: View {
         viewModel.profileActionInFlightName != nil || viewModel.switchingProfileName != nil
     }
 
+    private var runtimeStatusText: String {
+        viewModel.runtimeProbeSummary ?? "Checking codex runtime..."
+    }
+
+    private var runtimeStatusSymbol: String {
+        if viewModel.isCodexRuntimeAvailable {
+            return "checkmark.circle.fill"
+        }
+        if viewModel.runtimeProbeSummary == nil {
+            return "clock"
+        }
+        return "exclamationmark.triangle.fill"
+    }
+
+    private var runtimeStatusColor: Color {
+        if viewModel.isCodexRuntimeAvailable {
+            return .green
+        }
+        if viewModel.runtimeProbeSummary == nil {
+            return .secondary
+        }
+        return .orange
+    }
+
     private var testConfigToggleBinding: Binding<Bool> {
         Binding(
             get: { viewModel.isUsingTemporaryAuthSandbox },
@@ -357,6 +455,17 @@ struct SettingsContentView: View {
 
     private func normalized(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func statusColor(for state: ProfileConnectionState) -> Color {
+        switch state {
+        case .connected:
+            return .green
+        case .needsLogin:
+            return .orange
+        case .error:
+            return .red
+        }
     }
 
     private func pill(_ text: String, color: Color) -> some View {

@@ -5,20 +5,39 @@ struct ProfileUsageCardView: View {
     let resetDisplayMode: ResetDisplayMode
     let isSwitching: Bool
     let isRunningAuthAction: Bool
+    let isExpanded: Bool
+    let isSelected: Bool
     let onSwitch: () -> Void
     let onRelogin: () -> Void
+    let onToggleExpanded: () -> Void
+
+    private enum PrimaryAction {
+        case switchProfile
+        case relogin
+    }
+
+    private var isBusy: Bool {
+        isSwitching || isRunningAuthAction
+    }
+
+    private var primaryAction: PrimaryAction? {
+        if profile.connectionState == .needsLogin {
+            return .relogin
+        }
+        if !profile.isCurrent {
+            return .switchProfile
+        }
+        return nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             rowTop
             rowUsage
-            rowMeta
 
-            if let usageError = profile.usageError {
-                Text(usageError)
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-                    .lineLimit(1)
+            if isExpanded {
+                expandedDetails
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(10)
@@ -28,7 +47,7 @@ struct ProfileUsageCardView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(profile.isCurrent ? Color.accentColor.opacity(0.36) : Color.secondary.opacity(0.14), lineWidth: 1)
+                .stroke(cardBorderColor, lineWidth: isSelected ? 1.4 : 1)
         )
     }
 
@@ -42,64 +61,119 @@ struct ProfileUsageCardView: View {
                 statePill("Current", tone: .accentColor)
             }
 
-            if !profile.hasAuth {
-                statePill("Auth Needed", tone: .orange)
-            }
+            statePill(profile.connectionState.label, tone: statusTone)
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 6) {
-                if !profile.isCurrent {
+            if let primaryAction {
+                switch primaryAction {
+                case .switchProfile:
                     Button {
                         onSwitch()
                     } label: {
                         if isSwitching {
                             ProgressView()
                                 .controlSize(.small)
-                                .frame(width: 44)
                         } else {
                             Text("Switch")
                                 .font(.caption.weight(.semibold))
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(isSwitching || isRunningAuthAction)
-                }
-
-                if !profile.hasAuth {
+                    .disabled(isBusy)
+                case .relogin:
                     Button {
                         onRelogin()
                     } label: {
-                        Text("Re-login")
-                            .font(.caption.weight(.semibold))
+                        if isRunningAuthAction {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("Re-login")
+                                .font(.caption.weight(.semibold))
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(isSwitching || isRunningAuthAction)
+                    .disabled(isBusy)
                 }
             }
+
+            Button {
+                onToggleExpanded()
+            } label: {
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .help(isExpanded ? "Hide details" : "Show details")
         }
     }
 
     private var rowUsage: some View {
         HStack(spacing: 8) {
-            MinimalMetricView(metric: profile.usage.fiveHour, title: "5h", resetDisplayMode: resetDisplayMode)
-            MinimalMetricView(metric: profile.usage.weekly, title: "weekly", resetDisplayMode: resetDisplayMode)
+            MinimalMetricView(metric: profile.usage.fiveHour, title: "5h", resetDisplayMode: resetDisplayMode, showReset: isExpanded)
+            MinimalMetricView(metric: profile.usage.weekly, title: "weekly", resetDisplayMode: resetDisplayMode, showReset: isExpanded)
         }
     }
 
-    private var rowMeta: some View {
-        HStack(spacing: 10) {
-            Text(profile.source)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text("Last used \(profile.lastUsedLabel)")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
+    private var expandedDetails: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let hint = profile.connectionHint {
+                Text(hint)
+                    .font(.caption2)
+                    .foregroundStyle(statusTone)
+                    .lineLimit(2)
+            }
+
+            HStack(spacing: 10) {
+                Text(profile.source)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("Last used \(profile.lastUsedLabel)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+
+            if let status = profile.lastLoginStatusPreview {
+                Text(status)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
         }
-        .lineLimit(1)
+        .padding(.top, 2)
+    }
+
+    private var statusTone: Color {
+        switch profile.connectionState {
+        case .connected:
+            return .green
+        case .needsLogin:
+            return .orange
+        case .error:
+            return .red
+        }
+    }
+
+    private var cardBorderColor: Color {
+        if isSelected {
+            return Color.accentColor.opacity(0.55)
+        }
+        if profile.connectionState == .error {
+            return Color.red.opacity(0.24)
+        }
+        if profile.connectionState == .needsLogin {
+            return Color.orange.opacity(0.24)
+        }
+        if profile.isCurrent {
+            return Color.accentColor.opacity(0.26)
+        }
+        return Color.secondary.opacity(0.14)
     }
 
     private func statePill(_ text: String, tone: Color) -> some View {
@@ -107,7 +181,7 @@ struct ProfileUsageCardView: View {
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(tone.opacity(0.16), in: Capsule())
+            .background(tone.opacity(0.13), in: Capsule())
             .foregroundStyle(tone)
     }
 }
@@ -116,6 +190,7 @@ private struct MinimalMetricView: View {
     let metric: UsageMetric
     let title: String
     let resetDisplayMode: ResetDisplayMode
+    let showReset: Bool
 
     private var tone: Color {
         switch UsageLevel.from(usedPercent: metric.usedPercent) {
@@ -142,10 +217,12 @@ private struct MinimalMetricView: View {
             ProgressView(value: metric.normalizedFraction)
                 .tint(tone)
 
-            Text(metric.resetText(mode: resetDisplayMode))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            if showReset {
+                Text(metric.resetText(mode: resetDisplayMode))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(8)
