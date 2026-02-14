@@ -10,17 +10,17 @@ struct ActionPillButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: symbol)
-                .font(.caption.weight(.bold))
+                .font(.caption.weight(.semibold))
                 .labelStyle(.titleAndIcon)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(prominent ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+                        .fill(prominent ? Color.accentColor : Color(nsColor: .controlBackgroundColor).opacity(0.55))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(prominent ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.25), lineWidth: 1)
+                        .stroke(prominent ? Color.accentColor.opacity(0.40) : Color.secondary.opacity(0.20), lineWidth: 1)
                 )
                 .foregroundStyle(prominent ? Color.white : Color.primary)
         }

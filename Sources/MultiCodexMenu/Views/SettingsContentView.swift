@@ -38,11 +38,11 @@ struct SettingsContentView: View {
 
     private var headerCard: some View {
         SettingsCard {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Settings")
                     .font(.title3.weight(.semibold))
 
-                Text("Manage profiles, login flows, runtime path, and refresh behavior.")
+                Text("Manage profiles, login flow, runtime path, and usage preferences.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -70,7 +70,7 @@ struct SettingsContentView: View {
                 }
                 .disabled(isProfileActionRunning)
 
-                Text("Starts browser login first, then auto-creates a random profile name. You can rename it below.")
+                Text("Start browser login, then rename the created profile if needed.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -127,7 +127,7 @@ struct SettingsContentView: View {
                     .disabled(isProfileActionRunning)
                 }
 
-                simpleActionButton("Login", symbol: "person.crop.circle.badge.plus") {
+                simpleActionButton(profile.hasAuth ? "Login" : "Re-login", symbol: "person.crop.circle.badge.plus", prominent: !profile.hasAuth) {
                     viewModel.openLoginInTerminal(for: profile.name)
                 }
                 .disabled(isProfileActionRunning)
@@ -392,7 +392,7 @@ private struct SettingsCard<Content: View>: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
+                .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
         )
     }
 }

@@ -28,7 +28,7 @@ struct ProfileUsageCardView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(profile.isCurrent ? Color.accentColor.opacity(0.45) : Color.secondary.opacity(0.16), lineWidth: 1)
+                .stroke(profile.isCurrent ? Color.accentColor.opacity(0.36) : Color.secondary.opacity(0.14), lineWidth: 1)
         )
     }
 
@@ -39,11 +39,11 @@ struct ProfileUsageCardView: View {
                 .lineLimit(1)
 
             if profile.isCurrent {
-                Text("Current")
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.accentColor.opacity(0.16), in: Capsule())
+                statePill("Current", tone: .accentColor)
+            }
+
+            if !profile.hasAuth {
+                statePill("Auth Needed", tone: .orange)
             }
 
             Spacer(minLength: 8)
@@ -60,10 +60,9 @@ struct ProfileUsageCardView: View {
                         } else {
                             Text("Switch")
                                 .font(.caption.weight(.semibold))
-                                .frame(minWidth: 44)
                         }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(isSwitching || isRunningAuthAction)
                 }
@@ -75,7 +74,7 @@ struct ProfileUsageCardView: View {
                         Text("Re-login")
                             .font(.caption.weight(.semibold))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(isSwitching || isRunningAuthAction)
                 }
@@ -95,18 +94,21 @@ struct ProfileUsageCardView: View {
             Text(profile.source)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-
-            Text(profile.lastUsedLabel)
+            Text("Last used \(profile.lastUsedLabel)")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-
-            if !profile.hasAuth {
-                Text("Auth needed")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.orange)
-            }
+            Spacer(minLength: 0)
         }
         .lineLimit(1)
+    }
+
+    private func statePill(_ text: String, tone: Color) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(tone.opacity(0.16), in: Capsule())
+            .foregroundStyle(tone)
     }
 }
 
@@ -147,6 +149,6 @@ private struct MinimalMetricView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(8)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

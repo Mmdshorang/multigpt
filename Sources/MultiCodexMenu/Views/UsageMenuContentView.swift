@@ -8,14 +8,8 @@ struct UsageMenuContentView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.08),
-                    Color(nsColor: .windowBackgroundColor),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            Color(nsColor: .windowBackgroundColor)
+                .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 10) {
                 header
@@ -67,9 +61,14 @@ struct UsageMenuContentView: View {
 
     private func currentStrip(profile: ProfileUsage) -> some View {
         HStack(spacing: 8) {
-            Text(profile.name)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Current")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(profile.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+            }
 
             Spacer(minLength: 8)
 
@@ -80,11 +79,11 @@ struct UsageMenuContentView: View {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.accentColor.opacity(0.1))
+                .fill(Color(nsColor: .controlBackgroundColor))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.accentColor.opacity(0.22), lineWidth: 1)
+                .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
         )
     }
 
@@ -127,12 +126,8 @@ struct UsageMenuContentView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            ActionPillButton(title: "Login New", symbol: "person.crop.circle.badge.plus") {
+            ActionPillButton(title: "Login New", symbol: "person.crop.circle.badge.plus", prominent: true, isDisabled: isActionBusy) {
                 viewModel.startNewProfileLogin()
-            }
-
-            ActionPillButton(title: viewModel.resetDisplayMode.buttonLabel, symbol: resetModeIcon) {
-                viewModel.toggleResetDisplayMode()
             }
 
             Spacer()
@@ -169,13 +164,8 @@ struct UsageMenuContentView: View {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private var resetModeIcon: String {
-        switch viewModel.resetDisplayMode {
-        case .relative:
-            return "clock.arrow.circlepath"
-        case .absolute:
-            return "calendar"
-        }
+    private var isActionBusy: Bool {
+        viewModel.isRefreshing || viewModel.profileActionInFlightName != nil || viewModel.switchingProfileName != nil
     }
 
     private var visibleProfiles: [ProfileUsage] {
