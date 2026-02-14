@@ -4,7 +4,9 @@ struct ProfileUsageCardView: View {
     let profile: ProfileUsage
     let resetDisplayMode: ResetDisplayMode
     let isSwitching: Bool
+    let isRunningAuthAction: Bool
     let onSwitch: () -> Void
+    let onRelogin: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -46,23 +48,37 @@ struct ProfileUsageCardView: View {
 
             Spacer(minLength: 8)
 
-            if !profile.isCurrent {
-                Button {
-                    onSwitch()
-                } label: {
-                    if isSwitching {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 44)
-                    } else {
-                        Text("Switch")
-                            .font(.caption.weight(.semibold))
-                            .frame(minWidth: 44)
+            HStack(spacing: 6) {
+                if !profile.isCurrent {
+                    Button {
+                        onSwitch()
+                    } label: {
+                        if isSwitching {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 44)
+                        } else {
+                            Text("Switch")
+                                .font(.caption.weight(.semibold))
+                                .frame(minWidth: 44)
+                        }
                     }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isSwitching || isRunningAuthAction)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .disabled(isSwitching)
+
+                if !profile.hasAuth {
+                    Button {
+                        onRelogin()
+                    } label: {
+                        Text("Re-login")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isSwitching || isRunningAuthAction)
+                }
             }
         }
     }

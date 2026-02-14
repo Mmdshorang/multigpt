@@ -108,7 +108,9 @@ struct UsageMenuContentView: View {
                         profile: profile,
                         resetDisplayMode: viewModel.resetDisplayMode,
                         isSwitching: viewModel.switchingProfileName == profile.name,
-                        onSwitch: { viewModel.switchToProfile(named: profile.name) }
+                        isRunningAuthAction: viewModel.profileActionInFlightName == profile.name,
+                        onSwitch: { viewModel.switchToProfile(named: profile.name) },
+                        onRelogin: { viewModel.openLoginInTerminal(for: profile.name) }
                     )
                 }
 
@@ -125,31 +127,19 @@ struct UsageMenuContentView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Button("Login New") {
+            ActionPillButton(title: "Login New", symbol: "person.crop.circle.badge.plus") {
                 viewModel.startNewProfileLogin()
             }
-            .buttonStyle(.plain)
-            .font(.caption)
 
-            Button(viewModel.resetDisplayMode.buttonLabel) {
+            ActionPillButton(title: viewModel.resetDisplayMode.buttonLabel, symbol: resetModeIcon) {
                 viewModel.toggleResetDisplayMode()
             }
-            .buttonStyle(.plain)
-            .font(.caption)
 
             Spacer()
 
-            Button("Config") {
-                viewModel.openMulticodexConfigDirectory()
-            }
-            .buttonStyle(.plain)
-            .font(.caption)
-
-            Button("Settings") {
+            ActionPillButton(title: "Settings", symbol: "gearshape.fill") {
                 openSettingsWindow()
             }
-            .buttonStyle(.plain)
-            .font(.caption)
         }
     }
 
@@ -177,6 +167,15 @@ struct UsageMenuContentView: View {
         NSApp.setActivationPolicy(.regular)
         openWindow(id: "settings")
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private var resetModeIcon: String {
+        switch viewModel.resetDisplayMode {
+        case .relative:
+            return "clock.arrow.circlepath"
+        case .absolute:
+            return "calendar"
+        }
     }
 
     private var visibleProfiles: [ProfileUsage] {
