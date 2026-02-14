@@ -39,8 +39,13 @@ final class UsageMenuViewModel: ObservableObject {
             ?? ""
         let rawResetMode = defaults.string(forKey: DefaultsKey.resetDisplayMode)
         resetDisplayMode = ResetDisplayMode(rawValue: rawResetMode ?? "") ?? .relative
+#if DEBUG
         isUsingTemporaryAuthSandbox = defaults.bool(forKey: DefaultsKey.temporaryAuthSandboxEnabled)
         temporaryAuthSandboxHome = defaults.string(forKey: DefaultsKey.temporaryAuthSandboxHome)
+#else
+        isUsingTemporaryAuthSandbox = false
+        temporaryAuthSandboxHome = nil
+#endif
         cli.customNodePath = customNodePath.isEmpty ? nil : customNodePath
         configureSandboxEnvironment()
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
@@ -253,6 +258,17 @@ final class UsageMenuViewModel: ObservableObject {
         configureSandboxEnvironment()
         setProfileFeedback(message: "Temporary auth sandbox disabled. Using your regular setup.", error: nil)
         refreshLive()
+    }
+
+    func setTemporaryAuthSandboxEnabled(_ enabled: Bool) {
+        guard enabled != isUsingTemporaryAuthSandbox else {
+            return
+        }
+        if enabled {
+            enableTemporaryAuthSandbox()
+        } else {
+            disableTemporaryAuthSandbox()
+        }
     }
 
     func openTemporaryAuthSandboxDirectory() {

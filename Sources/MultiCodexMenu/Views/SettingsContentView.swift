@@ -16,7 +16,9 @@ struct SettingsContentView: View {
                     profilesCard
                     runtimeCard
                     preferencesCard
+#if DEBUG
                     testSetupCard
+#endif
                     diagnosticsCard
                 }
                 .padding(16)
@@ -261,11 +263,23 @@ struct SettingsContentView: View {
                 Text("Test Setup")
                     .font(.headline)
 
+                Toggle(isOn: testConfigToggleBinding) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Use Test Config Directory")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Toggle between real and isolated temporary config directories.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.switch)
+                .disabled(isProfileActionRunning)
+
                 if viewModel.isUsingTemporaryAuthSandbox {
-                    pill("Temporary Auth Sandbox Active", color: .orange)
+                    pill("Using Test Config", color: .orange)
 
                     if let sandbox = viewModel.temporaryAuthSandboxHome, !sandbox.isEmpty {
-                        Text(sandbox)
+                        Text("Current: \(sandbox)/.config/multicodex")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(3)
@@ -281,20 +295,15 @@ struct SettingsContentView: View {
                             viewModel.openTemporaryAuthSandboxDirectory()
                         }
 
-                        simpleActionButton("Use Real Setup", symbol: "xmark.circle") {
-                            viewModel.disableTemporaryAuthSandbox()
+                        simpleActionButton("Use Real Config", symbol: "xmark.circle") {
+                            viewModel.setTemporaryAuthSandboxEnabled(false)
                         }
                         .disabled(isProfileActionRunning)
                     }
                 } else {
-                    Text("Use an isolated temporary directory for auth and profile data while testing setup.")
+                    Text("Current: real config at ~/.config/multicodex")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-
-                    simpleActionButton("Use Temporary Sandbox", symbol: "testtube.2", prominent: true) {
-                        viewModel.enableTemporaryAuthSandbox()
-                    }
-                    .disabled(isProfileActionRunning)
                 }
             }
         }
@@ -316,6 +325,13 @@ struct SettingsContentView: View {
 
     private var isProfileActionRunning: Bool {
         viewModel.profileActionInFlightName != nil || viewModel.switchingProfileName != nil
+    }
+
+    private var testConfigToggleBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.isUsingTemporaryAuthSandbox },
+            set: { viewModel.setTemporaryAuthSandboxEnabled($0) }
+        )
     }
 
     private func renameBinding(for profileName: String) -> Binding<String> {
