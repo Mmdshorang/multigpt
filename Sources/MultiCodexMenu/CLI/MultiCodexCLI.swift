@@ -64,6 +64,11 @@ final class MultiCodexCLI {
         let display: String
     }
 
+    struct RuntimeProbe {
+        let isAvailable: Bool
+        let summary: String
+    }
+
     private enum ExistingAccountBehavior {
         case ignore
         case fail
@@ -155,8 +160,37 @@ final class MultiCodexCLI {
         try launchTerminal(script: command)
     }
 
+    func loginInApp(account name: String, createIfNeeded: Bool) async throws -> String {
+        if createIfNeeded {
+            _ = try addAccountIfNeededNow(name: name)
+        }
+        _ = try switchAccountNow(name: name)
+
+        let result = try await runCodexCaptureAsync(arguments: ["login"])
+        let combined = (result.stdout + result.stderr).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard result.exitCode == 0 else {
+            throw MultiCodexCLIError(message: combined.isEmpty ? "Login failed." : combined)
+        }
+        return combined
+    }
+
     func effectiveMulticodexHomePath() -> String {
         currentPaths().multicodexHome
+    }
+
+    func probeRuntime() -> RuntimeProbe {
+        do {
+            let result = try runCodexCapture(arguments: ["--version"])
+            let combined = (result.stdout + result.stderr).trimmingCharacters(in: .whitespacesAndNewlines)
+            if result.exitCode == 0 {
+                let summary = combined.isEmpty ? "codex runtime is available." : combined
+                return RuntimeProbe(isAvailable: true, summary: summary)
+            }
+            let summary = combined.isEmpty ? "codex runtime check failed." : combined
+            return RuntimeProbe(isAvailable: false, summary: summary)
+        } catch {
+            return RuntimeProbe(isAvailable: false, summary: error.localizedDescription)
+        }
     }
 
     // MARK: - Accounts
@@ -548,8 +582,14 @@ final class MultiCodexCLI {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         process.arguments = [
-            "-e", "tell application \"Terminal\" to activate",
-            "-e", "tell application \"Terminal\" to do script \"\(escaped)\"",
+            "-e", "tell application \"Terminal\"",
+            "-e", "if not (exists front window) then",
+            "-e", "do script \"\(escaped)\"",
+            "-e", "else",
+            "-e", "do script \"\(escaped)\" in front window",
+            "-e", "end if",
+            "-e", "activate",
+            "-e", "end tell",
         ]
 
         do {
@@ -679,6 +719,42 @@ final class MultiCodexCLI {
             stdout: stdout,
             stderr: stderr
         )
+    }
+
+    private func runCodexCaptureAsync(arguments: [String]) async throws -> ProcessResult {
+        let runtime = try resolveCodexRuntime()
+        let process = Process()
+        process.executableURL = runtime.executableURL
+        process.arguments = runtime.prefixArguments + arguments
+        process.environment = baseEnvironment()
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        return try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { process in
+                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+                let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+                continuation.resume(
+                    returning: ProcessResult(
+                        exitCode: process.terminationStatus,
+                        stdout: stdout,
+                        stderr: stderr
+                    )
+                )
+            }
+
+            do {
+                try process.run()
+            } catch {
+                process.terminationHandler = nil
+                continuation.resume(throwing: MultiCodexCLIError(message: "Could not run \(runtime.display): \(error.localizedDescription)"))
+            }
+        }
     }
 
     private func makeCodexShellCommand(arguments: [String]) throws -> String {

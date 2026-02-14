@@ -12,6 +12,9 @@ final class UsageMenuViewModel: ObservableObject {
     @Published private(set) var profileActionInFlightName: String?
     @Published private(set) var profileActionMessage: String?
     @Published private(set) var profileActionError: String?
+    @Published private(set) var runtimeProbeSummary: String?
+    @Published private(set) var isCodexRuntimeAvailable = false
+    @Published private(set) var focusedProfileName: String?
     @Published private(set) var isUsingTemporaryAuthSandbox = false
     @Published private(set) var temporaryAuthSandboxHome: String?
     @Published var customNodePath: String
@@ -31,6 +34,7 @@ final class UsageMenuViewModel: ObservableObject {
     private var refreshLoopTask: Task<Void, Never>?
     private var didBecomeActiveObserver: NSObjectProtocol?
     private var pendingInteractiveLoginProfile: String?
+    private var feedbackAutoClearTask: Task<Void, Never>?
 
     init() {
         customNodePath =
@@ -48,6 +52,7 @@ final class UsageMenuViewModel: ObservableObject {
 #endif
         cli.customNodePath = customNodePath.isEmpty ? nil : customNodePath
         configureSandboxEnvironment()
+        refreshRuntimeProbe()
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification,
             object: nil,
@@ -157,12 +162,7 @@ final class UsageMenuViewModel: ObservableObject {
 
     func startNewProfileLogin() {
         let generatedName = generateRandomProfileName()
-        beginInteractiveLogin(
-            profileName: generatedName,
-            successMessage: "Opened browser login. After sign-in, profile \(generatedName) will appear (you can rename it anytime)."
-        ) {
-            try self.cli.openNewProfileLoginInTerminal(newProfileName: generatedName)
-        }
+        startLoginFlow(profileName: generatedName, createIfNeeded: true)
     }
 
     func renameProfile(from oldName: String, to rawNewName: String) {
@@ -207,15 +207,12 @@ final class UsageMenuViewModel: ObservableObject {
     }
 
     func openLoginInTerminal(for name: String) {
-        beginInteractiveLogin(
-            profileName: name,
-            successMessage: "Opened Terminal login for \(name). Browser login should start and return you to MultiCodex."
-        ) {
-            try self.cli.openLoginInTerminal(account: name)
-        }
+        startLoginFlow(profileName: name, createIfNeeded: false)
     }
 
     func clearProfileActionFeedback() {
+        feedbackAutoClearTask?.cancel()
+        feedbackAutoClearTask = nil
         setProfileFeedback(message: nil, error: nil)
     }
 
@@ -287,11 +284,16 @@ final class UsageMenuViewModel: ObservableObject {
             defaults.set(trimmed, forKey: DefaultsKey.customNodePath)
             cli.customNodePath = trimmed
         }
+        refreshRuntimeProbe()
         refresh()
     }
 
     func clearCustomNodePath() {
         updateCustomNodePath("")
+    }
+
+    func dismissFocusHint() {
+        focusedProfileName = nil
     }
 
     func chooseCustomNodePath() {
@@ -324,6 +326,9 @@ final class UsageMenuViewModel: ObservableObject {
             let limits = try await cli.fetchLimits(refreshLive: refreshLive)
 
             profiles = UsageDataService.mergeProfiles(accounts: accounts, limits: limits)
+            if let focused = focusedProfileName, !profiles.contains(where: { $0.name == focused }) {
+                focusedProfileName = nil
+            }
             lastUpdatedAt = Date()
             cliResolutionHint = cli.resolutionHint
 
@@ -348,6 +353,19 @@ final class UsageMenuViewModel: ObservableObject {
     private func setProfileFeedback(message: String?, error: String?) {
         profileActionMessage = message
         profileActionError = error
+        feedbackAutoClearTask?.cancel()
+        feedbackAutoClearTask = nil
+        guard message != nil || error != nil else {
+            return
+        }
+        feedbackAutoClearTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(5))
+            if Task.isCancelled {
+                return
+            }
+            profileActionMessage = nil
+            profileActionError = nil
+        }
     }
 
     private func triggerRefresh(refreshLive: Bool) {
@@ -356,22 +374,75 @@ final class UsageMenuViewModel: ObservableObject {
         }
     }
 
-    private func beginInteractiveLogin(
-        profileName: String,
-        successMessage: String,
-        openFlow: () throws -> Void
-    ) {
-        guard profileActionInFlightName == nil else {
+    private func startLoginFlow(profileName: String, createIfNeeded: Bool) {
+        guard profileActionInFlightName == nil, pendingInteractiveLoginProfile == nil else {
             return
         }
 
+        Task {
+            profileActionInFlightName = profileName
+            focusedProfileName = profileName
+            feedbackAutoClearTask?.cancel()
+            feedbackAutoClearTask = nil
+            profileActionMessage = "Opening browser login for \(profileName)..."
+            profileActionError = nil
+
+            defer {
+                profileActionInFlightName = nil
+            }
+
+            do {
+                _ = try await cli.loginInApp(account: profileName, createIfNeeded: createIfNeeded)
+                _ = try await cli.importDefaultAuth(into: profileName)
+                let status = try await cli.fetchStatus(name: profileName)
+
+                switch statusOutcome(
+                    for: profileName,
+                    status: status,
+                    successFallback: "Login synced to \(profileName)."
+                ) {
+                case let .success(message):
+                    setProfileFeedback(message: message, error: nil)
+                case let .failure(message):
+                    setProfileFeedback(message: nil, error: message)
+                }
+
+                await performRefresh(refreshLive: true)
+            } catch {
+                if shouldFallbackToTerminal(error) {
+                    launchTerminalLoginFallback(profileName: profileName, createIfNeeded: createIfNeeded, rootError: error)
+                } else {
+                    setProfileFeedback(message: nil, error: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    private func shouldFallbackToTerminal(_ error: Error) -> Bool {
+        let text = error.localizedDescription.lowercased()
+        return text.contains("tty")
+            || text.contains("not interactive")
+            || text.contains("stdin")
+            || text.contains("standard input")
+    }
+
+    private func launchTerminalLoginFallback(profileName: String, createIfNeeded: Bool, rootError: Error) {
         do {
-            try openFlow()
+            if createIfNeeded {
+                try cli.openNewProfileLoginInTerminal(newProfileName: profileName)
+            } else {
+                try cli.openLoginInTerminal(account: profileName)
+            }
             pendingInteractiveLoginProfile = profileName
-            setProfileFeedback(message: successMessage, error: nil)
+            setProfileFeedback(
+                message: "Using Terminal fallback for \(profileName). Complete login and return to MultiCodex.",
+                error: nil
+            )
         } catch {
-            pendingInteractiveLoginProfile = nil
-            setProfileFeedback(message: nil, error: error.localizedDescription)
+            setProfileFeedback(
+                message: nil,
+                error: "\(rootError.localizedDescription) (Fallback failed: \(error.localizedDescription))"
+            )
         }
     }
 
@@ -441,6 +512,7 @@ final class UsageMenuViewModel: ObservableObject {
         }
 
         pendingInteractiveLoginProfile = nil
+        focusedProfileName = pendingProfile
         runProfileAction(for: pendingProfile) {
             _ = try await self.cli.importDefaultAuth(into: pendingProfile)
             let status = try await self.cli.fetchStatus(name: pendingProfile)
@@ -450,6 +522,12 @@ final class UsageMenuViewModel: ObservableObject {
                 successFallback: "Login synced to \(pendingProfile). You can rename it anytime."
             )
         }
+    }
+
+    private func refreshRuntimeProbe() {
+        let probe = cli.probeRuntime()
+        isCodexRuntimeAvailable = probe.isAvailable
+        runtimeProbeSummary = probe.summary
     }
 
     private func configureSandboxEnvironment() {

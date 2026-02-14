@@ -36,6 +36,23 @@ enum UsageLevel {
     }
 }
 
+enum ProfileConnectionState {
+    case connected
+    case needsLogin
+    case error
+
+    var label: String {
+        switch self {
+        case .connected:
+            return "Connected"
+        case .needsLogin:
+            return "Needs Login"
+        case .error:
+            return "Error"
+        }
+    }
+}
+
 enum ResetDisplayMode: String, CaseIterable {
     case relative
     case absolute
@@ -131,5 +148,32 @@ struct ProfileUsage: Identifiable {
         }
 
         return UsageFormatter.relativeDateFormatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    var connectionState: ProfileConnectionState {
+        if !hasAuth {
+            return .needsLogin
+        }
+        if usageError != nil {
+            return .error
+        }
+        return .connected
+    }
+
+    var connectionHint: String? {
+        switch connectionState {
+        case .connected:
+            return nil
+        case .needsLogin:
+            if let status = lastLoginStatusPreview, !status.isEmpty {
+                return "Needs login: \(status)"
+            }
+            return "Needs login: no active auth found."
+        case .error:
+            if let usageError, !usageError.isEmpty {
+                return "Error: \(usageError)"
+            }
+            return "Error: refresh failed."
+        }
     }
 }
