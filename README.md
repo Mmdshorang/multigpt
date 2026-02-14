@@ -1,24 +1,29 @@
 # MultiCodex (macOS Menu Bar App)
 
-Native macOS SwiftUI menu bar app for managing multiple Codex logins.
+Native macOS SwiftUI menu bar app for managing multiple Codex profiles.
 
-## Highlights
+## What It Does
 
-- Fully native Swift core (no bundled JavaScript CLI runtime).
-- Uses the same storage layout as `multicodex` CLI:
-  - `~/.config/multicodex` (or `MULTICODEX_HOME`)
-  - `~/.codex/auth.json`
-- Profile management: add/remove/rename/use/import/status.
-- Login flows directly in Terminal with browser-based `codex login`.
-- Login-first onboarding for new profiles with auto-generated names (rename later).
-- Optional temporary sandbox mode for safe setup testing.
-- Menubar usage view with 5h + weekly limits and profile switching.
+- Shows 5h and weekly usage in a compact menu bar view.
+- Lets you switch profiles and re-login when a profile needs auth.
+- Opens browser-based `codex login` flows through Terminal.
+- Provides profile operations in Settings: use, rename, remove, import auth, and status check.
+- Uses a fully native Swift runtime (no bundled JavaScript CLI runtime).
+
+## Storage Layout
+
+MultiCodex follows the same storage layout as the `multicodex` CLI:
+
+- `~/.config/multicodex` (or `MULTICODEX_HOME`)
+- `~/.codex/auth.json`
+
+Note: the temporary test config/sandbox flow is debug-only.
 
 ## Requirements
 
 - macOS 13+
 - Xcode 15+ (or Swift 5.9+ toolchain)
-- `codex` available in `PATH`
+- `codex` CLI available in `PATH` (or set custom path in app Settings)
 - `just` (recommended)
 
 ## Development
@@ -28,15 +33,17 @@ just doctor
 just dev
 ```
 
-Common commands:
+Useful commands:
 
 ```bash
 just list
 just dev
-just dmg
 just ci
+just dmg
 just icons
-just release 0.1.0
+just clean
+just release patch
+just release 0.2.0
 just kickoff-release
 ```
 
@@ -45,3 +52,17 @@ just kickoff-release
 - Workflow: `.github/workflows/release-macos.yml`
 - Tag format: `vMAJOR.MINOR.PATCH`
 - Artifact: `build/dist/MultiCodex.dmg`
+
+To create a release tag and trigger GitHub Actions:
+
+```bash
+just release patch
+# or
+just release v0.2.0
+```
+
+## Troubleshooting
+
+- `codex` not found: install `codex` or set the runtime path in Settings > Codex Runtime.
+- Profile says auth is needed: use `Re-login` on that profile.
+- Swift build fails with module/PCH cache path errors after moving clones: run `just clean` and build again.
