@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsContentView: View {
-    @ObservedObject var viewModel: UsageMenuViewModel
+    @ObservedObject var viewModel: AccountsMenuViewModel
 
     @State private var codexPathDraft = ""
     @State private var renameDrafts: [String: String] = [:]
@@ -18,14 +18,14 @@ struct SettingsContentView: View {
         .navigationSplitViewStyle(.balanced)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
-            codexPathDraft = viewModel.customNodePath
+            codexPathDraft = viewModel.customCodexPath
             syncRenameDrafts()
             if viewModel.selectedSettingsSection == .advanced, !viewModel.isAdvancedSettingsVisible {
                 viewModel.setAdvancedSettingsVisible(true)
             }
         }
-        .onChange(of: viewModel.customNodePath) { codexPathDraft = $0 }
-        .onChange(of: viewModel.profiles.map(\.name)) { _ in
+        .onChange(of: viewModel.customCodexPath) { codexPathDraft = $0 }
+        .onChange(of: viewModel.accounts.map(\.name)) { _ in
             syncRenameDrafts()
         }
         .sheet(isPresented: removalSheetBinding) {
@@ -74,8 +74,8 @@ struct SettingsContentView: View {
                 switch viewModel.selectedSettingsSection {
                 case .dashboard:
                     dashboardPage
-                case .profiles:
-                    profilesPage
+                case .accounts:
+                    accountsPage
                 case .runtime:
                     runtimePage
                 case .display:
@@ -102,12 +102,12 @@ struct SettingsContentView: View {
                 Text("Settings")
                     .font(.title3.weight(.semibold))
 
-                Text("Manage profiles, runtime setup, display preferences, and troubleshooting.")
+                Text("Manage accounts, runtime setup, display preferences, and troubleshooting.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 if let warning = viewModel.refreshWarningMessage {
-                    subtleWarningRow(warning)
+                    SubtleWarningRow(text: warning)
                 }
 
                 HStack(spacing: 8) {
@@ -136,9 +136,9 @@ struct SettingsContentView: View {
                         .font(.headline)
 
                     HStack(spacing: 12) {
-                        dashboardMetric(title: "Profiles", value: "\(viewModel.profiles.count)")
-                        dashboardMetric(title: "Needs Login", value: "\(viewModel.profilesNeedingLogin.count)")
-                        dashboardMetric(title: "Current", value: viewModel.currentProfile?.name ?? "-")
+                        dashboardMetric(title: "Accounts", value: "\(viewModel.accounts.count)")
+                        dashboardMetric(title: "Needs Login", value: "\(viewModel.accountsNeedingLogin.count)")
+                        dashboardMetric(title: "Current", value: viewModel.currentAccount?.name ?? "-")
                     }
 
                     if let alert = viewModel.prioritizedMenuAlert {
@@ -169,14 +169,14 @@ struct SettingsContentView: View {
 
     private func dashboardAlert(_ alert: MenuAlertState) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: alertSymbol(for: alert.severity))
+            Image(systemName: AccountPresentation.alertSymbol(for: alert.severity))
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(alertColor(for: alert.severity))
+                .foregroundStyle(AccountPresentation.alertColor(for: alert.severity))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(alert.title)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(alertColor(for: alert.severity))
+                    .foregroundStyle(AccountPresentation.alertColor(for: alert.severity))
                 Text(alert.message)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -190,10 +190,10 @@ struct SettingsContentView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(alertColor(for: alert.severity).opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(AccountPresentation.alertColor(for: alert.severity).opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(alertColor(for: alert.severity).opacity(0.22), lineWidth: 1)
+                .stroke(AccountPresentation.alertColor(for: alert.severity).opacity(0.22), lineWidth: 1)
         )
     }
 
@@ -217,12 +217,12 @@ struct SettingsContentView: View {
                             viewModel.selectSettingsSection(.runtime)
                         }
                     case .login:
-                        ActionPillButton(title: "Login First Profile", symbol: "person.crop.circle.badge.plus", role: .primary) {
-                            viewModel.startNewProfileLogin()
+                        ActionPillButton(title: "Login First Account", symbol: "person.crop.circle.badge.plus", role: .primary) {
+                            viewModel.startNewAccountLogin()
                         }
                     case .verify:
                         ActionPillButton(title: "Check Status", symbol: "person.crop.circle.badge.checkmark", role: .primary) {
-                            if let current = viewModel.currentProfile {
+                            if let current = viewModel.currentAccount {
                                 viewModel.checkLoginStatus(for: current.name)
                             } else {
                                 viewModel.refreshLive()
@@ -256,39 +256,39 @@ struct SettingsContentView: View {
         }
     }
 
-    private var profilesPage: some View {
+    private var accountsPage: some View {
         SettingsPanelCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Profiles")
+                    Text("Accounts")
                         .font(.headline)
 
                     Spacer()
 
-                    ActionPillButton(title: "Login New Profile", symbol: "person.crop.circle.badge.plus", role: .primary, isDisabled: isProfileActionRunning) {
-                        viewModel.startNewProfileLogin()
+                    ActionPillButton(title: "Login New Account", symbol: "person.crop.circle.badge.plus", role: .primary, isDisabled: isAccountActionRunning) {
+                        viewModel.startNewAccountLogin()
                     }
                 }
 
-                if let message = viewModel.profileActionMessage {
+                if let message = viewModel.accountActionMessage {
                     feedbackRow(message, color: .green)
                 }
 
-                if let error = viewModel.profileActionError {
+                if let error = viewModel.accountActionError {
                     feedbackRow(error, color: .red)
                 }
 
-                if viewModel.profiles.isEmpty {
-                    noProfilesState
+                if viewModel.accounts.isEmpty {
+                    noAccountsState
                 } else {
                     HStack(spacing: 0) {
-                        profileListPane
+                        accountListPane
                             .frame(width: 260)
 
                         Divider()
                             .padding(.horizontal, 12)
 
-                        profileDetailPane
+                        accountDetailPane
                     }
                     .frame(minHeight: 380)
                 }
@@ -296,58 +296,58 @@ struct SettingsContentView: View {
         }
     }
 
-    private var noProfilesState: some View {
+    private var noAccountsState: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("No profiles yet", systemImage: "person.crop.circle.badge.plus")
+            Label("No accounts yet", systemImage: "person.crop.circle.badge.plus")
                 .font(.caption.weight(.semibold))
 
-            Text("Use \"Login New Profile\" to connect your first account.")
+            Text("Use \"Login New Account\" to connect your first account.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 6) {
-                Image(systemName: runtimeStatusSymbol)
+                Image(systemName: runtimeStatus.symbol)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(runtimeStatusColor)
-                Text(runtimeStatusText)
+                    .foregroundStyle(runtimeStatus.color)
+                Text(runtimeStatus.text)
                     .font(.caption2)
-                    .foregroundStyle(viewModel.isCodexRuntimeAvailable ? .secondary : runtimeStatusColor)
+                    .foregroundStyle(viewModel.isCodexRuntimeAvailable ? .secondary : runtimeStatus.color)
                     .lineLimit(2)
             }
         }
     }
 
-    private var profileListPane: some View {
+    private var accountListPane: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("Search profiles", text: profileSearchBinding)
+            TextField("Search accounts", text: accountSearchBinding)
                 .textFieldStyle(.roundedBorder)
 
-            if viewModel.filteredProfiles.isEmpty {
-                Text("No profiles match your search.")
+            if viewModel.filteredAccounts.isEmpty {
+                Text("No accounts match your search.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)
             } else {
                 ScrollView {
                     VStack(spacing: 6) {
-                        ForEach(viewModel.filteredProfiles) { profile in
+                        ForEach(viewModel.filteredAccounts) { account in
                             Button {
-                                viewModel.selectSettingsProfile(named: profile.name)
+                                viewModel.selectSettingsAccount(named: account.name)
                             } label: {
                                 HStack(spacing: 8) {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(profile.name)
+                                        Text(account.name)
                                             .font(.caption.weight(.semibold))
                                             .lineLimit(1)
-                                        Text(profile.connectionState.label)
+                                        Text(account.connectionState.label)
                                             .font(.caption2)
-                                            .foregroundStyle(statusColor(for: profile.connectionState))
+                                            .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
                                     }
 
                                     Spacer()
 
-                                    if profile.isCurrent {
-                                        pill("Current", color: .accentColor)
+                                    if account.isCurrent {
+                                        AccountStatusPill(text: "Current", color: .accentColor)
                                     }
                                 }
                                 .padding(.horizontal, 8)
@@ -355,11 +355,11 @@ struct SettingsContentView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(isSelectedProfile(profile.name) ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.05))
+                                        .fill(isSelectedAccount(account.name) ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.05))
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .stroke(isSelectedProfile(profile.name) ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.10), lineWidth: 1)
+                                        .stroke(isSelectedAccount(account.name) ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.10), lineWidth: 1)
                                 )
                             }
                             .buttonStyle(.plain)
@@ -371,21 +371,21 @@ struct SettingsContentView: View {
     }
 
     @ViewBuilder
-    private var profileDetailPane: some View {
-        if let profile = viewModel.selectedSettingsProfile {
+    private var accountDetailPane: some View {
+        if let account = viewModel.selectedSettingsAccount {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    profileIdentitySection(profile)
-                    profileAuthSection(profile)
-                    profileUsageSection(profile)
-                    profileDangerSection(profile)
+                    accountIdentitySection(account)
+                    accountAuthSection(account)
+                    accountUsageSection(account)
+                    accountDangerSection(account)
                 }
             }
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Select a profile")
+                Text("Select an account")
                     .font(.headline)
-                Text("Choose a profile from the left to manage it.")
+                Text("Choose an account from the left to manage it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -393,21 +393,21 @@ struct SettingsContentView: View {
         }
     }
 
-    private func profileIdentitySection(_ profile: ProfileUsage) -> some View {
+    private func accountIdentitySection(_ account: AccountUsage) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("Identity")
 
-            Text(profile.name)
+            Text(account.name)
                 .font(.subheadline.weight(.semibold))
 
             HStack(spacing: 8) {
-                TextField("Rename profile", text: renameBinding(for: profile.name))
+                TextField("Rename account", text: renameBinding(for: account.name))
                     .textFieldStyle(.roundedBorder)
 
                 ActionPillButton(title: "Rename", symbol: "pencil") {
-                    viewModel.renameProfile(from: profile.name, to: renameDrafts[profile.name] ?? profile.name)
+                    viewModel.renameAccount(from: account.name, to: renameDrafts[account.name] ?? account.name)
                 }
-                .disabled(cannotRename(profile.name) || isProfileActionRunning)
+                .disabled(cannotRename(account.name) || isAccountActionRunning)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -415,42 +415,42 @@ struct SettingsContentView: View {
         .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    private func profileAuthSection(_ profile: ProfileUsage) -> some View {
+    private func accountAuthSection(_ account: AccountUsage) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("Authentication")
 
             HStack(spacing: 8) {
-                if !profile.isCurrent {
+                if !account.isCurrent {
                     ActionPillButton(title: "Use", symbol: "checkmark.circle.fill", role: .secondary) {
-                        viewModel.switchToProfile(named: profile.name)
+                        viewModel.switchToAccount(named: account.name)
                     }
-                    .disabled(isProfileActionRunning)
+                    .disabled(isAccountActionRunning)
                 }
 
                 ActionPillButton(
-                    title: profile.connectionState == .needsLogin ? "Re-login" : "Login",
+                    title: account.connectionState == .needsLogin ? "Re-login" : "Login",
                     symbol: "person.crop.circle.badge.plus",
                     role: .secondary
                 ) {
-                    viewModel.openLoginInTerminal(for: profile.name)
+                    viewModel.openLoginInTerminal(for: account.name)
                 }
-                .disabled(isProfileActionRunning)
+                .disabled(isAccountActionRunning)
 
                 ActionPillButton(title: "Status", symbol: "person.crop.circle.badge.checkmark") {
-                    viewModel.checkLoginStatus(for: profile.name)
+                    viewModel.checkLoginStatus(for: account.name)
                 }
-                .disabled(isProfileActionRunning)
+                .disabled(isAccountActionRunning)
 
                 ActionPillButton(title: "Import Auth", symbol: "square.and.arrow.down") {
-                    viewModel.importCurrentAuth(into: profile.name)
+                    viewModel.importCurrentAuth(into: account.name)
                 }
-                .disabled(isProfileActionRunning)
+                .disabled(isAccountActionRunning)
             }
 
-            if let hint = profile.connectionHint {
+            if let hint = account.connectionHint {
                 Text(hint)
                     .font(.caption2)
-                    .foregroundStyle(statusColor(for: profile.connectionState))
+                    .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
                     .lineLimit(2)
             }
         }
@@ -459,30 +459,30 @@ struct SettingsContentView: View {
         .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    private func profileUsageSection(_ profile: ProfileUsage) -> some View {
+    private func accountUsageSection(_ account: AccountUsage) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("Usage")
 
             HStack(spacing: 8) {
-                SettingsUsageMetricView(
-                    metric: profile.usage.fiveHour,
+                AccountUsageMetricCard(
                     title: "5h",
+                    metric: account.usage.fiveHour,
                     resetDisplayMode: viewModel.resetDisplayMode,
-                    progressValue: viewModel.progressValue(for: profile.usage.fiveHour)
+                    progressValue: viewModel.progressValue(for: account.usage.fiveHour)
                 )
-                SettingsUsageMetricView(
-                    metric: profile.usage.weekly,
+                AccountUsageMetricCard(
                     title: "weekly",
+                    metric: account.usage.weekly,
                     resetDisplayMode: viewModel.resetDisplayMode,
-                    progressValue: viewModel.progressValue(for: profile.usage.weekly)
+                    progressValue: viewModel.progressValue(for: account.usage.weekly)
                 )
             }
 
             HStack(spacing: 8) {
-                Text(profile.source)
+                Text(account.source)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                Text("Last used \(profile.lastUsedLabel)")
+                Text("Last used \(account.lastUsedLabel)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -492,7 +492,7 @@ struct SettingsContentView: View {
         .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    private func profileDangerSection(_ profile: ProfileUsage) -> some View {
+    private func accountDangerSection(_ account: AccountUsage) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             DisclosureGroup {
                 VStack(alignment: .leading, spacing: 8) {
@@ -501,14 +501,14 @@ struct SettingsContentView: View {
                         .foregroundStyle(.secondary)
 
                     HStack(spacing: 8) {
-                        Button("Remove profile", role: .destructive) {
-                            viewModel.beginProfileRemoval(named: profile.name, deleteData: false)
+                        Button("Remove account", role: .destructive) {
+                            viewModel.beginAccountRemoval(named: account.name, deleteData: false)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
 
                         Button("Remove + delete data", role: .destructive) {
-                            viewModel.beginProfileRemoval(named: profile.name, deleteData: true)
+                            viewModel.beginAccountRemoval(named: account.name, deleteData: true)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -541,19 +541,19 @@ struct SettingsContentView: View {
 
                 HStack(spacing: 8) {
                     ActionPillButton(title: "Save", symbol: "checkmark", role: .primary) {
-                        viewModel.updateCustomNodePath(codexPathDraft)
+                        viewModel.updateCustomCodexPath(codexPathDraft)
                     }
-                    .disabled(normalized(codexPathDraft) == viewModel.customNodePath)
+                    .disabled(normalized(codexPathDraft) == viewModel.customCodexPath)
 
                     ActionPillButton(title: "Choose", symbol: "folder") {
-                        viewModel.chooseCustomNodePath()
+                        viewModel.chooseCustomCodexPath()
                     }
 
                     ActionPillButton(title: "Use Auto", symbol: "sparkles") {
                         codexPathDraft = ""
-                        viewModel.clearCustomNodePath()
+                        viewModel.clearCustomCodexPath()
                     }
-                    .disabled(viewModel.customNodePath.isEmpty)
+                    .disabled(viewModel.customCodexPath.isEmpty)
                 }
 
                 if let probe = viewModel.runtimeProbeSummary {
@@ -682,10 +682,10 @@ struct SettingsContentView: View {
                         }
                     }
                     .toggleStyle(.switch)
-                    .disabled(isProfileActionRunning)
+                    .disabled(isAccountActionRunning)
 
                     if viewModel.isUsingTemporaryAuthSandbox {
-                        pill("Using Test Config", color: .orange)
+                        AccountStatusPill(text: "Using Test Config", color: .orange)
 
                         if let sandbox = viewModel.temporaryAuthSandboxHome, !sandbox.isEmpty {
                             Text("Current: \(sandbox)/.config/multicodex")
@@ -698,7 +698,7 @@ struct SettingsContentView: View {
                             ActionPillButton(title: "Reset Sandbox", symbol: "arrow.clockwise") {
                                 viewModel.resetTemporaryAuthSandbox()
                             }
-                            .disabled(isProfileActionRunning)
+                            .disabled(isAccountActionRunning)
 
                             ActionPillButton(title: "Open Folder", symbol: "folder") {
                                 viewModel.openTemporaryAuthSandboxDirectory()
@@ -707,7 +707,7 @@ struct SettingsContentView: View {
                             ActionPillButton(title: "Use Real Config", symbol: "xmark.circle") {
                                 viewModel.setTemporaryAuthSandboxEnabled(false)
                             }
-                            .disabled(isProfileActionRunning)
+                            .disabled(isAccountActionRunning)
                         }
                     } else {
                         Text("Current: real config at ~/.config/multicodex")
@@ -740,22 +740,22 @@ struct SettingsContentView: View {
 
     private var removalConfirmationSheet: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let request = viewModel.pendingProfileRemovalRequest {
-                Text(request.deleteData ? "Remove profile and delete data" : "Remove profile")
+            if let request = viewModel.pendingAccountRemovalRequest {
+                Text(request.deleteData ? "Remove account and delete data" : "Remove account")
                     .font(.headline)
 
                 Text(request.deleteData
-                    ? "This will permanently remove \(request.profileName) and delete its stored data."
-                    : "This will remove \(request.profileName) from MultiCodex.")
+                    ? "This will permanently remove \(request.accountName) and delete its stored data."
+                    : "This will remove \(request.accountName) from MultiCodex.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 if request.deleteData {
-                    Text("Type \"\(request.profileName)\" to confirm")
+                    Text("Type \"\(request.accountName)\" to confirm")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
-                    TextField("Profile name", text: $deleteConfirmationName)
+                    TextField("Account name", text: $deleteConfirmationName)
                         .textFieldStyle(.roundedBorder)
                 }
 
@@ -763,12 +763,12 @@ struct SettingsContentView: View {
                     Spacer()
                     Button("Cancel") {
                         deleteConfirmationName = ""
-                        viewModel.cancelPendingProfileRemoval()
+                        viewModel.cancelPendingAccountRemoval()
                     }
 
                     Button(request.deleteData ? "Delete Data" : "Remove", role: .destructive) {
-                        viewModel.executePendingProfileRemoval(confirming: deleteConfirmationName)
-                        if viewModel.pendingProfileRemovalRequest == nil {
+                        viewModel.executePendingAccountRemoval(confirming: deleteConfirmationName)
+                        if viewModel.pendingAccountRemovalRequest == nil {
                             deleteConfirmationName = ""
                         }
                     }
@@ -781,12 +781,12 @@ struct SettingsContentView: View {
         .frame(width: 420)
     }
 
-    private func canConfirmRemoval(_ request: PendingProfileRemovalRequest) -> Bool {
-        if isProfileActionRunning {
+    private func canConfirmRemoval(_ request: PendingAccountRemovalRequest) -> Bool {
+        if isAccountActionRunning {
             return false
         }
         if request.deleteData {
-            return deleteConfirmationName.trimmingCharacters(in: .whitespacesAndNewlines) == request.profileName
+            return deleteConfirmationName.trimmingCharacters(in: .whitespacesAndNewlines) == request.accountName
         }
         return true
     }
@@ -804,26 +804,11 @@ struct SettingsContentView: View {
                 .foregroundStyle(color)
             Spacer()
             Button("Dismiss") {
-                viewModel.clearProfileActionFeedback()
+                viewModel.clearAccountActionFeedback()
             }
             .buttonStyle(.plain)
             .font(.caption2)
         }
-    }
-
-    private func subtleWarningRow(_ text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.orange)
-            Text(text)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private func displayOptionRow<Control: View>(
@@ -853,10 +838,10 @@ struct SettingsContentView: View {
         )
     }
 
-    private var profileSearchBinding: Binding<String> {
+    private var accountSearchBinding: Binding<String> {
         Binding(
-            get: { viewModel.profileSearchQuery },
-            set: { viewModel.setProfileSearchQuery($0) }
+            get: { viewModel.accountSearchQuery },
+            set: { viewModel.setAccountSearchQuery($0) }
         )
     }
 
@@ -883,42 +868,25 @@ struct SettingsContentView: View {
 
     private var removalSheetBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.pendingProfileRemovalRequest != nil },
+            get: { viewModel.pendingAccountRemovalRequest != nil },
             set: { isPresented in
                 if !isPresented {
                     deleteConfirmationName = ""
-                    viewModel.cancelPendingProfileRemoval()
+                    viewModel.cancelPendingAccountRemoval()
                 }
             }
         )
     }
 
-    private var isProfileActionRunning: Bool {
-        viewModel.profileActionInFlightName != nil || viewModel.switchingProfileName != nil
+    private var isAccountActionRunning: Bool {
+        viewModel.accountActionInFlightName != nil || viewModel.switchingAccountName != nil
     }
 
-    private var runtimeStatusText: String {
-        viewModel.runtimeProbeSummary ?? "Checking codex runtime..."
-    }
-
-    private var runtimeStatusSymbol: String {
-        if viewModel.isCodexRuntimeAvailable {
-            return "checkmark.circle.fill"
-        }
-        if viewModel.runtimeProbeSummary == nil {
-            return "clock"
-        }
-        return "exclamationmark.triangle.fill"
-    }
-
-    private var runtimeStatusColor: Color {
-        if viewModel.isCodexRuntimeAvailable {
-            return .green
-        }
-        if viewModel.runtimeProbeSummary == nil {
-            return .secondary
-        }
-        return .orange
+    private var runtimeStatus: RuntimeStatusPresentation {
+        AccountPresentation.runtimeStatus(
+            summary: viewModel.runtimeProbeSummary,
+            isAvailable: viewModel.isCodexRuntimeAvailable
+        )
     }
 
     private var testConfigToggleBinding: Binding<Bool> {
@@ -928,17 +896,17 @@ struct SettingsContentView: View {
         )
     }
 
-    private func renameBinding(for profileName: String) -> Binding<String> {
+    private func renameBinding(for accountName: String) -> Binding<String> {
         Binding(
-            get: { renameDrafts[profileName] ?? profileName },
-            set: { renameDrafts[profileName] = $0 }
+            get: { renameDrafts[accountName] ?? accountName },
+            set: { renameDrafts[accountName] = $0 }
         )
     }
 
-    private func cannotRename(_ profileName: String) -> Bool {
-        let raw = renameDrafts[profileName] ?? profileName
+    private func cannotRename(_ accountName: String) -> Bool {
+        let raw = renameDrafts[accountName] ?? accountName
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty || trimmed == profileName
+        return trimmed.isEmpty || trimmed == accountName
     }
 
     private func normalized(_ value: String) -> String {
@@ -946,48 +914,15 @@ struct SettingsContentView: View {
     }
 
     private func syncRenameDrafts() {
-        let names = Set(viewModel.profiles.map(\.name))
+        let names = Set(viewModel.accounts.map(\.name))
         renameDrafts = renameDrafts.filter { names.contains($0.key) }
-        for profile in viewModel.profiles where renameDrafts[profile.name] == nil {
-            renameDrafts[profile.name] = profile.name
+        for account in viewModel.accounts where renameDrafts[account.name] == nil {
+            renameDrafts[account.name] = account.name
         }
     }
 
-    private func isSelectedProfile(_ name: String) -> Bool {
-        viewModel.selectedSettingsProfileName == name
-    }
-
-    private func statusColor(for state: ProfileConnectionState) -> Color {
-        switch state {
-        case .connected:
-            return .green
-        case .needsLogin:
-            return .orange
-        case .error:
-            return .red
-        }
-    }
-
-    private func alertColor(for severity: MenuAlertState.Severity) -> Color {
-        switch severity {
-        case .runtimeUnavailable:
-            return .orange
-        case .refreshError:
-            return .red
-        case .authRequired:
-            return .orange
-        }
-    }
-
-    private func alertSymbol(for severity: MenuAlertState.Severity) -> String {
-        switch severity {
-        case .runtimeUnavailable:
-            return "terminal"
-        case .refreshError:
-            return "exclamationmark.triangle.fill"
-        case .authRequired:
-            return "person.crop.circle.badge.exclamationmark"
-        }
+    private func isSelectedAccount(_ name: String) -> Bool {
+        viewModel.selectedSettingsAccountName == name
     }
 
     private func stepSymbol(_ step: OnboardingStep, isActive: Bool) -> String {
@@ -1009,80 +944,5 @@ struct SettingsContentView: View {
         default:
             viewModel.performMenuAlertAction(alert.action)
         }
-    }
-
-    private func pill(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.14), in: Capsule())
-            .foregroundStyle(color)
-    }
-}
-
-private struct SettingsPanelCard<Content: View>: View {
-    @ViewBuilder let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            content
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
-        )
-    }
-}
-
-private struct SettingsUsageMetricView: View {
-    let metric: UsageMetric
-    let title: String
-    let resetDisplayMode: ResetDisplayMode
-    let progressValue: Double
-
-    private var tone: Color {
-        switch UsageLevel.from(usedPercent: metric.usedPercent) {
-        case .critical:
-            return .red
-        case .warning:
-            return .orange
-        case .normal:
-            return .green
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(metric.percentText)
-                    .font(.caption.weight(.semibold))
-            }
-
-            ProgressView(value: progressValue)
-                .tint(tone)
-
-            Text(metric.resetText(mode: resetDisplayMode))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

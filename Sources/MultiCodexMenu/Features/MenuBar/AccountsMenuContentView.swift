@@ -1,12 +1,12 @@
 import AppKit
 import SwiftUI
 
-struct UsageMenuContentView: View {
-    @ObservedObject var viewModel: UsageMenuViewModel
+struct AccountsMenuContentView: View {
+    @ObservedObject var viewModel: AccountsMenuViewModel
     @Environment(\.openWindow) private var openWindow
-    @State private var selectedProfileName: String?
+    @State private var selectedAccountName: String?
     @State private var keyboardMonitor: Any?
-    @State private var expandedProfileNames: Set<String> = []
+    @State private var expandedAccountNames: Set<String> = []
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -21,16 +21,16 @@ struct UsageMenuContentView: View {
                 }
 
                 if viewModel.prioritizedMenuAlert == nil, let warning = viewModel.refreshWarningMessage {
-                    subtleWarningRow(warning)
+                    SubtleWarningRow(text: warning)
                 }
 
-                if viewModel.profiles.isEmpty {
+                if viewModel.accounts.isEmpty {
                     emptyStateCard
                 } else {
-                    if let current = viewModel.currentProfile {
-                        currentProfileCard(current)
+                    if let current = viewModel.currentAccount {
+                        currentAccountCard(current)
                     }
-                    quickProfilesCard
+                    quickAccountsCard
                 }
 
                 footer
@@ -50,18 +50,18 @@ struct UsageMenuContentView: View {
         .onDisappear {
             removeKeyboardMonitor()
         }
-        .onChange(of: viewModel.profiles.map(\.name)) { _ in
-            let activeNames = Set(viewModel.profiles.map(\.name))
-            expandedProfileNames = expandedProfileNames.intersection(activeNames)
+        .onChange(of: viewModel.accounts.map(\.name)) { _ in
+            let activeNames = Set(viewModel.accounts.map(\.name))
+            expandedAccountNames = expandedAccountNames.intersection(activeNames)
             synchronizeSelection()
         }
-        .onChange(of: viewModel.focusedProfileName) { _ in
+        .onChange(of: viewModel.focusedAccountName) { _ in
             synchronizeSelection()
         }
-        .animation(.easeInOut(duration: 0.18), value: viewModel.profiles.map(\.name))
-        .animation(.easeInOut(duration: 0.18), value: viewModel.switchingProfileName)
-        .animation(.easeInOut(duration: 0.18), value: viewModel.profileActionInFlightName)
-        .animation(.easeInOut(duration: 0.18), value: expandedProfileNames)
+        .animation(.easeInOut(duration: 0.18), value: viewModel.accounts.map(\.name))
+        .animation(.easeInOut(duration: 0.18), value: viewModel.switchingAccountName)
+        .animation(.easeInOut(duration: 0.18), value: viewModel.accountActionInFlightName)
+        .animation(.easeInOut(duration: 0.18), value: expandedAccountNames)
     }
 
     private var header: some View {
@@ -93,14 +93,14 @@ struct UsageMenuContentView: View {
 
     private func alertBanner(_ alert: MenuAlertState) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: alertSymbol(for: alert.severity))
+            Image(systemName: AccountPresentation.alertSymbol(for: alert.severity))
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(alertColor(for: alert.severity))
+                .foregroundStyle(AccountPresentation.alertColor(for: alert.severity))
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(alert.title)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(alertColor(for: alert.severity))
+                    .foregroundStyle(AccountPresentation.alertColor(for: alert.severity))
                 Text(alert.message)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -120,56 +120,43 @@ struct UsageMenuContentView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(alertColor(for: alert.severity).opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(AccountPresentation.alertColor(for: alert.severity).opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(alertColor(for: alert.severity).opacity(0.24), lineWidth: 1)
+                .stroke(AccountPresentation.alertColor(for: alert.severity).opacity(0.24), lineWidth: 1)
         )
     }
 
-    private func subtleWarningRow(_ text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.orange)
-            Text(text)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    private func currentProfileCard(_ profile: ProfileUsage) -> some View {
+    private func currentAccountCard(_ account: AccountUsage) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Current Profile")
+                    Text("Current Account")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                    Text(profile.name)
+                    Text(account.name)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                 }
                 Spacer()
-                statePill(profile.connectionState.label, tone: statusColor(for: profile.connectionState))
+                AccountStatusPill(
+                    text: account.connectionState.label,
+                    color: AccountPresentation.statusColor(for: account.connectionState)
+                )
             }
 
             HStack(spacing: 8) {
-                CompactUsageMetric(
+                AccountUsageMetricCard(
                     title: "5h",
-                    metric: profile.usage.fiveHour,
+                    metric: account.usage.fiveHour,
                     resetDisplayMode: viewModel.resetDisplayMode,
-                    progressValue: viewModel.progressValue(for: profile.usage.fiveHour)
+                    progressValue: viewModel.progressValue(for: account.usage.fiveHour)
                 )
-                CompactUsageMetric(
+                AccountUsageMetricCard(
                     title: "weekly",
-                    metric: profile.usage.weekly,
+                    metric: account.usage.weekly,
                     resetDisplayMode: viewModel.resetDisplayMode,
-                    progressValue: viewModel.progressValue(for: profile.usage.weekly)
+                    progressValue: viewModel.progressValue(for: account.usage.weekly)
                 )
             }
         }
@@ -184,15 +171,15 @@ struct UsageMenuContentView: View {
         )
     }
 
-    private var quickProfilesCard: some View {
+    private var quickAccountsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Profiles")
+                Text("Accounts")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                if hiddenProfilesCount > 0 {
-                    Text("+\(hiddenProfilesCount) more in Settings")
+                if hiddenAccountsCount > 0 {
+                    Text("+\(hiddenAccountsCount) more in Settings")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -200,16 +187,16 @@ struct UsageMenuContentView: View {
 
             VStack(spacing: 7) {
                 ForEach(visibleRows) { row in
-                    MenuProfileQuickRow(
+                    MenuAccountQuickRow(
                         row: row,
-                        isSelected: row.name == selectedProfileName,
-                        isExpanded: expandedProfileNames.contains(row.name),
-                        fiveHourProgressValue: viewModel.progressValue(for: row.profile.usage.fiveHour),
-                        weeklyProgressValue: viewModel.progressValue(for: row.profile.usage.weekly),
+                        isSelected: row.name == selectedAccountName,
+                        isExpanded: expandedAccountNames.contains(row.name),
+                        fiveHourProgressValue: viewModel.progressValue(for: row.account.usage.fiveHour),
+                        weeklyProgressValue: viewModel.progressValue(for: row.account.usage.weekly),
                         isBusy: isActionBusy,
-                        isSwitching: viewModel.switchingProfileName == row.name,
-                        isAuthRunning: viewModel.profileActionInFlightName == row.name,
-                        onSelect: { selectedProfileName = row.name },
+                        isSwitching: viewModel.switchingAccountName == row.name,
+                        isAuthRunning: viewModel.accountActionInFlightName == row.name,
+                        onSelect: { selectedAccountName = row.name },
                         onPrimaryAction: { performPrimaryAction(for: row) },
                         onToggleExpanded: { toggleExpanded(row.name) }
                     )
@@ -235,7 +222,7 @@ struct UsageMenuContentView: View {
 
     private var emptyStateCard: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Label("Set up your first profile", systemImage: "sparkles")
+            Label("Set up your first account", systemImage: "sparkles")
                 .font(.subheadline.weight(.semibold))
 
             Text(onboardingCopy)
@@ -243,24 +230,24 @@ struct UsageMenuContentView: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 6) {
-                Image(systemName: runtimeStatusSymbol)
+                Image(systemName: runtimeStatus.symbol)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(runtimeStatusColor)
-                Text(runtimeStatusText)
+                    .foregroundStyle(runtimeStatus.color)
+                Text(runtimeStatus.text)
                     .font(.caption2)
-                    .foregroundStyle(viewModel.isCodexRuntimeAvailable ? .secondary : runtimeStatusColor)
+                    .foregroundStyle(viewModel.isCodexRuntimeAvailable ? .secondary : runtimeStatus.color)
                     .lineLimit(2)
             }
 
             HStack(spacing: 8) {
                 ActionPillButton(
-                    title: viewModel.isCodexRuntimeAvailable ? "Login First Profile" : "Fix Runtime",
+                    title: viewModel.isCodexRuntimeAvailable ? "Login First Account" : "Fix Runtime",
                     symbol: viewModel.isCodexRuntimeAvailable ? "person.crop.circle.badge.plus" : "terminal",
                     role: .primary,
                     isDisabled: isActionBusy
                 ) {
                     if viewModel.isCodexRuntimeAvailable {
-                        viewModel.startNewProfileLogin()
+                        viewModel.startNewAccountLogin()
                     } else {
                         viewModel.selectSettingsSection(.runtime)
                         openSettingsWindow()
@@ -291,7 +278,7 @@ struct UsageMenuContentView: View {
                 role: loginNewFooterRole,
                 isDisabled: isActionBusy
             ) {
-                viewModel.startNewProfileLogin()
+                viewModel.startNewAccountLogin()
             }
 
             Spacer()
@@ -304,16 +291,16 @@ struct UsageMenuContentView: View {
         }
     }
 
-    private var visibleRows: [ProfileRowState] {
-        viewModel.menuProfileRows(limit: viewModel.preferredMenuProfileCount)
+    private var visibleRows: [AccountRowState] {
+        viewModel.menuAccountRows(limit: viewModel.preferredMenuAccountCount)
     }
 
-    private var hiddenProfilesCount: Int {
-        max(0, viewModel.profiles.count - visibleRows.count)
+    private var hiddenAccountsCount: Int {
+        max(0, viewModel.accounts.count - visibleRows.count)
     }
 
     private var loginNewFooterRole: ActionPillRole {
-        if viewModel.prioritizedMenuAlert != nil || viewModel.profiles.isEmpty {
+        if viewModel.prioritizedMenuAlert != nil || viewModel.accounts.isEmpty {
             return .secondary
         }
         return .primary
@@ -322,35 +309,13 @@ struct UsageMenuContentView: View {
     private var onboardingCopy: String {
         switch viewModel.onboardingState.step {
         case .runtime:
-            return "Confirm the codex runtime first, then connect your first profile."
+            return "Confirm the codex runtime first, then connect your first account."
         case .login:
             return "Login once and MultiCodex will start showing usage cards automatically."
         case .verify:
-            return "Verify authentication status for your profile to finish setup."
+            return "Verify authentication status for your account to finish setup."
         case .done:
             return "Your setup is complete."
-        }
-    }
-
-    private func alertColor(for severity: MenuAlertState.Severity) -> Color {
-        switch severity {
-        case .runtimeUnavailable:
-            return .orange
-        case .refreshError:
-            return .red
-        case .authRequired:
-            return .orange
-        }
-    }
-
-    private func alertSymbol(for severity: MenuAlertState.Severity) -> String {
-        switch severity {
-        case .runtimeUnavailable:
-            return "terminal"
-        case .refreshError:
-            return "exclamationmark.triangle.fill"
-        case .authRequired:
-            return "person.crop.circle.badge.exclamationmark"
         }
     }
 
@@ -364,10 +329,10 @@ struct UsageMenuContentView: View {
         }
     }
 
-    private func performPrimaryAction(for row: ProfileRowState) {
+    private func performPrimaryAction(for row: AccountRowState) {
         switch row.primaryAction {
-        case .switchProfile:
-            viewModel.switchToProfile(named: row.name)
+        case .switchAccount:
+            viewModel.switchToAccount(named: row.name)
         case .relogin:
             viewModel.openLoginInTerminal(for: row.name)
         case .none:
@@ -376,10 +341,10 @@ struct UsageMenuContentView: View {
     }
 
     private var activeToast: (text: String, color: Color)? {
-        if let error = viewModel.profileActionError {
+        if let error = viewModel.accountActionError {
             return (error, .red)
         }
-        if let message = viewModel.profileActionMessage {
+        if let message = viewModel.accountActionMessage {
             return (message, .green)
         }
         return nil
@@ -403,51 +368,14 @@ struct UsageMenuContentView: View {
     }
 
     private var isActionBusy: Bool {
-        viewModel.isRefreshing || viewModel.profileActionInFlightName != nil || viewModel.switchingProfileName != nil
+        viewModel.isRefreshing || viewModel.accountActionInFlightName != nil || viewModel.switchingAccountName != nil
     }
 
-    private var runtimeStatusText: String {
-        viewModel.runtimeProbeSummary ?? "Checking codex runtime..."
-    }
-
-    private var runtimeStatusSymbol: String {
-        if viewModel.isCodexRuntimeAvailable {
-            return "checkmark.circle.fill"
-        }
-        if viewModel.runtimeProbeSummary == nil {
-            return "clock"
-        }
-        return "exclamationmark.triangle.fill"
-    }
-
-    private var runtimeStatusColor: Color {
-        if viewModel.isCodexRuntimeAvailable {
-            return .green
-        }
-        if viewModel.runtimeProbeSummary == nil {
-            return .secondary
-        }
-        return .orange
-    }
-
-    private func statusColor(for state: ProfileConnectionState) -> Color {
-        switch state {
-        case .connected:
-            return .green
-        case .needsLogin:
-            return .orange
-        case .error:
-            return .red
-        }
-    }
-
-    private func statePill(_ text: String, tone: Color) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(tone.opacity(0.14), in: Capsule())
-            .foregroundStyle(tone)
+    private var runtimeStatus: RuntimeStatusPresentation {
+        AccountPresentation.runtimeStatus(
+            summary: viewModel.runtimeProbeSummary,
+            isAvailable: viewModel.isCodexRuntimeAvailable
+        )
     }
 
     private func openSettingsWindow() {
@@ -459,17 +387,17 @@ struct UsageMenuContentView: View {
     private func synchronizeSelection() {
         let names = visibleRows.map(\.name)
 
-        if let focus = viewModel.focusedProfileName, names.contains(focus) {
-            selectedProfileName = focus
+        if let focus = viewModel.focusedAccountName, names.contains(focus) {
+            selectedAccountName = focus
             viewModel.dismissFocusHint()
             return
         }
 
-        if let selectedProfileName, names.contains(selectedProfileName) {
+        if let selectedAccountName, names.contains(selectedAccountName) {
             return
         }
 
-        selectedProfileName = names.first
+        selectedAccountName = names.first
     }
 
     private func installKeyboardMonitor() {
@@ -519,21 +447,21 @@ struct UsageMenuContentView: View {
         let names = visibleRows.map(\.name)
         guard !names.isEmpty else { return }
 
-        guard let selectedProfileName,
-              let idx = names.firstIndex(of: selectedProfileName)
+        guard let selectedAccountName,
+              let idx = names.firstIndex(of: selectedAccountName)
         else {
-            self.selectedProfileName = names.first
+            self.selectedAccountName = names.first
             return
         }
 
         let next = (idx + delta + names.count) % names.count
-        self.selectedProfileName = names[next]
+        self.selectedAccountName = names[next]
     }
 
     private func triggerPrimaryActionForSelection() {
         guard
-            let selectedProfileName,
-            let row = visibleRows.first(where: { $0.name == selectedProfileName })
+            let selectedAccountName,
+            let row = visibleRows.first(where: { $0.name == selectedAccountName })
         else {
             return
         }
@@ -541,59 +469,17 @@ struct UsageMenuContentView: View {
         performPrimaryAction(for: row)
     }
 
-    private func toggleExpanded(_ profileName: String) {
-        if expandedProfileNames.contains(profileName) {
-            expandedProfileNames.remove(profileName)
+    private func toggleExpanded(_ accountName: String) {
+        if expandedAccountNames.contains(accountName) {
+            expandedAccountNames.remove(accountName)
         } else {
-            expandedProfileNames.insert(profileName)
+            expandedAccountNames.insert(accountName)
         }
     }
 }
 
-private struct CompactUsageMetric: View {
-    let title: String
-    let metric: UsageMetric
-    let resetDisplayMode: ResetDisplayMode
-    let progressValue: Double
-
-    private var tone: Color {
-        switch UsageLevel.from(usedPercent: metric.usedPercent) {
-        case .critical:
-            return .red
-        case .warning:
-            return .orange
-        case .normal:
-            return .green
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(metric.percentText)
-                    .font(.caption.weight(.semibold))
-            }
-
-            ProgressView(value: progressValue)
-                .tint(tone)
-
-            Text(metric.resetText(mode: resetDisplayMode))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-}
-
-private struct MenuProfileQuickRow: View {
-    let row: ProfileRowState
+private struct MenuAccountQuickRow: View {
+    let row: AccountRowState
     let isSelected: Bool
     let isExpanded: Bool
     let fiveHourProgressValue: Double
@@ -614,9 +500,12 @@ private struct MenuProfileQuickRow: View {
                             .font(.caption.weight(.semibold))
                             .lineLimit(1)
                         if row.isCurrent {
-                            statePill("Current", tone: .accentColor)
+                            AccountStatusPill(text: "Current", color: .accentColor)
                         }
-                        statePill(row.connectionState.label, tone: statusColor(for: row.connectionState))
+                        AccountStatusPill(
+                            text: row.connectionState.label,
+                            color: AccountPresentation.statusColor(for: row.connectionState)
+                        )
                     }
 
                     HStack(spacing: 8) {
@@ -632,7 +521,7 @@ private struct MenuProfileQuickRow: View {
                 Spacer(minLength: 8)
 
                 if row.primaryAction != .none {
-                    if row.primaryAction == .switchProfile, isSwitching {
+                    if row.primaryAction == .switchAccount, isSwitching {
                         ProgressView()
                             .controlSize(.small)
                     } else if row.primaryAction == .relogin, isAuthRunning {
@@ -662,24 +551,24 @@ private struct MenuProfileQuickRow: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        CompactUsageMetric(
+                        AccountUsageMetricCard(
                             title: "5h",
-                            metric: row.profile.usage.fiveHour,
+                            metric: row.account.usage.fiveHour,
                             resetDisplayMode: row.resetDisplayMode,
                             progressValue: fiveHourProgressValue
                         )
-                        CompactUsageMetric(
+                        AccountUsageMetricCard(
                             title: "weekly",
-                            metric: row.profile.usage.weekly,
+                            metric: row.account.usage.weekly,
                             resetDisplayMode: row.resetDisplayMode,
                             progressValue: weeklyProgressValue
                         )
                     }
 
-                    if let hint = row.profile.connectionHint {
+                    if let hint = row.account.connectionHint {
                         Text(hint)
                             .font(.caption2)
-                            .foregroundStyle(statusColor(for: row.connectionState))
+                            .foregroundStyle(AccountPresentation.statusColor(for: row.connectionState))
                             .lineLimit(2)
                     }
                 }
@@ -700,23 +589,4 @@ private struct MenuProfileQuickRow: View {
         .onTapGesture(perform: onSelect)
     }
 
-    private func statusColor(for state: ProfileConnectionState) -> Color {
-        switch state {
-        case .connected:
-            return .green
-        case .needsLogin:
-            return .orange
-        case .error:
-            return .red
-        }
-    }
-
-    private func statePill(_ text: String, tone: Color) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(tone.opacity(0.14), in: Capsule())
-            .foregroundStyle(tone)
-    }
 }

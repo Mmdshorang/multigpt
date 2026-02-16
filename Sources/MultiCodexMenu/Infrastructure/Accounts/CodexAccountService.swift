@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-final class MultiCodexCLI {
+final class CodexAccountService {
     static let defaultLimitsCacheTTLSeconds = 1_200
     static let minLimitsCacheTTLSeconds = 60
     static let maxLimitsCacheTTLSeconds = 7_200
@@ -20,16 +20,8 @@ final class MultiCodexCLI {
         return formatter
     }()
 
-    private struct ProcessResult {
-        let exitCode: Int32
-        let stdout: String
-        let stderr: String
-    }
-
-    private struct NativeConfig {
-        var currentAccount: String?
-        var accounts: Set<String>
-    }
+    private typealias ProcessResult = CodexCommandResult
+    private typealias NativeConfig = AccountConfigRecord
 
     private struct AccountMeta: Codable {
         var createdAt: String
@@ -64,10 +56,7 @@ final class MultiCodexCLI {
         let provider: String?
     }
 
-    private struct LimitsCacheFile: Codable {
-        var version: Int
-        var accounts: [String: LimitsCacheEntry]
-    }
+    private typealias LimitsCacheFile = LimitsCacheRecord<LimitsCacheEntry>
 
     private struct UsageHTTPResponse {
         let statusCode: Int
@@ -75,11 +64,7 @@ final class MultiCodexCLI {
         let data: Data
     }
 
-    private struct CodexRuntime {
-        let executableURL: URL
-        let prefixArguments: [String]
-        let display: String
-    }
+    private typealias CodexRuntime = CodexRuntimeDescriptor
 
     struct RuntimeProbe {
         let isAvailable: Bool
@@ -122,7 +107,7 @@ final class MultiCodexCLI {
 
     // Kept for backward compatibility with existing settings key.
     // This now points to a codex executable path/name (not Node).
-    var customNodePath: String?
+    var customCodexPath: String?
     var sandboxHomeDirectory: String?
     var sandboxMulticodexHomeDirectory: String?
     var limitsCacheTTLSeconds: Int = defaultLimitsCacheTTLSeconds
@@ -172,14 +157,14 @@ final class MultiCodexCLI {
 
     func openLoginInTerminal(account name: String) throws {
         _ = try switchAccountNow(name: name)
-        let command = try makeTerminalCodexLoginCommand(profileName: name, firstTime: false)
+        let command = try makeTerminalCodexLoginCommand(accountName: name, firstTime: false)
         try launchTerminal(script: command)
     }
 
-    func openNewProfileLoginInTerminal(newProfileName name: String) throws {
+    func openNewAccountLoginInTerminal(newAccountName name: String) throws {
         _ = try addAccountIfNeededNow(name: name)
         _ = try switchAccountNow(name: name)
-        let command = try makeTerminalCodexLoginCommand(profileName: name, firstTime: true)
+        let command = try makeTerminalCodexLoginCommand(accountName: name, firstTime: true)
         try launchTerminal(script: command)
     }
 
@@ -192,7 +177,7 @@ final class MultiCodexCLI {
         let result = try await runCodexCaptureAsync(arguments: ["login"])
         let combined = (result.stdout + result.stderr).trimmingCharacters(in: .whitespacesAndNewlines)
         guard result.exitCode == 0 else {
-            throw MultiCodexCLIError(message: combined.isEmpty ? "Login failed." : combined)
+            throw CodexAccountServiceError(message: combined.isEmpty ? "Login failed." : combined)
         }
         return combined
     }
@@ -253,7 +238,7 @@ final class MultiCodexCLI {
 
         if config.accounts.contains(account) {
             if onExisting == .fail {
-                throw MultiCodexCLIError(message: "Account already exists: \(account)")
+                throw CodexAccountServiceError(message: "Account already exists: \(account)")
             }
             return AddAccountPayload(account: account, currentAccount: config.currentAccount)
         }
@@ -276,7 +261,7 @@ final class MultiCodexCLI {
         var config = try loadConfig(paths: paths)
 
         guard config.accounts.contains(account) else {
-            throw MultiCodexCLIError(message: "Unknown account: \(account)")
+            throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
 
         try applyAccountAuthToDefault(account: account, forceLock: false, paths: paths)
@@ -296,7 +281,7 @@ final class MultiCodexCLI {
         var config = try loadConfig(paths: paths)
 
         guard config.accounts.contains(account) else {
-            throw MultiCodexCLIError(message: "Unknown account: \(account)")
+            throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
 
         config.accounts.remove(account)
@@ -321,10 +306,10 @@ final class MultiCodexCLI {
         var config = try loadConfig(paths: paths)
 
         guard config.accounts.contains(source) else {
-            throw MultiCodexCLIError(message: "Unknown account: \(source)")
+            throw CodexAccountServiceError(message: "Unknown account: \(source)")
         }
         guard !config.accounts.contains(target) else {
-            throw MultiCodexCLIError(message: "Account already exists: \(target)")
+            throw CodexAccountServiceError(message: "Account already exists: \(target)")
         }
 
         let srcDir = paths.accountDir(source)
@@ -354,7 +339,7 @@ final class MultiCodexCLI {
         let paths = currentPaths()
         let config = try loadConfig(paths: paths)
         guard config.accounts.contains(account) else {
-            throw MultiCodexCLIError(message: "Unknown account: \(account)")
+            throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
 
         let lock = try acquireAuthLock(account: account, force: false, paths: paths)
@@ -375,7 +360,7 @@ final class MultiCodexCLI {
         let paths = currentPaths()
         let config = try loadConfig(paths: paths)
         guard config.accounts.contains(account) else {
-            throw MultiCodexCLIError(message: "Unknown account: \(account)")
+            throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
 
         let result = try withAccountAuth(account: account, forceLock: false, restorePreviousAuth: true, paths: paths) {
@@ -485,7 +470,7 @@ final class MultiCodexCLI {
         do {
             try process.run()
         } catch {
-            throw MultiCodexCLIError(message: "Could not run \(runtime.display): \(error.localizedDescription)")
+            throw CodexAccountServiceError(message: "Could not run \(runtime.display): \(error.localizedDescription)")
         }
 
         let stdoutHandle = stdoutPipe.fileHandleForReading
@@ -554,15 +539,18 @@ final class MultiCodexCLI {
         }
 
         do {
-            try writeRpcMessage(["id": 1, "method": "initialize", "params": ["clientInfo": ["name": "multicodex-mac", "version": "native"]]], to: stdinHandle)
-            try writeRpcMessage(["method": "initialized", "params": [:]], to: stdinHandle)
-            try writeRpcMessage(["id": 2, "method": "account/rateLimits/read", "params": [:]], to: stdinHandle)
+            try RateLimitsRPCClient.writeMessage(
+                ["id": 1, "method": "initialize", "params": ["clientInfo": ["name": "multicodex-mac", "version": "native"]]],
+                to: stdinHandle
+            )
+            try RateLimitsRPCClient.writeMessage(["method": "initialized", "params": [:]], to: stdinHandle)
+            try RateLimitsRPCClient.writeMessage(["id": 2, "method": "account/rateLimits/read", "params": [:]], to: stdinHandle)
         } catch {
             stdoutHandle.readabilityHandler = nil
             stderrHandle.readabilityHandler = nil
             if process.isRunning { process.terminate() }
             process.waitUntilExit()
-            throw MultiCodexCLIError(message: "Could not write Codex RPC request: \(error.localizedDescription)")
+            throw CodexAccountServiceError(message: "Could not write Codex RPC request: \(error.localizedDescription)")
         }
 
         let waitResult = responseSemaphore.wait(timeout: .now() + 12)
@@ -579,21 +567,21 @@ final class MultiCodexCLI {
         if waitResult == .timedOut {
             let stderrText = stderrBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
             if stderrText.isEmpty {
-                throw MultiCodexCLIError(message: "Codex RPC timed out while fetching rate limits.")
+                throw CodexAccountServiceError(message: "Codex RPC timed out while fetching rate limits.")
             }
-            throw MultiCodexCLIError(message: "Codex RPC timed out: \(stderrText)")
+            throw CodexAccountServiceError(message: "Codex RPC timed out: \(stderrText)")
         }
 
         if let responseError, !responseError.isEmpty {
-            throw MultiCodexCLIError(message: "Codex RPC error: \(responseError)")
+            throw CodexAccountServiceError(message: "Codex RPC error: \(responseError)")
         }
 
         guard let message = responseMessage else {
             let stderrText = stderrBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
             if stderrText.isEmpty {
-                throw MultiCodexCLIError(message: "Codex RPC returned no response.")
+                throw CodexAccountServiceError(message: "Codex RPC returned no response.")
             }
-            throw MultiCodexCLIError(message: stderrText)
+            throw CodexAccountServiceError(message: stderrText)
         }
 
         let result = message["result"] as? [String: Any]
@@ -604,7 +592,7 @@ final class MultiCodexCLI {
         }
 
         guard let rateLimitsObject = rateLimitsValue as? [String: Any] else {
-            throw MultiCodexCLIError(message: "Unexpected Codex RPC payload for rate limits.")
+            throw CodexAccountServiceError(message: "Unexpected Codex RPC payload for rate limits.")
         }
 
         let data = try JSONSerialization.data(withJSONObject: rateLimitsObject, options: [])
@@ -619,18 +607,18 @@ final class MultiCodexCLI {
         if let apiKey = authPayload["OPENAI_API_KEY"] as? String,
            !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         {
-            throw MultiCodexCLIError(message: "Usage not available for API key.")
+            throw CodexAccountServiceError(message: "Usage not available for API key.")
         }
 
         guard let tokens = asObject(authPayload["tokens"]),
               let rawAccessToken = tokens["access_token"] as? String
         else {
-            throw MultiCodexCLIError(message: "Not logged in. Run `codex` to authenticate.")
+            throw CodexAccountServiceError(message: "Not logged in. Run `codex` to authenticate.")
         }
 
         var accessToken = rawAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !accessToken.isEmpty else {
-            throw MultiCodexCLIError(message: "Not logged in. Run `codex` to authenticate.")
+            throw CodexAccountServiceError(message: "Not logged in. Run `codex` to authenticate.")
         }
 
         let accountID = (tokens["account_id"] as? String)?
@@ -653,15 +641,15 @@ final class MultiCodexCLI {
         }
 
         if usageResponse.statusCode == 401 || usageResponse.statusCode == 403 {
-            throw MultiCodexCLIError(message: "Token expired. Run `codex` to log in again.")
+            throw CodexAccountServiceError(message: "Token expired. Run `codex` to log in again.")
         }
 
         guard (200...299).contains(usageResponse.statusCode) else {
-            throw MultiCodexCLIError(message: "Usage request failed (HTTP \(usageResponse.statusCode)). Try again later.")
+            throw CodexAccountServiceError(message: "Usage request failed (HTTP \(usageResponse.statusCode)). Try again later.")
         }
 
         guard let usageBody = parseJSONRecord(usageResponse.data) else {
-            throw MultiCodexCLIError(message: "Usage response invalid. Try again later.")
+            throw CodexAccountServiceError(message: "Usage response invalid. Try again later.")
         }
 
         return parseUsageSnapshotFromWhamResponse(
@@ -671,19 +659,11 @@ final class MultiCodexCLI {
     }
 
     private func fetchUsage(accessToken: String, accountID: String?) throws -> UsageHTTPResponse {
-        guard let url = URL(string: Self.usageURLString) else {
-            throw MultiCodexCLIError(message: "Usage request URL is invalid.")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("multicodex", forHTTPHeaderField: "User-Agent")
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        if let accountID, !accountID.isEmpty {
-            request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
-        }
-
+        let request = try UsageAPIClient.makeUsageRequest(
+            urlString: Self.usageURLString,
+            accessToken: accessToken,
+            accountID: accountID
+        )
         return try performHTTPRequest(request: request, timeoutSeconds: 10)
     }
 
@@ -695,14 +675,12 @@ final class MultiCodexCLI {
             return nil
         }
 
-        guard let url = URL(string: Self.refreshTokenURLString) else {
+        guard let request = UsageAPIClient.makeRefreshTokenRequest(
+            urlString: Self.refreshTokenURLString,
+            body: buildRefreshRequestBody(refreshToken: refreshToken)
+        ) else {
             return nil
         }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = buildRefreshRequestBody(refreshToken: refreshToken)
 
         let response: UsageHTTPResponse
         do {
@@ -714,7 +692,7 @@ final class MultiCodexCLI {
         let responseBody = parseJSONRecord(response.data)
         if response.statusCode == 400 || response.statusCode == 401 {
             let code = refreshErrorCode(from: responseBody)
-            throw MultiCodexCLIError(message: tokenErrorMessage(forRefreshCode: code))
+            throw CodexAccountServiceError(message: tokenErrorMessage(forRefreshCode: code))
         }
 
         guard (200...299).contains(response.statusCode) else {
@@ -771,13 +749,13 @@ final class MultiCodexCLI {
 
         if waitResult == .timedOut {
             task.cancel()
-            throw MultiCodexCLIError(message: "Usage request timed out. Try again later.")
+            throw CodexAccountServiceError(message: "Usage request timed out. Try again later.")
         }
         if let responseError {
-            throw MultiCodexCLIError(message: "Usage request failed: \(responseError.localizedDescription)")
+            throw CodexAccountServiceError(message: "Usage request failed: \(responseError.localizedDescription)")
         }
         guard let responseObject else {
-            throw MultiCodexCLIError(message: "Usage response invalid. Try again later.")
+            throw CodexAccountServiceError(message: "Usage response invalid. Try again later.")
         }
 
         return UsageHTTPResponse(
@@ -789,7 +767,7 @@ final class MultiCodexCLI {
 
     private func loadAuthPayload(from path: String) throws -> [String: Any] {
         guard let rawData = readFileIfExists(path), !rawData.isEmpty else {
-            throw MultiCodexCLIError(message: "Not logged in. Run `codex` to authenticate.")
+            throw CodexAccountServiceError(message: "Not logged in. Run `codex` to authenticate.")
         }
 
         if let parsed = parseJSONRecord(rawData) {
@@ -803,7 +781,7 @@ final class MultiCodexCLI {
             return decoded
         }
 
-        throw MultiCodexCLIError(message: "Not logged in. Run `codex` to authenticate.")
+        throw CodexAccountServiceError(message: "Not logged in. Run `codex` to authenticate.")
     }
 
     private func persistAuthPayload(_ payload: [String: Any], path: String) throws {
@@ -1052,14 +1030,6 @@ final class MultiCodexCLI {
         return String(value)
     }
 
-    private func writeRpcMessage(_ payload: [String: Any], to handle: FileHandle) throws {
-        let data = try JSONSerialization.data(withJSONObject: payload, options: [])
-        handle.write(data)
-        if let newline = "\n".data(using: .utf8) {
-            handle.write(newline)
-        }
-    }
-
     // MARK: - Terminal login
 
     private func launchTerminal(script: String) throws {
@@ -1083,26 +1053,26 @@ final class MultiCodexCLI {
         do {
             try process.run()
         } catch {
-            throw MultiCodexCLIError(message: "Could not open Terminal for login: \(error.localizedDescription)")
+            throw CodexAccountServiceError(message: "Could not open Terminal for login: \(error.localizedDescription)")
         }
 
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            throw MultiCodexCLIError(message: "Could not launch Terminal login session (exit \(process.terminationStatus)).")
+            throw CodexAccountServiceError(message: "Could not launch Terminal login session (exit \(process.terminationStatus)).")
         }
     }
 
-    private func makeTerminalCodexLoginCommand(profileName: String, firstTime: Bool) throws -> String {
+    private func makeTerminalCodexLoginCommand(accountName: String, firstTime: Bool) throws -> String {
         let appName = shellQuote("MultiCodex")
-        let profile = shellQuote(profileName)
+        let account = shellQuote(accountName)
         let codexLoginCommand = try makeCodexShellCommand(arguments: ["login"])
 
         var lines = terminalPreambleLines()
         if firstTime {
             lines.append("echo \"Starting first-time MultiCodex login...\"")
-            lines.append("echo \"Profile \(profile) is ready and can be renamed later in Settings.\"")
+            lines.append("echo \"Account \(account) is ready and can be renamed later in Settings.\"")
         } else {
-            lines.append("echo \"Starting MultiCodex login flow for \(profile)...\"")
+            lines.append("echo \"Starting MultiCodex login flow for \(account)...\"")
         }
         lines.append(codexLoginCommand)
         lines.append("LOGIN_EXIT=$?")
@@ -1120,50 +1090,11 @@ final class MultiCodexCLI {
     // MARK: - Runtime and process
 
     private func resolveCodexRuntime() throws -> CodexRuntime {
-        func runtimeForRaw(_ raw: String, source: String) throws -> CodexRuntime {
-            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                throw MultiCodexCLIError(message: "Empty runtime value for \(source).")
-            }
-            if trimmed.contains("/") {
-                let expanded = (trimmed as NSString).expandingTildeInPath
-                if fileManager.isExecutableFile(atPath: expanded) {
-                    return CodexRuntime(executableURL: URL(fileURLWithPath: expanded), prefixArguments: [], display: "\(expanded) [\(source)]")
-                }
-                throw MultiCodexCLIError(message: "Configured codex executable is not executable: \(expanded)")
-            }
-            return CodexRuntime(executableURL: URL(fileURLWithPath: "/usr/bin/env"), prefixArguments: [trimmed], display: "\(trimmed) (from PATH, \(source))")
-        }
-
-        if let custom = customNodePath?.trimmingCharacters(in: .whitespacesAndNewlines), !custom.isEmpty {
-            // Migration guard: ignore old Node path values if present.
-            let lower = custom.lowercased()
-            if !lower.hasSuffix("/node") && lower != "node" {
-                let runtime = try runtimeForRaw(custom, source: "custom")
-                updateResolutionHint(runtime: runtime)
-                return runtime
-            }
-        }
-
-        if let envRaw = ProcessInfo.processInfo.environment["MULTICODEX_CODEX"], !envRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            let runtime = try runtimeForRaw(envRaw, source: "MULTICODEX_CODEX")
-            updateResolutionHint(runtime: runtime)
-            return runtime
-        }
-
-        let knownPaths = [
-            "/opt/homebrew/bin/codex",
-            "/usr/local/bin/codex",
-            "/usr/bin/codex",
-        ]
-
-        for codexPath in knownPaths where fileManager.isExecutableFile(atPath: codexPath) {
-            let runtime = CodexRuntime(executableURL: URL(fileURLWithPath: codexPath), prefixArguments: [], display: codexPath)
-            updateResolutionHint(runtime: runtime)
-            return runtime
-        }
-
-        let runtime = CodexRuntime(executableURL: URL(fileURLWithPath: "/usr/bin/env"), prefixArguments: ["codex"], display: "codex (from PATH)")
+        let runtime = try CodexRuntimeResolver.resolve(
+            customCodexPath: customCodexPath,
+            fileManager: fileManager,
+            environment: ProcessInfo.processInfo.environment
+        )
         updateResolutionHint(runtime: runtime)
         return runtime
     }
@@ -1178,71 +1109,20 @@ final class MultiCodexCLI {
 
     private func runCodexCapture(arguments: [String]) throws -> ProcessResult {
         let runtime = try resolveCodexRuntime()
-        let process = Process()
-        process.executableURL = runtime.executableURL
-        process.arguments = runtime.prefixArguments + arguments
-        process.environment = baseEnvironment()
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try process.run()
-        } catch {
-            throw MultiCodexCLIError(message: "Could not run \(runtime.display): \(error.localizedDescription)")
-        }
-
-        process.waitUntilExit()
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-
-        return ProcessResult(
-            exitCode: process.terminationStatus,
-            stdout: stdout,
-            stderr: stderr
+        return try CodexCommandRunner.runSync(
+            runtime: runtime,
+            arguments: arguments,
+            environment: baseEnvironment()
         )
     }
 
     private func runCodexCaptureAsync(arguments: [String]) async throws -> ProcessResult {
         let runtime = try resolveCodexRuntime()
-        let process = Process()
-        process.executableURL = runtime.executableURL
-        process.arguments = runtime.prefixArguments + arguments
-        process.environment = baseEnvironment()
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        return try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { process in
-                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-                let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-                continuation.resume(
-                    returning: ProcessResult(
-                        exitCode: process.terminationStatus,
-                        stdout: stdout,
-                        stderr: stderr
-                    )
-                )
-            }
-
-            do {
-                try process.run()
-            } catch {
-                process.terminationHandler = nil
-                continuation.resume(throwing: MultiCodexCLIError(message: "Could not run \(runtime.display): \(error.localizedDescription)"))
-            }
-        }
+        return try await CodexCommandRunner.runAsync(
+            runtime: runtime,
+            arguments: arguments,
+            environment: baseEnvironment()
+        )
     }
 
     private func makeCodexShellCommand(arguments: [String]) throws -> String {
@@ -1294,34 +1174,11 @@ final class MultiCodexCLI {
     }
 
     private func loadConfig(paths: PathContext) throws -> NativeConfig {
-        guard let data = readFileIfExists(paths.configPath), !data.isEmpty else {
-            return NativeConfig(currentAccount: nil, accounts: [])
-        }
-
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return NativeConfig(currentAccount: nil, accounts: [])
-        }
-
-        if let version = json["version"] as? Int, (version == 1 || version == 2) {
-            let current = json["currentAccount"] as? String
-            let accountObjects = json["accounts"] as? [String: Any] ?? [:]
-            return NativeConfig(currentAccount: current, accounts: Set(accountObjects.keys))
-        }
-
-        return NativeConfig(currentAccount: nil, accounts: [])
+        try AccountConfigStore.decodeConfig(from: readFileIfExists(paths.configPath))
     }
 
     private func saveConfig(_ config: NativeConfig, paths: PathContext) throws {
-        let accountsObject = Dictionary(uniqueKeysWithValues: config.accounts.sorted().map { ($0, [String: Any]()) })
-        var root: [String: Any] = [
-            "version": 2,
-            "accounts": accountsObject,
-        ]
-        if let current = config.currentAccount {
-            root["currentAccount"] = current
-        }
-
-        let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+        let data = try AccountConfigStore.encodeConfig(config)
         try writeFileAtomic(data: data + Data("\n".utf8), path: paths.configPath, mode: 0o600)
     }
 
@@ -1342,7 +1199,7 @@ final class MultiCodexCLI {
 
         let tmp = "\(path).tmp.\(UUID().uuidString)"
         guard fileManager.createFile(atPath: tmp, contents: data) else {
-            throw MultiCodexCLIError(message: "Could not create temporary file at \(tmp).")
+            throw CodexAccountServiceError(message: "Could not create temporary file at \(tmp).")
         }
         try fileManager.setAttributes([.posixPermissions: NSNumber(value: mode)], ofItemAtPath: tmp)
 
@@ -1421,7 +1278,7 @@ final class MultiCodexCLI {
             }
 
             if errno != EEXIST {
-                throw MultiCodexCLIError(message: "Failed to acquire auth lock (errno \(errno)).")
+                throw CodexAccountServiceError(message: "Failed to acquire auth lock (errno \(errno)).")
             }
 
             let existing = readOwner(lockDir: lockDir)
@@ -1442,7 +1299,7 @@ final class MultiCodexCLI {
                 who = "unknown owner"
             }
 
-            throw MultiCodexCLIError(message: "Auth swap is locked by \(who). Close the other session and retry.")
+            throw CodexAccountServiceError(message: "Auth swap is locked by \(who). Close the other session and retry.")
         }
     }
 
@@ -1523,14 +1380,21 @@ final class MultiCodexCLI {
     }
 
     private func syncAuthFile(from source: String, to destination: String, destinationDirectory: String? = nil) throws {
-        if let data = readFileIfExists(source) {
-            if let destinationDirectory {
-                try createDirectory(path: destinationDirectory, mode: 0o700)
+        try AccountAuthCoordinator.syncAuthFile(
+            fileManager: fileManager,
+            sourcePath: source,
+            destinationPath: destination,
+            destinationDirectory: destinationDirectory,
+            writeFile: { data, path, mode in
+                try self.writeFileAtomic(data: data, path: path, mode: mode)
+            },
+            deleteFile: { path in
+                try self.deleteFileIfExists(path)
+            },
+            createDirectory: { path, mode in
+                try self.createDirectory(path: path, mode: mode)
             }
-            try writeFileAtomic(data: data, path: destination, mode: 0o600)
-        } else {
-            try deleteFileIfExists(destination)
-        }
+        )
     }
 
     // MARK: - Limits cache
@@ -1557,17 +1421,15 @@ final class MultiCodexCLI {
     }
 
     private func loadLimitsCache(paths: PathContext) throws -> LimitsCacheFile {
-        guard let data = readFileIfExists(paths.limitsCachePath), !data.isEmpty else {
-            return LimitsCacheFile(version: 1, accounts: [:])
-        }
-        if let decoded = try? decoder.decode(LimitsCacheFile.self, from: data), decoded.version == 1 {
-            return decoded
-        }
-        return LimitsCacheFile(version: 1, accounts: [:])
+        LimitsCacheStore.decode(
+            data: readFileIfExists(paths.limitsCachePath),
+            decoder: decoder,
+            defaultVersion: 1
+        )
     }
 
     private func saveLimitsCache(_ cache: LimitsCacheFile, paths: PathContext) throws {
-        let data = try encoder.encode(cache)
+        let data = try LimitsCacheStore.encode(cache, encoder: encoder)
         try writeFileAtomic(data: data + Data("\n".utf8), path: paths.limitsCachePath, mode: 0o600)
     }
 
@@ -1580,7 +1442,7 @@ final class MultiCodexCLI {
     private func validatedAccountName(_ name: String) throws -> String {
         let account = normalizeAccountName(name)
         guard isValidAccountName(account) else {
-            throw MultiCodexCLIError(message: "Invalid account name. Use letters, numbers, underscore, or dash.")
+            throw CodexAccountServiceError(message: "Invalid account name. Use letters, numbers, underscore, or dash.")
         }
         return account
     }
@@ -1603,7 +1465,7 @@ final class MultiCodexCLI {
     }
 }
 
-struct MultiCodexCLIError: LocalizedError {
+struct CodexAccountServiceError: LocalizedError {
     let message: String
 
     var errorDescription: String? {

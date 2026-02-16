@@ -3,11 +3,11 @@ import SwiftUI
 @main
 struct MultiCodexMenuApp: App {
     @NSApplicationDelegateAdaptor(MultiCodexAppDelegate.self) private var appDelegate
-    @StateObject private var viewModel = UsageMenuViewModel()
+    @StateObject private var viewModel = AccountsMenuViewModel()
 
     var body: some Scene {
         MenuBarExtra {
-            UsageMenuContentView(viewModel: viewModel)
+            AccountsMenuContentView(viewModel: viewModel)
                 .frame(minWidth: 420, idealWidth: 440)
         } label: {
             MenuBarStatusLabelView(

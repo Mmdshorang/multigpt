@@ -36,7 +36,7 @@ enum UsageLevel {
     }
 }
 
-enum ProfileConnectionState {
+enum AccountConnectionState {
     case connected
     case needsLogin
     case error
@@ -102,7 +102,7 @@ struct UsageSummary {
     let credits: String
 }
 
-struct ProfileUsage: Identifiable {
+struct AccountUsage: Identifiable {
     let name: String
     let isCurrent: Bool
     let hasAuth: Bool
@@ -150,7 +150,7 @@ struct ProfileUsage: Identifiable {
         return UsageFormatter.relativeDateFormatter.localizedString(for: date, relativeTo: Date())
     }
 
-    var connectionState: ProfileConnectionState {
+    var connectionState: AccountConnectionState {
         if !hasAuth {
             return .needsLogin
         }

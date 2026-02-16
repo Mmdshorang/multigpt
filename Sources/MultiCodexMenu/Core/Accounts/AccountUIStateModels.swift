@@ -2,7 +2,7 @@ import Foundation
 
 enum SettingsSection: String, CaseIterable, Identifiable {
     case dashboard
-    case profiles
+    case accounts
     case runtime
     case display
     case troubleshooting
@@ -14,8 +14,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard:
             return "Dashboard"
-        case .profiles:
-            return "Profiles"
+        case .accounts:
+            return "Accounts"
         case .runtime:
             return "Runtime"
         case .display:
@@ -31,7 +31,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard:
             return "rectangle.grid.2x2"
-        case .profiles:
+        case .accounts:
             return "person.2"
         case .runtime:
             return "terminal"
@@ -96,7 +96,7 @@ struct MenuAlertState {
     enum Action: Equatable {
         case openRuntimeSettings
         case refreshLive
-        case relogin(profileName: String)
+        case relogin(accountName: String)
     }
 
     let severity: Severity
@@ -106,17 +106,17 @@ struct MenuAlertState {
     let action: Action
 }
 
-struct ProfileRowState: Identifiable {
+struct AccountRowState: Identifiable {
     enum PrimaryAction: Equatable {
         case none
-        case switchProfile
+        case switchAccount
         case relogin
 
         var title: String {
             switch self {
             case .none:
                 return ""
-            case .switchProfile:
+            case .switchAccount:
                 return "Switch"
             case .relogin:
                 return "Re-login"
@@ -127,7 +127,7 @@ struct ProfileRowState: Identifiable {
             switch self {
             case .none:
                 return ""
-            case .switchProfile:
+            case .switchAccount:
                 return "checkmark.circle.fill"
             case .relogin:
                 return "person.crop.circle.badge.plus"
@@ -135,26 +135,26 @@ struct ProfileRowState: Identifiable {
         }
     }
 
-    let profile: ProfileUsage
+    let account: AccountUsage
     let resetDisplayMode: ResetDisplayMode
 
-    var id: String { profile.name }
+    var id: String { account.name }
 
-    var name: String { profile.name }
-    var isCurrent: Bool { profile.isCurrent }
-    var connectionState: ProfileConnectionState { profile.connectionState }
-    var fiveHourPercent: String { profile.usage.fiveHour.percentText }
-    var weeklyPercent: String { profile.usage.weekly.percentText }
+    var name: String { account.name }
+    var isCurrent: Bool { account.isCurrent }
+    var connectionState: AccountConnectionState { account.connectionState }
+    var fiveHourPercent: String { account.usage.fiveHour.percentText }
+    var weeklyPercent: String { account.usage.weekly.percentText }
     var resetText: String {
-        profile.usage.fiveHour.resetText(mode: resetDisplayMode)
+        account.usage.fiveHour.resetText(mode: resetDisplayMode)
     }
 
     var primaryAction: PrimaryAction {
-        if profile.connectionState == .needsLogin {
+        if account.connectionState == .needsLogin {
             return .relogin
         }
-        if !profile.isCurrent {
-            return .switchProfile
+        if !account.isCurrent {
+            return .switchAccount
         }
         return .none
     }
@@ -188,11 +188,11 @@ struct OnboardingState {
     }
 }
 
-struct PendingProfileRemovalRequest: Identifiable {
-    let profileName: String
+struct PendingAccountRemovalRequest: Identifiable {
+    let accountName: String
     let deleteData: Bool
 
     var id: String {
-        "\(profileName)|\(deleteData)"
+        "\(accountName)|\(deleteData)"
     }
 }

@@ -1,14 +1,14 @@
 import Foundation
 
-enum UsageDataService {
-    static func mergeProfiles(
+enum AccountUsageMergeService {
+    static func mergeAccounts(
         accounts: AccountsListPayload,
         limits: LimitsPayload,
-        previousProfiles: [ProfileUsage] = []
-    ) -> [ProfileUsage] {
+        previousAccounts: [AccountUsage] = []
+    ) -> [AccountUsage] {
         let resultByAccount = Dictionary(uniqueKeysWithValues: limits.results.map { ($0.account, $0) })
         let errorsByAccount = Dictionary(uniqueKeysWithValues: limits.errors.map { ($0.account, $0.message) })
-        let previousByAccount = Dictionary(uniqueKeysWithValues: previousProfiles.map { ($0.name, $0) })
+        let previousByAccount = Dictionary(uniqueKeysWithValues: previousAccounts.map { ($0.name, $0) })
 
         let mapped = accounts.accounts.map { account in
             let result = resultByAccount[account.name]
@@ -20,7 +20,7 @@ enum UsageDataService {
             let source = preservedUsage?.source ?? UsageFormatter.sourceLabel(from: result)
             let effectiveUsageError = preservedUsage == nil ? usageError : nil
 
-            return ProfileUsage(
+            return AccountUsage(
                 name: account.name,
                 isCurrent: account.isCurrent || account.name == accounts.currentAccount,
                 hasAuth: account.hasAuth,
