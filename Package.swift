@@ -17,5 +17,10 @@ let package = Package(
                 .copy("Resources"),
             ]
         ),
+        .testTarget(
+            name: "MultiCodexMenuTests",
+            dependencies: ["MultiCodexMenu"],
+            path: "Tests/MultiCodexMenuTests"
+        ),
     ]
 )
