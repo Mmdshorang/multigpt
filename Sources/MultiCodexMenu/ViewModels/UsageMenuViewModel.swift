@@ -19,6 +19,14 @@ final class UsageMenuViewModel: ObservableObject {
     @Published private(set) var temporaryAuthSandboxHome: String?
     @Published var customNodePath: String
     @Published var resetDisplayMode: ResetDisplayMode
+    @Published private(set) var selectedSettingsSection: SettingsSection
+    @Published private(set) var selectedSettingsProfileName: String?
+    @Published private(set) var profileSearchQuery: String
+    @Published private(set) var hasCompletedOnboarding: Bool
+    @Published private(set) var isAdvancedSettingsVisible: Bool
+    @Published private(set) var menuDensity: MenuDensity
+    @Published private(set) var usageBarStyle: UsageBarStyle
+    @Published private(set) var pendingProfileRemovalRequest: PendingProfileRemovalRequest?
 
     private let cli = MultiCodexCLI()
     private let fileManager = FileManager.default
@@ -30,6 +38,12 @@ final class UsageMenuViewModel: ObservableObject {
         static let resetDisplayMode = "multicodexMenu.resetDisplayMode"
         static let temporaryAuthSandboxEnabled = "multicodexMenu.temporaryAuthSandboxEnabled"
         static let temporaryAuthSandboxHome = "multicodexMenu.temporaryAuthSandboxHome"
+        static let selectedSettingsSection = "multicodexMenu.selectedSettingsSection"
+        static let selectedSettingsProfileName = "multicodexMenu.selectedSettingsProfileName"
+        static let hasCompletedOnboarding = "multicodexMenu.hasCompletedOnboarding"
+        static let isAdvancedSettingsVisible = "multicodexMenu.isAdvancedSettingsVisible"
+        static let menuDensity = "multicodexMenu.menuDensity"
+        static let usageBarStyle = "multicodexMenu.usageBarStyle"
     }
     private var refreshLoopTask: Task<Void, Never>?
     private var didBecomeActiveObserver: NSObjectProtocol?
@@ -43,6 +57,19 @@ final class UsageMenuViewModel: ObservableObject {
             ?? ""
         let rawResetMode = defaults.string(forKey: DefaultsKey.resetDisplayMode)
         resetDisplayMode = ResetDisplayMode(rawValue: rawResetMode ?? "") ?? .relative
+        selectedSettingsSection = SettingsSection(
+            rawValue: defaults.string(forKey: DefaultsKey.selectedSettingsSection) ?? ""
+        ) ?? .dashboard
+        selectedSettingsProfileName = defaults.string(forKey: DefaultsKey.selectedSettingsProfileName)
+        profileSearchQuery = ""
+        hasCompletedOnboarding = defaults.bool(forKey: DefaultsKey.hasCompletedOnboarding)
+        isAdvancedSettingsVisible = defaults.bool(forKey: DefaultsKey.isAdvancedSettingsVisible)
+        menuDensity = MenuDensity(rawValue: defaults.string(forKey: DefaultsKey.menuDensity) ?? "") ?? .compact
+        usageBarStyle = UsageBarStyle(rawValue: defaults.string(forKey: DefaultsKey.usageBarStyle) ?? "") ?? .depleting
+        pendingProfileRemovalRequest = nil
+        if !isAdvancedSettingsVisible, selectedSettingsSection == .advanced {
+            selectedSettingsSection = .dashboard
+        }
 #if DEBUG
         isUsingTemporaryAuthSandbox = defaults.bool(forKey: DefaultsKey.temporaryAuthSandboxEnabled)
         temporaryAuthSandboxHome = defaults.string(forKey: DefaultsKey.temporaryAuthSandboxHome)
@@ -103,13 +130,6 @@ final class UsageMenuViewModel: ObservableObject {
         }
     }
 
-    var subtitle: String {
-        if let current = currentProfile {
-            return "Current profile: \(current.name)"
-        }
-        return "No current profile selected"
-    }
-
     var currentFiveHourFraction: Double {
         currentProfile?.usage.fiveHour.normalizedFraction ?? 0
     }
@@ -123,6 +143,109 @@ final class UsageMenuViewModel: ObservableObject {
             return "Not refreshed yet"
         }
         return "Updated \(UsageFormatter.relativeDateFormatter.localizedString(for: lastUpdatedAt, relativeTo: Date()))"
+    }
+
+    var profilesNeedingLogin: [ProfileUsage] {
+        profiles.filter { $0.connectionState == .needsLogin }
+    }
+
+    var filteredProfiles: [ProfileUsage] {
+        let query = profileSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return profiles
+        }
+
+        return profiles.filter { profile in
+            profile.name.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var selectedSettingsProfile: ProfileUsage? {
+        guard let selectedSettingsProfileName else {
+            return nil
+        }
+        return filteredProfiles.first(where: { $0.name == selectedSettingsProfileName })
+            ?? profiles.first(where: { $0.name == selectedSettingsProfileName })
+    }
+
+    var onboardingState: OnboardingState {
+        if hasCompletedOnboarding {
+            return OnboardingState(step: .done)
+        }
+        if !isCodexRuntimeAvailable {
+            return OnboardingState(step: .runtime)
+        }
+        if profiles.isEmpty {
+            return OnboardingState(step: .login)
+        }
+        if profiles.contains(where: { $0.connectionState != .connected }) {
+            return OnboardingState(step: .verify)
+        }
+        return OnboardingState(step: .done)
+    }
+
+    var prioritizedMenuAlert: MenuAlertState? {
+        if !isCodexRuntimeAvailable {
+            return MenuAlertState(
+                severity: .runtimeUnavailable,
+                title: "Codex runtime unavailable",
+                message: runtimeProbeSummary ?? "Set the runtime path in Settings.",
+                actionTitle: "Open Runtime Settings",
+                action: .openRuntimeSettings
+            )
+        }
+
+        if let lastRefreshError {
+            return MenuAlertState(
+                severity: .refreshError,
+                title: "Refresh failed",
+                message: lastRefreshError,
+                actionTitle: "Refresh Live",
+                action: .refreshLive
+            )
+        }
+
+        if let profile = profilesNeedingLogin.first {
+            return MenuAlertState(
+                severity: .authRequired,
+                title: "Profile needs login",
+                message: "\(profile.name) requires authentication.",
+                actionTitle: "Re-login \(profile.name)",
+                action: .relogin(profileName: profile.name)
+            )
+        }
+
+        return nil
+    }
+
+    var preferredMenuProfileCount: Int {
+        switch menuDensity {
+        case .compact:
+            return 5
+        case .comfortable:
+            return 4
+        }
+    }
+
+    var settingsSections: [SettingsSection] {
+        var sections: [SettingsSection] = [
+            .dashboard,
+            .profiles,
+            .runtime,
+            .display,
+            .troubleshooting,
+        ]
+        if isAdvancedSettingsVisible {
+            sections.append(.advanced)
+        }
+        return sections
+    }
+
+    func menuProfileRows(limit: Int? = nil) -> [ProfileRowState] {
+        let maxCount = limit ?? preferredMenuProfileCount
+        return Array(profiles.prefix(maxCount)).map { profile in
+            ProfileRowState(profile: profile, resetDisplayMode: resetDisplayMode)
+        }
     }
 
     func start() {
@@ -149,6 +272,111 @@ final class UsageMenuViewModel: ObservableObject {
 
     func refreshLive() {
         triggerRefresh(refreshLive: true)
+    }
+
+    func performMenuAlertAction(_ action: MenuAlertState.Action) {
+        switch action {
+        case .openRuntimeSettings:
+            selectSettingsSection(.runtime)
+        case .refreshLive:
+            refreshLive()
+        case let .relogin(profileName):
+            openLoginInTerminal(for: profileName)
+        }
+    }
+
+    func selectSettingsSection(_ section: SettingsSection) {
+        if section == .advanced, !isAdvancedSettingsVisible {
+            setAdvancedSettingsVisible(true)
+        }
+        selectedSettingsSection = section
+        defaults.set(section.rawValue, forKey: DefaultsKey.selectedSettingsSection)
+    }
+
+    func selectSettingsProfile(named name: String?) {
+        selectedSettingsProfileName = name
+        if let name {
+            defaults.set(name, forKey: DefaultsKey.selectedSettingsProfileName)
+        } else {
+            defaults.removeObject(forKey: DefaultsKey.selectedSettingsProfileName)
+        }
+    }
+
+    func setProfileSearchQuery(_ query: String) {
+        profileSearchQuery = query
+        syncSelectedSettingsProfile()
+    }
+
+    func setAdvancedSettingsVisible(_ isVisible: Bool) {
+        isAdvancedSettingsVisible = isVisible
+        defaults.set(isVisible, forKey: DefaultsKey.isAdvancedSettingsVisible)
+        if !isVisible, selectedSettingsSection == .advanced {
+            selectSettingsSection(.dashboard)
+        }
+    }
+
+    func setMenuDensity(_ density: MenuDensity) {
+        guard density != menuDensity else {
+            return
+        }
+        menuDensity = density
+        defaults.set(density.rawValue, forKey: DefaultsKey.menuDensity)
+    }
+
+    func setUsageBarStyle(_ style: UsageBarStyle) {
+        guard style != usageBarStyle else {
+            return
+        }
+        usageBarStyle = style
+        defaults.set(style.rawValue, forKey: DefaultsKey.usageBarStyle)
+    }
+
+    func progressValue(for metric: UsageMetric) -> Double {
+        guard let usedPercent = metric.usedPercent else {
+            return 0
+        }
+        let usedFraction = min(1, max(0, usedPercent / 100))
+        switch usageBarStyle {
+        case .depleting:
+            return 1 - usedFraction
+        case .filling:
+            return usedFraction
+        }
+    }
+
+    func markOnboardingCompleted() {
+        hasCompletedOnboarding = true
+        defaults.set(true, forKey: DefaultsKey.hasCompletedOnboarding)
+    }
+
+    func resetOnboardingProgress() {
+        hasCompletedOnboarding = false
+        defaults.set(false, forKey: DefaultsKey.hasCompletedOnboarding)
+    }
+
+    func beginProfileRemoval(named name: String, deleteData: Bool) {
+        pendingProfileRemovalRequest = PendingProfileRemovalRequest(profileName: name, deleteData: deleteData)
+    }
+
+    func cancelPendingProfileRemoval() {
+        pendingProfileRemovalRequest = nil
+    }
+
+    func executePendingProfileRemoval(confirming typedName: String?) {
+        guard let request = pendingProfileRemovalRequest else {
+            return
+        }
+
+        if request.deleteData {
+            let normalizedTyped = (typedName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if normalizedTyped != request.profileName {
+                setProfileFeedback(message: nil, error: "Type the profile name to confirm delete-data removal.")
+                return
+            }
+        }
+
+        pendingProfileRemovalRequest = nil
+        removeProfile(named: request.profileName, deleteData: request.deleteData)
     }
 
     func switchToProfile(named name: String) {
@@ -181,13 +409,22 @@ final class UsageMenuViewModel: ObservableObject {
 
         runProfileAction(for: oldName) {
             _ = try await self.cli.renameAccount(from: oldName, to: newName)
+            if self.selectedSettingsProfileName == oldName {
+                self.selectSettingsProfile(named: newName)
+            }
             return .success("Renamed \(oldName) to \(newName).")
         }
     }
 
     func removeProfile(named name: String, deleteData: Bool) {
+        if pendingProfileRemovalRequest?.profileName == name {
+            pendingProfileRemovalRequest = nil
+        }
         runProfileAction(for: name) {
             _ = try await self.cli.removeAccount(name: name, deleteData: deleteData)
+            if self.selectedSettingsProfileName == name {
+                self.selectSettingsProfile(named: nil)
+            }
             return .success(deleteData ? "Removed \(name) and deleted stored data." : "Removed \(name).")
         }
     }
@@ -329,6 +566,10 @@ final class UsageMenuViewModel: ObservableObject {
             if let focused = focusedProfileName, !profiles.contains(where: { $0.name == focused }) {
                 focusedProfileName = nil
             }
+            syncSelectedSettingsProfile()
+            if !hasCompletedOnboarding && onboardingState.step == .done {
+                markOnboardingCompleted()
+            }
             lastUpdatedAt = Date()
             cliResolutionHint = cli.resolutionHint
 
@@ -355,7 +596,7 @@ final class UsageMenuViewModel: ObservableObject {
         profileActionError = error
         feedbackAutoClearTask?.cancel()
         feedbackAutoClearTask = nil
-        guard message != nil || error != nil else {
+        guard message != nil else {
             return
         }
         feedbackAutoClearTask = Task { @MainActor in
@@ -364,7 +605,6 @@ final class UsageMenuViewModel: ObservableObject {
                 return
             }
             profileActionMessage = nil
-            profileActionError = nil
         }
     }
 
@@ -568,6 +808,30 @@ final class UsageMenuViewModel: ObservableObject {
         try fileManager.createDirectory(at: homeURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: codexURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: multicodexURL, withIntermediateDirectories: true)
+    }
+
+    private func syncSelectedSettingsProfile() {
+        let candidates = filteredProfiles
+        guard !candidates.isEmpty else {
+            selectedSettingsProfileName = nil
+            defaults.removeObject(forKey: DefaultsKey.selectedSettingsProfileName)
+            return
+        }
+
+        if let selectedSettingsProfileName,
+           candidates.contains(where: { $0.name == selectedSettingsProfileName })
+        {
+            return
+        }
+
+        if let currentProfile,
+           candidates.contains(where: { $0.name == currentProfile.name })
+        {
+            selectSettingsProfile(named: currentProfile.name)
+            return
+        }
+
+        selectSettingsProfile(named: candidates.first?.name)
     }
 
     private func generateRandomProfileName() -> String {

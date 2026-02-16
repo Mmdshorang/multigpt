@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 
 final class MultiCodexCLI {
-    static let limitsCacheTTLSeconds = 300
+    static let limitsCacheTTLSeconds = 1_200
     private static let nowFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

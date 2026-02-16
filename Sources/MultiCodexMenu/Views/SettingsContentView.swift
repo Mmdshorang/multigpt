@@ -2,61 +2,116 @@ import SwiftUI
 
 struct SettingsContentView: View {
     @ObservedObject var viewModel: UsageMenuViewModel
+
     @State private var codexPathDraft = ""
     @State private var renameDrafts: [String: String] = [:]
-    @State private var selectedTab: SettingsTab = .profiles
-    @State private var isDiagnosticsExpanded = false
-
-    private enum SettingsTab: String, CaseIterable, Identifiable {
-        case profiles = "Profiles"
-        case runtime = "Runtime"
-        case advanced = "Advanced"
-
-        var id: String { rawValue }
-    }
+    @State private var deleteConfirmationName = ""
 
     var body: some View {
-        ZStack {
-            Color(nsColor: .windowBackgroundColor)
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    headerCard
-                    tabSelector
-                    tabContent
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .scrollIndicators(.hidden)
+        NavigationSplitView {
+            sidebar
+        } detail: {
+            detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(Color(nsColor: .windowBackgroundColor))
         }
+        .navigationSplitViewStyle(.balanced)
+        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             codexPathDraft = viewModel.customNodePath
             syncRenameDrafts()
+            if viewModel.selectedSettingsSection == .advanced, !viewModel.isAdvancedSettingsVisible {
+                viewModel.setAdvancedSettingsVisible(true)
+            }
         }
         .onChange(of: viewModel.customNodePath) { codexPathDraft = $0 }
         .onChange(of: viewModel.profiles.map(\.name)) { _ in
             syncRenameDrafts()
         }
+        .sheet(isPresented: removalSheetBinding) {
+            removalConfirmationSheet
+        }
+    }
+
+    private var sidebar: some View {
+        VStack(spacing: 0) {
+            List(selection: sidebarSelectionBinding) {
+                ForEach(viewModel.settingsSections) { section in
+                    Label(section.title, systemImage: section.symbol)
+                        .tag(section)
+                }
+            }
+
+            Divider()
+
+            HStack {
+                if viewModel.isAdvancedSettingsVisible {
+                    Button("Hide Advanced") {
+                        viewModel.setAdvancedSettingsVisible(false)
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                } else {
+                    Button("Show Advanced") {
+                        viewModel.setAdvancedSettingsVisible(true)
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                }
+
+                Spacer()
+            }
+            .padding(10)
+        }
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                headerCard
+
+                switch viewModel.selectedSettingsSection {
+                case .dashboard:
+                    dashboardPage
+                case .profiles:
+                    profilesPage
+                case .runtime:
+                    runtimePage
+                case .display:
+                    displayPage
+                case .troubleshooting:
+                    troubleshootingPage
+                case .advanced:
+                    if viewModel.isAdvancedSettingsVisible {
+                        advancedPage
+                    } else {
+                        hiddenAdvancedPage
+                    }
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.hidden)
     }
 
     private var headerCard: some View {
-        SettingsCard {
+        SettingsPanelCard {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Settings")
                     .font(.title3.weight(.semibold))
 
-                Text("Manage profiles, runtime setup, and advanced troubleshooting.")
+                Text("Manage profiles, runtime setup, display preferences, and troubleshooting.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 8) {
-                    simpleActionButton("Refresh", symbol: "arrow.clockwise") {
+                    ActionPillButton(title: "Refresh", symbol: "arrow.clockwise") {
                         viewModel.refresh()
                     }
 
-                    simpleActionButton("Refresh Live", symbol: "bolt.horizontal.fill", prominent: true) {
+                    ActionPillButton(title: "Refresh Live", symbol: "bolt.horizontal.fill", prominent: true) {
                         viewModel.refreshLive()
                     }
                 }
@@ -64,41 +119,147 @@ struct SettingsContentView: View {
         }
     }
 
-    private var tabSelector: some View {
-        Picker("Settings Tab", selection: $selectedTab) {
-            ForEach(SettingsTab.allCases) { tab in
-                Text(tab.rawValue).tag(tab)
+    private var dashboardPage: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsPanelCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Dashboard")
+                        .font(.headline)
+
+                    HStack(spacing: 12) {
+                        dashboardMetric(title: "Profiles", value: "\(viewModel.profiles.count)")
+                        dashboardMetric(title: "Needs Login", value: "\(viewModel.profilesNeedingLogin.count)")
+                        dashboardMetric(title: "Current", value: viewModel.currentProfile?.name ?? "-")
+                    }
+
+                    if let alert = viewModel.prioritizedMenuAlert {
+                        dashboardAlert(alert)
+                    }
+                }
+            }
+
+            if !viewModel.onboardingState.isComplete {
+                onboardingWizardCard
             }
         }
-        .pickerStyle(.segmented)
     }
 
-    @ViewBuilder
-    private var tabContent: some View {
-        switch selectedTab {
-        case .profiles:
-            profilesCard
-        case .runtime:
-            runtimeCard
-            preferencesCard
-        case .advanced:
-            diagnosticsCard
-#if DEBUG
-            testSetupCard
-#endif
+    private func dashboardMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func dashboardAlert(_ alert: MenuAlertState) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: alertSymbol(for: alert.severity))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(alertColor(for: alert.severity))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(alert.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(alertColor(for: alert.severity))
+                Text(alert.message)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            ActionPillButton(title: alert.actionTitle, symbol: "arrow.right.circle.fill", prominent: true) {
+                handleAlertAction(alert)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(alertColor(for: alert.severity).opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(alertColor(for: alert.severity).opacity(0.22), lineWidth: 1)
+        )
+    }
+
+    private var onboardingWizardCard: some View {
+        SettingsPanelCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("First-Run Setup")
+                    .font(.headline)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    onboardingStepRow(.runtime, isActive: viewModel.onboardingState.step == .runtime)
+                    onboardingStepRow(.login, isActive: viewModel.onboardingState.step == .login)
+                    onboardingStepRow(.verify, isActive: viewModel.onboardingState.step == .verify)
+                    onboardingStepRow(.done, isActive: viewModel.onboardingState.step == .done)
+                }
+
+                HStack(spacing: 8) {
+                    switch viewModel.onboardingState.step {
+                    case .runtime:
+                        ActionPillButton(title: "Open Runtime", symbol: "terminal", prominent: true) {
+                            viewModel.selectSettingsSection(.runtime)
+                        }
+                    case .login:
+                        ActionPillButton(title: "Login First Profile", symbol: "person.crop.circle.badge.plus", prominent: true) {
+                            viewModel.startNewProfileLogin()
+                        }
+                    case .verify:
+                        ActionPillButton(title: "Check Status", symbol: "person.crop.circle.badge.checkmark", prominent: true) {
+                            if let current = viewModel.currentProfile {
+                                viewModel.checkLoginStatus(for: current.name)
+                            } else {
+                                viewModel.refreshLive()
+                            }
+                        }
+                    case .done:
+                        ActionPillButton(title: "Finish", symbol: "checkmark.circle.fill", prominent: true) {
+                            viewModel.markOnboardingCompleted()
+                        }
+                    }
+
+                    ActionPillButton(title: "Reset Wizard", symbol: "arrow.counterclockwise") {
+                        viewModel.resetOnboardingProgress()
+                    }
+                }
+            }
         }
     }
 
-    private var profilesCard: some View {
-        SettingsCard {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Profiles")
-                    .font(.headline)
+    private func onboardingStepRow(_ step: OnboardingStep, isActive: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: stepSymbol(step, isActive: isActive))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
 
-                simpleActionButton("Login New Profile", symbol: "person.crop.circle.badge.plus", prominent: true) {
-                    viewModel.startNewProfileLogin()
+            Text(step.title)
+                .font(.caption)
+                .foregroundStyle(isActive ? Color.primary : Color.secondary)
+
+            Spacer()
+        }
+    }
+
+    private var profilesPage: some View {
+        SettingsPanelCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Profiles")
+                        .font(.headline)
+
+                    Spacer()
+
+                    ActionPillButton(title: "Login New Profile", symbol: "person.crop.circle.badge.plus", prominent: true, isDisabled: isProfileActionRunning) {
+                        viewModel.startNewProfileLogin()
+                    }
                 }
-                .disabled(isProfileActionRunning)
 
                 if let message = viewModel.profileActionMessage {
                     feedbackRow(message, color: .green)
@@ -109,24 +270,29 @@ struct SettingsContentView: View {
                 }
 
                 if viewModel.profiles.isEmpty {
-                    emptyProfilesOnboarding
+                    noProfilesState
                 } else {
-                    VStack(spacing: 8) {
-                        ForEach(viewModel.profiles) { profile in
-                            profileRow(profile)
-                        }
+                    HStack(spacing: 0) {
+                        profileListPane
+                            .frame(width: 260)
+
+                        Divider()
+                            .padding(.horizontal, 12)
+
+                        profileDetailPane
                     }
+                    .frame(minHeight: 380)
                 }
             }
         }
     }
 
-    private var emptyProfilesOnboarding: some View {
+    private var noProfilesState: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("No profiles yet", systemImage: "person.crop.circle.badge.plus")
                 .font(.caption.weight(.semibold))
 
-            Text("Use “Login New Profile” to connect your first account.")
+            Text("Use \"Login New Profile\" to connect your first account.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
@@ -140,38 +306,120 @@ struct SettingsContentView: View {
                     .lineLimit(2)
             }
         }
-        .padding(.vertical, 4)
     }
 
-    private func profileRow(_ profile: ProfileUsage) -> some View {
+    private var profileListPane: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(profile.name)
-                    .font(.subheadline.weight(.semibold))
+            TextField("Search profiles", text: profileSearchBinding)
+                .textFieldStyle(.roundedBorder)
 
-                if profile.isCurrent {
-                    pill("Current", color: .accentColor)
-                }
-                pill(profile.connectionState.label, color: statusColor(for: profile.connectionState))
+            if viewModel.filteredProfiles.isEmpty {
+                Text("No profiles match your search.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+            } else {
+                ScrollView {
+                    VStack(spacing: 6) {
+                        ForEach(viewModel.filteredProfiles) { profile in
+                            Button {
+                                viewModel.selectSettingsProfile(named: profile.name)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(profile.name)
+                                            .font(.caption.weight(.semibold))
+                                            .lineLimit(1)
+                                        Text(profile.connectionState.label)
+                                            .font(.caption2)
+                                            .foregroundStyle(statusColor(for: profile.connectionState))
+                                    }
 
-                Spacer(minLength: 8)
+                                    Spacer()
 
-                if viewModel.profileActionInFlightName == profile.name {
-                    ProgressView()
-                        .controlSize(.small)
+                                    if profile.isCurrent {
+                                        pill("Current", color: .accentColor)
+                                    }
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 7)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(isSelectedProfile(profile.name) ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.05))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(isSelectedProfile(profile.name) ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.10), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var profileDetailPane: some View {
+        if let profile = viewModel.selectedSettingsProfile {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    profileIdentitySection(profile)
+                    profileAuthSection(profile)
+                    profileUsageSection(profile)
+                    profileDangerSection(profile)
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Select a profile")
+                    .font(.headline)
+                Text("Choose a profile from the left to manage it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private func profileIdentitySection(_ profile: ProfileUsage) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("Identity")
+
+            Text(profile.name)
+                .font(.subheadline.weight(.semibold))
+
+            HStack(spacing: 8) {
+                TextField("Rename profile", text: renameBinding(for: profile.name))
+                    .textFieldStyle(.roundedBorder)
+
+                ActionPillButton(title: "Rename", symbol: "pencil") {
+                    viewModel.renameProfile(from: profile.name, to: renameDrafts[profile.name] ?? profile.name)
+                }
+                .disabled(cannotRename(profile.name) || isProfileActionRunning)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func profileAuthSection(_ profile: ProfileUsage) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("Authentication")
 
             HStack(spacing: 8) {
                 if !profile.isCurrent {
-                    simpleActionButton("Use", symbol: "checkmark.circle.fill", prominent: true) {
+                    ActionPillButton(title: "Use", symbol: "checkmark.circle.fill", prominent: true) {
                         viewModel.switchToProfile(named: profile.name)
                     }
                     .disabled(isProfileActionRunning)
                 }
 
-                simpleActionButton(
-                    profile.connectionState == .needsLogin ? "Re-login" : "Login",
+                ActionPillButton(
+                    title: profile.connectionState == .needsLogin ? "Re-login" : "Login",
                     symbol: "person.crop.circle.badge.plus",
                     prominent: profile.connectionState == .needsLogin
                 ) {
@@ -179,27 +427,15 @@ struct SettingsContentView: View {
                 }
                 .disabled(isProfileActionRunning)
 
-                simpleActionButton("Status", symbol: "person.crop.circle.badge.checkmark") {
+                ActionPillButton(title: "Status", symbol: "person.crop.circle.badge.checkmark") {
                     viewModel.checkLoginStatus(for: profile.name)
                 }
                 .disabled(isProfileActionRunning)
 
-                Menu("More") {
-                    Button("Import current auth") {
-                        viewModel.importCurrentAuth(into: profile.name)
-                    }
+                ActionPillButton(title: "Import Auth", symbol: "square.and.arrow.down") {
+                    viewModel.importCurrentAuth(into: profile.name)
                 }
                 .disabled(isProfileActionRunning)
-            }
-
-            HStack(spacing: 8) {
-                TextField("rename", text: renameBinding(for: profile.name))
-                    .textFieldStyle(.roundedBorder)
-
-                simpleActionButton("Rename", symbol: "pencil") {
-                    viewModel.renameProfile(from: profile.name, to: renameDrafts[profile.name] ?? profile.name)
-                }
-                .disabled(cannotRename(profile.name) || isProfileActionRunning)
             }
 
             if let hint = profile.connectionHint {
@@ -208,45 +444,85 @@ struct SettingsContentView: View {
                     .foregroundStyle(statusColor(for: profile.connectionState))
                     .lineLimit(2)
             }
-
-            VStack(alignment: .leading, spacing: 6) {
-                Label("Danger Zone", systemImage: "exclamationmark.triangle")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red)
-
-                Text("These actions are permanent and cannot be undone.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 8) {
-                    Button("Remove profile", role: .destructive) {
-                        viewModel.removeProfile(named: profile.name, deleteData: false)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    Button("Remove + delete data", role: .destructive) {
-                        viewModel.removeProfile(named: profile.name, deleteData: true)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
-            .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.red.opacity(0.24), lineWidth: 1)
-            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    private var runtimeCard: some View {
-        SettingsCard {
+    private func profileUsageSection(_ profile: ProfileUsage) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("Usage")
+
+            HStack(spacing: 8) {
+                SettingsUsageMetricView(
+                    metric: profile.usage.fiveHour,
+                    title: "5h",
+                    resetDisplayMode: viewModel.resetDisplayMode,
+                    progressValue: viewModel.progressValue(for: profile.usage.fiveHour)
+                )
+                SettingsUsageMetricView(
+                    metric: profile.usage.weekly,
+                    title: "weekly",
+                    resetDisplayMode: viewModel.resetDisplayMode,
+                    progressValue: viewModel.progressValue(for: profile.usage.weekly)
+                )
+            }
+
+            HStack(spacing: 8) {
+                Text(profile.source)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("Last used \(profile.lastUsedLabel)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func profileDangerSection(_ profile: ProfileUsage) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("These actions are permanent and cannot be undone.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    HStack(spacing: 8) {
+                        Button("Remove profile", role: .destructive) {
+                            viewModel.beginProfileRemoval(named: profile.name, deleteData: false)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+
+                        Button("Remove + delete data", role: .destructive) {
+                            viewModel.beginProfileRemoval(named: profile.name, deleteData: true)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+                .padding(.top, 6)
+            } label: {
+                Label("Danger Zone", systemImage: "exclamationmark.triangle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.red)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.red.opacity(0.22), lineWidth: 1)
+        )
+    }
+
+    private var runtimePage: some View {
+        SettingsPanelCard {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Runtime")
                     .font(.headline)
@@ -255,16 +531,16 @@ struct SettingsContentView: View {
                     .textFieldStyle(.roundedBorder)
 
                 HStack(spacing: 8) {
-                    simpleActionButton("Save", symbol: "checkmark", prominent: true) {
+                    ActionPillButton(title: "Save", symbol: "checkmark", prominent: true) {
                         viewModel.updateCustomNodePath(codexPathDraft)
                     }
                     .disabled(normalized(codexPathDraft) == viewModel.customNodePath)
 
-                    simpleActionButton("Choose", symbol: "folder") {
+                    ActionPillButton(title: "Choose", symbol: "folder") {
                         viewModel.chooseCustomNodePath()
                     }
 
-                    simpleActionButton("Use Auto", symbol: "sparkles") {
+                    ActionPillButton(title: "Use Auto", symbol: "sparkles") {
                         codexPathDraft = ""
                         viewModel.clearCustomNodePath()
                     }
@@ -275,7 +551,7 @@ struct SettingsContentView: View {
                     Text(probe)
                         .font(.caption2)
                         .foregroundStyle(viewModel.isCodexRuntimeAvailable ? Color.secondary : Color.orange)
-                        .lineLimit(2)
+                        .lineLimit(3)
                 }
 
                 Text("Leave empty to auto-detect codex from known paths or PATH.")
@@ -285,102 +561,219 @@ struct SettingsContentView: View {
         }
     }
 
-    private var preferencesCard: some View {
-        SettingsCard {
+    private var displayPage: some View {
+        SettingsPanelCard {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Display")
                     .font(.headline)
 
-                HStack {
-                    Text("Reset labels")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    simpleActionButton(viewModel.resetDisplayMode.buttonLabel, symbol: "clock") {
+                displayOptionRow("Reset labels") {
+                    ActionPillButton(title: viewModel.resetDisplayMode.buttonLabel, symbol: "clock") {
                         viewModel.toggleResetDisplayMode()
                     }
                 }
+
+                displayOptionRow("Menu density") {
+                    Picker("Menu density", selection: menuDensityBinding) {
+                        ForEach(MenuDensity.allCases) { density in
+                            Text(density.title).tag(density)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
+                }
+
+                displayOptionRow("Usage bar mode") {
+                    Picker("Usage bars", selection: usageBarStyleBinding) {
+                        ForEach(UsageBarStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
+                }
+
+                Text(viewModel.usageBarStyle.descriptionText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    private var diagnosticsCard: some View {
-        SettingsCard {
-            DisclosureGroup(isExpanded: $isDiagnosticsExpanded) {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let hint = viewModel.cliResolutionHint {
-                        Text(hint)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(4)
-                    } else {
-                        Text("Run refresh to capture command resolution details.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+    private var troubleshootingPage: some View {
+        SettingsPanelCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Troubleshooting")
+                    .font(.headline)
 
-                    simpleActionButton("Open multicodex config directory", symbol: "folder.fill") {
+                if let hint = viewModel.cliResolutionHint {
+                    Text(hint)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(5)
+                } else {
+                    Text("Run refresh to capture command resolution details.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 8) {
+                    ActionPillButton(title: "Open Config Directory", symbol: "folder.fill") {
                         viewModel.openMulticodexConfigDirectory()
                     }
+
+                    ActionPillButton(title: "Refresh Live", symbol: "bolt.horizontal.fill", prominent: true) {
+                        viewModel.refreshLive()
+                    }
                 }
-                .padding(.top, 6)
-            } label: {
-                Label("Troubleshooting & Diagnostics", systemImage: "wrench.and.screwdriver")
-                    .font(.headline)
             }
         }
     }
 
-    private var testSetupCard: some View {
-        SettingsCard {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Test Setup")
-                    .font(.headline)
+    private var advancedPage: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsPanelCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Advanced")
+                        .font(.headline)
 
-                Toggle(isOn: testConfigToggleBinding) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Use Test Config Directory")
-                            .font(.subheadline.weight(.semibold))
-                        Text("Toggle between real and isolated temporary config directories.")
+                    Text("Advanced diagnostics and test tooling are available below.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+#if DEBUG
+            SettingsPanelCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Test Setup")
+                        .font(.headline)
+
+                    Toggle(isOn: testConfigToggleBinding) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Use Test Config Directory")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Toggle between real and isolated temporary config directories.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .disabled(isProfileActionRunning)
+
+                    if viewModel.isUsingTemporaryAuthSandbox {
+                        pill("Using Test Config", color: .orange)
+
+                        if let sandbox = viewModel.temporaryAuthSandboxHome, !sandbox.isEmpty {
+                            Text("Current: \(sandbox)/.config/multicodex")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                        }
+
+                        HStack(spacing: 8) {
+                            ActionPillButton(title: "Reset Sandbox", symbol: "arrow.clockwise") {
+                                viewModel.resetTemporaryAuthSandbox()
+                            }
+                            .disabled(isProfileActionRunning)
+
+                            ActionPillButton(title: "Open Folder", symbol: "folder") {
+                                viewModel.openTemporaryAuthSandboxDirectory()
+                            }
+
+                            ActionPillButton(title: "Use Real Config", symbol: "xmark.circle") {
+                                viewModel.setTemporaryAuthSandboxEnabled(false)
+                            }
+                            .disabled(isProfileActionRunning)
+                        }
+                    } else {
+                        Text("Current: real config at ~/.config/multicodex")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-                .toggleStyle(.switch)
-                .disabled(isProfileActionRunning)
+            }
+#endif
+        }
+    }
 
-                if viewModel.isUsingTemporaryAuthSandbox {
-                    pill("Using Test Config", color: .orange)
+    private var hiddenAdvancedPage: some View {
+        SettingsPanelCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Advanced")
+                    .font(.headline)
 
-                    if let sandbox = viewModel.temporaryAuthSandboxHome, !sandbox.isEmpty {
-                        Text("Current: \(sandbox)/.config/multicodex")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
-                    }
+                Text("Advanced controls are hidden.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-                    HStack(spacing: 8) {
-                        simpleActionButton("Reset Sandbox", symbol: "arrow.clockwise") {
-                            viewModel.resetTemporaryAuthSandbox()
-                        }
-                        .disabled(isProfileActionRunning)
-
-                        simpleActionButton("Open Folder", symbol: "folder") {
-                            viewModel.openTemporaryAuthSandboxDirectory()
-                        }
-
-                        simpleActionButton("Use Real Config", symbol: "xmark.circle") {
-                            viewModel.setTemporaryAuthSandboxEnabled(false)
-                        }
-                        .disabled(isProfileActionRunning)
-                    }
-                } else {
-                    Text("Current: real config at ~/.config/multicodex")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                ActionPillButton(title: "Show Advanced", symbol: "gearshape.2", prominent: true) {
+                    viewModel.setAdvancedSettingsVisible(true)
+                    viewModel.selectSettingsSection(.advanced)
                 }
             }
         }
+    }
+
+    private var removalConfirmationSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let request = viewModel.pendingProfileRemovalRequest {
+                Text(request.deleteData ? "Remove profile and delete data" : "Remove profile")
+                    .font(.headline)
+
+                Text(request.deleteData
+                    ? "This will permanently remove \(request.profileName) and delete its stored data."
+                    : "This will remove \(request.profileName) from MultiCodex.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if request.deleteData {
+                    Text("Type \"\(request.profileName)\" to confirm")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    TextField("Profile name", text: $deleteConfirmationName)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                HStack {
+                    Spacer()
+                    Button("Cancel") {
+                        deleteConfirmationName = ""
+                        viewModel.cancelPendingProfileRemoval()
+                    }
+
+                    Button(request.deleteData ? "Delete Data" : "Remove", role: .destructive) {
+                        viewModel.executePendingProfileRemoval(confirming: deleteConfirmationName)
+                        if viewModel.pendingProfileRemovalRequest == nil {
+                            deleteConfirmationName = ""
+                        }
+                    }
+                    .disabled(!canConfirmRemoval(request))
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(16)
+        .frame(width: 420)
+    }
+
+    private func canConfirmRemoval(_ request: PendingProfileRemovalRequest) -> Bool {
+        if isProfileActionRunning {
+            return false
+        }
+        if request.deleteData {
+            return deleteConfirmationName.trimmingCharacters(in: .whitespacesAndNewlines) == request.profileName
+        }
+        return true
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
     }
 
     private func feedbackRow(_ text: String, color: Color) -> some View {
@@ -395,6 +788,66 @@ struct SettingsContentView: View {
             .buttonStyle(.plain)
             .font(.caption2)
         }
+    }
+
+    private func displayOptionRow<Control: View>(
+        _ label: String,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 110, alignment: .leading)
+
+            Spacer(minLength: 0)
+
+            control()
+                .frame(width: 220, alignment: .leading)
+        }
+    }
+
+    private var sidebarSelectionBinding: Binding<SettingsSection?> {
+        Binding(
+            get: { viewModel.selectedSettingsSection },
+            set: { newValue in
+                guard let newValue else { return }
+                viewModel.selectSettingsSection(newValue)
+            }
+        )
+    }
+
+    private var profileSearchBinding: Binding<String> {
+        Binding(
+            get: { viewModel.profileSearchQuery },
+            set: { viewModel.setProfileSearchQuery($0) }
+        )
+    }
+
+    private var menuDensityBinding: Binding<MenuDensity> {
+        Binding(
+            get: { viewModel.menuDensity },
+            set: { viewModel.setMenuDensity($0) }
+        )
+    }
+
+    private var usageBarStyleBinding: Binding<UsageBarStyle> {
+        Binding(
+            get: { viewModel.usageBarStyle },
+            set: { viewModel.setUsageBarStyle($0) }
+        )
+    }
+
+    private var removalSheetBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.pendingProfileRemovalRequest != nil },
+            set: { isPresented in
+                if !isPresented {
+                    deleteConfirmationName = ""
+                    viewModel.cancelPendingProfileRemoval()
+                }
+            }
+        )
     }
 
     private var isProfileActionRunning: Bool {
@@ -445,6 +898,10 @@ struct SettingsContentView: View {
         return trimmed.isEmpty || trimmed == profileName
     }
 
+    private func normalized(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func syncRenameDrafts() {
         let names = Set(viewModel.profiles.map(\.name))
         renameDrafts = renameDrafts.filter { names.contains($0.key) }
@@ -453,8 +910,8 @@ struct SettingsContentView: View {
         }
     }
 
-    private func normalized(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func isSelectedProfile(_ name: String) -> Bool {
+        viewModel.selectedSettingsProfileName == name
     }
 
     private func statusColor(for state: ProfileConnectionState) -> Color {
@@ -468,6 +925,49 @@ struct SettingsContentView: View {
         }
     }
 
+    private func alertColor(for severity: MenuAlertState.Severity) -> Color {
+        switch severity {
+        case .runtimeUnavailable:
+            return .orange
+        case .refreshError:
+            return .red
+        case .authRequired:
+            return .orange
+        }
+    }
+
+    private func alertSymbol(for severity: MenuAlertState.Severity) -> String {
+        switch severity {
+        case .runtimeUnavailable:
+            return "terminal"
+        case .refreshError:
+            return "exclamationmark.triangle.fill"
+        case .authRequired:
+            return "person.crop.circle.badge.exclamationmark"
+        }
+    }
+
+    private func stepSymbol(_ step: OnboardingStep, isActive: Bool) -> String {
+        if isActive {
+            return "circle.fill"
+        }
+        switch step {
+        case .done:
+            return "checkmark.circle.fill"
+        default:
+            return "circle"
+        }
+    }
+
+    private func handleAlertAction(_ alert: MenuAlertState) {
+        switch alert.action {
+        case .openRuntimeSettings:
+            viewModel.selectSettingsSection(.runtime)
+        default:
+            viewModel.performMenuAlertAction(alert.action)
+        }
+    }
+
     private func pill(_ text: String, color: Color) -> some View {
         Text(text)
             .font(.caption2.weight(.semibold))
@@ -476,13 +976,9 @@ struct SettingsContentView: View {
             .background(color.opacity(0.14), in: Capsule())
             .foregroundStyle(color)
     }
-
-    private func simpleActionButton(_ title: String, symbol: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
-        ActionPillButton(title: title, symbol: symbol, prominent: prominent, action: action)
-    }
 }
 
-private struct SettingsCard<Content: View>: View {
+private struct SettingsPanelCard<Content: View>: View {
     @ViewBuilder let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -503,5 +999,47 @@ private struct SettingsCard<Content: View>: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
         )
+    }
+}
+
+private struct SettingsUsageMetricView: View {
+    let metric: UsageMetric
+    let title: String
+    let resetDisplayMode: ResetDisplayMode
+    let progressValue: Double
+
+    private var tone: Color {
+        switch UsageLevel.from(usedPercent: metric.usedPercent) {
+        case .critical:
+            return .red
+        case .warning:
+            return .orange
+        case .normal:
+            return .green
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(metric.percentText)
+                    .font(.caption.weight(.semibold))
+            }
+
+            ProgressView(value: progressValue)
+                .tint(tone)
+
+            Text(metric.resetText(mode: resetDisplayMode))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

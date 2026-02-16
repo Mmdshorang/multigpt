@@ -22,7 +22,7 @@ struct MultiCodexMenuApp: App {
 
         WindowGroup("Settings", id: "settings") {
             SettingsContentView(viewModel: viewModel)
-                .frame(minWidth: 700, minHeight: 780)
+                .frame(minWidth: 860, minHeight: 620)
         }
     }
 }

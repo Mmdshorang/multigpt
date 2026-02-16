@@ -4,10 +4,9 @@ import SwiftUI
 struct UsageMenuContentView: View {
     @ObservedObject var viewModel: UsageMenuViewModel
     @Environment(\.openWindow) private var openWindow
-    @State private var expandedProfileNames: Set<String> = []
     @State private var selectedProfileName: String?
     @State private var keyboardMonitor: Any?
-    private let maxVisibleProfiles = 6
+    @State private var expandedProfileNames: Set<String> = []
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -17,19 +16,17 @@ struct UsageMenuContentView: View {
             VStack(alignment: .leading, spacing: 10) {
                 header
 
-                if viewModel.isUsingTemporaryAuthSandbox {
-                    sandboxBanner
+                if let alert = viewModel.prioritizedMenuAlert {
+                    alertBanner(alert)
                 }
 
-                attentionQueue
-
                 if viewModel.profiles.isEmpty {
-                    onboardingCard
+                    emptyStateCard
                 } else {
                     if let current = viewModel.currentProfile {
-                        currentStrip(profile: current)
+                        currentProfileCard(current)
                     }
-                    profilesList
+                    quickProfilesCard
                 }
 
                 footer
@@ -49,17 +46,18 @@ struct UsageMenuContentView: View {
         .onDisappear {
             removeKeyboardMonitor()
         }
-        .onChange(of: viewModel.profiles.map(\.name)) { names in
-            expandedProfileNames = expandedProfileNames.filter { names.contains($0) }
+        .onChange(of: viewModel.profiles.map(\.name)) { _ in
+            let activeNames = Set(viewModel.profiles.map(\.name))
+            expandedProfileNames = expandedProfileNames.intersection(activeNames)
             synchronizeSelection()
         }
         .onChange(of: viewModel.focusedProfileName) { _ in
             synchronizeSelection()
         }
-        .animation(.easeInOut(duration: 0.18), value: expandedProfileNames)
         .animation(.easeInOut(duration: 0.18), value: viewModel.profiles.map(\.name))
         .animation(.easeInOut(duration: 0.18), value: viewModel.switchingProfileName)
-        .animation(.easeInOut(duration: 0.18), value: viewModel.currentProfile?.name)
+        .animation(.easeInOut(duration: 0.18), value: viewModel.profileActionInFlightName)
+        .animation(.easeInOut(duration: 0.18), value: expandedProfileNames)
     }
 
     private var header: some View {
@@ -75,7 +73,12 @@ struct UsageMenuContentView: View {
 
             Spacer()
 
-            ActionPillButton(title: "Refresh", symbol: "arrow.clockwise", prominent: true, isDisabled: viewModel.isRefreshing) {
+            ActionPillButton(
+                title: "Refresh",
+                symbol: "arrow.clockwise",
+                prominent: true,
+                isDisabled: viewModel.isRefreshing
+            ) {
                 viewModel.refreshLive()
             }
             .keyboardShortcut("r", modifiers: [.command])
@@ -83,79 +86,73 @@ struct UsageMenuContentView: View {
         }
     }
 
-    @ViewBuilder
-    private var attentionQueue: some View {
-        if let error = viewModel.lastRefreshError {
-            attentionRow(
-                title: "Error",
-                detail: error,
-                color: .red,
-                actionTitle: "Refresh Live",
-                action: { viewModel.refreshLive() }
-            )
-        }
-
-        if let authTarget = profilesNeedingLogin.first {
-            let count = profilesNeedingLogin.count
-            attentionRow(
-                title: count == 1 ? "Needs Login" : "\(count) Need Login",
-                detail: count == 1
-                    ? "\(authTarget.name) needs authentication."
-                    : "Multiple profiles need authentication.",
-                color: .orange,
-                actionTitle: "Re-login \(authTarget.name)",
-                action: { viewModel.openLoginInTerminal(for: authTarget.name) }
-            )
-        }
-    }
-
-    private func attentionRow(
-        title: String,
-        detail: String,
-        color: Color,
-        actionTitle: String,
-        action: @escaping () -> Void
-    ) -> some View {
+    private func alertBanner(_ alert: MenuAlertState) -> some View {
         HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+            Image(systemName: alertSymbol(for: alert.severity))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(alertColor(for: alert.severity))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(alert.title)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(color)
-                Text(detail)
+                    .foregroundStyle(alertColor(for: alert.severity))
+                Text(alert.message)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
+
             Spacer(minLength: 8)
-            ActionPillButton(title: actionTitle, symbol: "arrow.right.circle.fill", prominent: true, isDisabled: isActionBusy, action: action)
+
+            ActionPillButton(
+                title: alert.actionTitle,
+                symbol: "arrow.right.circle.fill",
+                prominent: true,
+                isDisabled: isActionBusy
+            ) {
+                performAlertAction(alert)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(alertColor(for: alert.severity).opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(color.opacity(0.22), lineWidth: 1)
+                .stroke(alertColor(for: alert.severity).opacity(0.24), lineWidth: 1)
         )
     }
 
-    private func currentStrip(profile: ProfileUsage) -> some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Current Profile")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Text(profile.name)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
+    private func currentProfileCard(_ profile: ProfileUsage) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Current Profile")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(profile.name)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                }
+                Spacer()
+                statePill(profile.connectionState.label, tone: statusColor(for: profile.connectionState))
             }
 
-            Spacer(minLength: 8)
-
-            UsageValueChip(title: "5h", value: profile.usage.fiveHour.percentText)
-            UsageValueChip(title: "weekly", value: profile.usage.weekly.percentText)
+            HStack(spacing: 8) {
+                CompactUsageMetric(
+                    title: "5h",
+                    metric: profile.usage.fiveHour,
+                    resetDisplayMode: viewModel.resetDisplayMode,
+                    progressValue: viewModel.progressValue(for: profile.usage.fiveHour)
+                )
+                CompactUsageMetric(
+                    title: "weekly",
+                    metric: profile.usage.weekly,
+                    resetDisplayMode: viewModel.resetDisplayMode,
+                    progressValue: viewModel.progressValue(for: profile.usage.weekly)
+                )
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
@@ -166,48 +163,59 @@ struct UsageMenuContentView: View {
         )
     }
 
-    @ViewBuilder
-    private var profilesList: some View {
-        VStack(spacing: 8) {
-            ForEach(visibleProfiles) { profile in
-                ProfileUsageCardView(
-                    profile: profile,
-                    resetDisplayMode: viewModel.resetDisplayMode,
-                    isSwitching: viewModel.switchingProfileName == profile.name,
-                    isRunningAuthAction: viewModel.profileActionInFlightName == profile.name,
-                    isExpanded: expandedProfileNames.contains(profile.name),
-                    isSelected: selectedProfileName == profile.name,
-                    onSwitch: { viewModel.switchToProfile(named: profile.name) },
-                    onRelogin: { viewModel.openLoginInTerminal(for: profile.name) },
-                    onToggleExpanded: { toggleExpanded(profile.name) }
-                )
-                .onTapGesture {
-                    selectedProfileName = profile.name
+    private var quickProfilesCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Profiles")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if hiddenProfilesCount > 0 {
+                    Text("+\(hiddenProfilesCount) more in Settings")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
 
-            if hiddenProfilesCount > 0 {
-                Text("+\(hiddenProfilesCount) more profiles in Settings")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 2)
+            VStack(spacing: 7) {
+                ForEach(visibleRows) { row in
+                    MenuProfileQuickRow(
+                        row: row,
+                        isSelected: row.name == selectedProfileName,
+                        isExpanded: expandedProfileNames.contains(row.name),
+                        isBusy: isActionBusy,
+                        isSwitching: viewModel.switchingProfileName == row.name,
+                        isAuthRunning: viewModel.profileActionInFlightName == row.name,
+                        onSelect: { selectedProfileName = row.name },
+                        onPrimaryAction: { performPrimaryAction(for: row) },
+                        onToggleExpanded: { toggleExpanded(row.name) }
+                    )
+                }
             }
 
-            Text("Shortcuts: Cmd+R refresh, ↑/↓ select, Enter action")
+            Text("Shortcuts: Cmd+R refresh, Cmd+, settings, ↑/↓ select, Enter action")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 2)
         }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
+        )
     }
 
-    private var onboardingCard: some View {
+    private var emptyStateCard: some View {
         VStack(alignment: .leading, spacing: 9) {
             Label("Set up your first profile", systemImage: "sparkles")
                 .font(.subheadline.weight(.semibold))
 
-            Text("Login once and MultiCodex will start showing usage cards automatically.")
+            Text(onboardingCopy)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -221,53 +229,120 @@ struct UsageMenuContentView: View {
                     .lineLimit(2)
             }
 
-            ActionPillButton(title: "Login First Profile", symbol: "person.crop.circle.badge.plus", prominent: true, isDisabled: isActionBusy) {
-                viewModel.startNewProfileLogin()
-            }
+            HStack(spacing: 8) {
+                ActionPillButton(
+                    title: viewModel.isCodexRuntimeAvailable ? "Login First Profile" : "Fix Runtime",
+                    symbol: viewModel.isCodexRuntimeAvailable ? "person.crop.circle.badge.plus" : "terminal",
+                    prominent: true,
+                    isDisabled: isActionBusy
+                ) {
+                    if viewModel.isCodexRuntimeAvailable {
+                        viewModel.startNewProfileLogin()
+                    } else {
+                        viewModel.selectSettingsSection(.runtime)
+                        openSettingsWindow()
+                    }
+                }
 
-            Button("Open Settings") {
-                openSettingsWindow()
+                ActionPillButton(title: "Settings", symbol: "gearshape.fill") {
+                    openSettingsWindow()
+                }
             }
-            .buttonStyle(.plain)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
         }
         .padding(10)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
         )
     }
 
     private var footer: some View {
         HStack(spacing: 10) {
-            ActionPillButton(title: "Login New", symbol: "person.crop.circle.badge.plus", prominent: true, isDisabled: isActionBusy) {
+            ActionPillButton(
+                title: "Login New",
+                symbol: "person.crop.circle.badge.plus",
+                prominent: true,
+                isDisabled: isActionBusy
+            ) {
                 viewModel.startNewProfileLogin()
             }
 
             Spacer()
 
-            ActionPillButton(title: "Settings", symbol: "gearshape.fill") {
+            ActionPillButton(title: "Open Settings", symbol: "gearshape.fill") {
                 openSettingsWindow()
             }
+            .keyboardShortcut(",", modifiers: [.command])
+            .help("Open Settings (Cmd+,)")
         }
     }
 
-    private var sandboxBanner: some View {
-        Label("Temporary auth sandbox active", systemImage: "testtube.2")
-            .font(.caption)
-            .foregroundStyle(.orange)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    private var visibleRows: [ProfileRowState] {
+        viewModel.menuProfileRows(limit: viewModel.preferredMenuProfileCount)
     }
 
-    private func openSettingsWindow() {
-        NSApp.setActivationPolicy(.regular)
-        openWindow(id: "settings")
-        NSApp.activate(ignoringOtherApps: true)
+    private var hiddenProfilesCount: Int {
+        max(0, viewModel.profiles.count - visibleRows.count)
+    }
+
+    private var onboardingCopy: String {
+        switch viewModel.onboardingState.step {
+        case .runtime:
+            return "Confirm the codex runtime first, then connect your first profile."
+        case .login:
+            return "Login once and MultiCodex will start showing usage cards automatically."
+        case .verify:
+            return "Verify authentication status for your profile to finish setup."
+        case .done:
+            return "Your setup is complete."
+        }
+    }
+
+    private func alertColor(for severity: MenuAlertState.Severity) -> Color {
+        switch severity {
+        case .runtimeUnavailable:
+            return .orange
+        case .refreshError:
+            return .red
+        case .authRequired:
+            return .orange
+        }
+    }
+
+    private func alertSymbol(for severity: MenuAlertState.Severity) -> String {
+        switch severity {
+        case .runtimeUnavailable:
+            return "terminal"
+        case .refreshError:
+            return "exclamationmark.triangle.fill"
+        case .authRequired:
+            return "person.crop.circle.badge.exclamationmark"
+        }
+    }
+
+    private func performAlertAction(_ alert: MenuAlertState) {
+        switch alert.action {
+        case .openRuntimeSettings:
+            viewModel.selectSettingsSection(.runtime)
+            openSettingsWindow()
+        default:
+            viewModel.performMenuAlertAction(alert.action)
+        }
+    }
+
+    private func performPrimaryAction(for row: ProfileRowState) {
+        switch row.primaryAction {
+        case .switchProfile:
+            viewModel.switchToProfile(named: row.name)
+        case .relogin:
+            viewModel.openLoginInTerminal(for: row.name)
+        case .none:
+            toggleExpanded(row.name)
+        }
     }
 
     private var activeToast: (text: String, color: Color)? {
@@ -325,44 +400,46 @@ struct UsageMenuContentView: View {
         return .orange
     }
 
-    private var profilesNeedingLogin: [ProfileUsage] {
-        viewModel.profiles.filter { $0.connectionState == .needsLogin }
-    }
-
-    private var visibleProfiles: [ProfileUsage] {
-        Array(viewModel.profiles.prefix(maxVisibleProfiles))
-    }
-
-    private var hiddenProfilesCount: Int {
-        max(0, viewModel.profiles.count - visibleProfiles.count)
-    }
-
-    private func toggleExpanded(_ profileName: String) {
-        if expandedProfileNames.contains(profileName) {
-            expandedProfileNames.remove(profileName)
-        } else {
-            expandedProfileNames.insert(profileName)
+    private func statusColor(for state: ProfileConnectionState) -> Color {
+        switch state {
+        case .connected:
+            return .green
+        case .needsLogin:
+            return .orange
+        case .error:
+            return .red
         }
-        selectedProfileName = profileName
+    }
+
+    private func statePill(_ text: String, tone: Color) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(tone.opacity(0.14), in: Capsule())
+            .foregroundStyle(tone)
+    }
+
+    private func openSettingsWindow() {
+        NSApp.setActivationPolicy(.regular)
+        openWindow(id: "settings")
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func synchronizeSelection() {
-        if let focus = viewModel.focusedProfileName, visibleProfiles.contains(where: { $0.name == focus }) {
+        let names = visibleRows.map(\.name)
+
+        if let focus = viewModel.focusedProfileName, names.contains(focus) {
             selectedProfileName = focus
-            expandedProfileNames.insert(focus)
             viewModel.dismissFocusHint()
             return
         }
 
-        if let selectedProfileName, visibleProfiles.contains(where: { $0.name == selectedProfileName }) {
+        if let selectedProfileName, names.contains(selectedProfileName) {
             return
         }
 
-        if let current = viewModel.currentProfile, visibleProfiles.contains(where: { $0.name == current.name }) {
-            self.selectedProfileName = current.name
-        } else {
-            self.selectedProfileName = visibleProfiles.first?.name
-        }
+        selectedProfileName = names.first
     }
 
     private func installKeyboardMonitor() {
@@ -388,6 +465,10 @@ struct UsageMenuContentView: View {
             viewModel.refreshLive()
             return true
         }
+        if modifiers == [.command], event.charactersIgnoringModifiers == "," {
+            openSettingsWindow()
+            return true
+        }
 
         switch event.keyCode {
         case 126: // up arrow
@@ -405,44 +486,188 @@ struct UsageMenuContentView: View {
     }
 
     private func moveSelection(_ delta: Int) {
-        guard !visibleProfiles.isEmpty else { return }
-        let names = visibleProfiles.map(\.name)
-        guard let currentName = selectedProfileName, let idx = names.firstIndex(of: currentName) else {
-            selectedProfileName = names.first
+        let names = visibleRows.map(\.name)
+        guard !names.isEmpty else { return }
+
+        guard let selectedProfileName,
+              let idx = names.firstIndex(of: selectedProfileName)
+        else {
+            self.selectedProfileName = names.first
             return
         }
 
         let next = (idx + delta + names.count) % names.count
-        selectedProfileName = names[next]
+        self.selectedProfileName = names[next]
     }
 
     private func triggerPrimaryActionForSelection() {
         guard
             let selectedProfileName,
-            let profile = visibleProfiles.first(where: { $0.name == selectedProfileName })
+            let row = visibleRows.first(where: { $0.name == selectedProfileName })
         else {
             return
         }
 
-        if profile.connectionState == .needsLogin {
-            viewModel.openLoginInTerminal(for: profile.name)
-            return
-        }
+        performPrimaryAction(for: row)
+    }
 
-        if !profile.isCurrent {
-            viewModel.switchToProfile(named: profile.name)
-            return
+    private func toggleExpanded(_ profileName: String) {
+        if expandedProfileNames.contains(profileName) {
+            expandedProfileNames.remove(profileName)
+        } else {
+            expandedProfileNames.insert(profileName)
         }
-
-        toggleExpanded(profile.name)
     }
 }
 
-private struct UsageValueChip: View {
+private struct CompactUsageMetric: View {
     let title: String
-    let value: String
+    let metric: UsageMetric
+    let resetDisplayMode: ResetDisplayMode
+    let progressValue: Double
+
+    private var tone: Color {
+        switch UsageLevel.from(usedPercent: metric.usedPercent) {
+        case .critical:
+            return .red
+        case .warning:
+            return .orange
+        case .normal:
+            return .green
+        }
+    }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(metric.percentText)
+                    .font(.caption.weight(.semibold))
+            }
+
+            ProgressView(value: progressValue)
+                .tint(tone)
+
+            Text(metric.resetText(mode: resetDisplayMode))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct MenuProfileQuickRow: View {
+    let row: ProfileRowState
+    let isSelected: Bool
+    let isExpanded: Bool
+    let isBusy: Bool
+    let isSwitching: Bool
+    let isAuthRunning: Bool
+    let onSelect: () -> Void
+    let onPrimaryAction: () -> Void
+    let onToggleExpanded: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(row.name)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        if row.isCurrent {
+                            statePill("Current", tone: .accentColor)
+                        }
+                        statePill(row.connectionState.label, tone: statusColor(for: row.connectionState))
+                    }
+
+                    HStack(spacing: 8) {
+                        Text("5h \(row.fiveHourPercent)")
+                        Text("weekly \(row.weeklyPercent)")
+                        Text(row.resetText)
+                            .lineLimit(1)
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                if row.primaryAction != .none {
+                    Button(action: onPrimaryAction) {
+                        if row.primaryAction == .switchProfile, isSwitching {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else if row.primaryAction == .relogin, isAuthRunning {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Label(row.primaryAction.title, systemImage: row.primaryAction.symbol)
+                                .font(.caption.weight(.semibold))
+                                .labelStyle(.titleAndIcon)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isBusy)
+                }
+
+                Button(action: onToggleExpanded) {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help(isExpanded ? "Hide remaining limit" : "Show remaining limit")
+            }
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 10) {
+                        remainingChip(title: "5h remaining", value: remainingPercentText(for: row.profile.usage.fiveHour))
+                        remainingChip(title: "weekly remaining", value: remainingPercentText(for: row.profile.usage.weekly))
+                    }
+
+                    if let hint = row.profile.connectionHint {
+                        Text(hint)
+                            .font(.caption2)
+                            .foregroundStyle(statusColor(for: row.connectionState))
+                            .lineLimit(2)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.secondary.opacity(isSelected ? 0.12 : 0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(isSelected ? Color.accentColor.opacity(0.48) : Color.secondary.opacity(0.10), lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onSelect)
+    }
+
+    private func remainingPercentText(for metric: UsageMetric) -> String {
+        guard let usedPercent = metric.usedPercent else {
+            return "-"
+        }
+        let remaining = min(100, max(0, 100 - usedPercent))
+        return "\(Int(remaining.rounded()))%"
+    }
+
+    private func remainingChip(title: String, value: String) -> some View {
         HStack(spacing: 4) {
             Text(title)
                 .font(.caption2)
@@ -450,8 +675,28 @@ private struct UsageValueChip: View {
             Text(value)
                 .font(.caption.weight(.semibold))
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 4)
-        .background(Color.primary.opacity(0.06), in: Capsule())
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Color.secondary.opacity(0.07), in: Capsule())
+    }
+
+    private func statusColor(for state: ProfileConnectionState) -> Color {
+        switch state {
+        case .connected:
+            return .green
+        case .needsLogin:
+            return .orange
+        case .error:
+            return .red
+        }
+    }
+
+    private func statePill(_ text: String, tone: Color) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(tone.opacity(0.14), in: Capsule())
+            .foregroundStyle(tone)
     }
 }
