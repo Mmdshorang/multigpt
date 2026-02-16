@@ -15,7 +15,7 @@ struct MultiCodexMenuApp: App {
                 symbolName: viewModel.menuBarSymbol,
                 fiveHourFraction: viewModel.currentFiveHourFraction,
                 weeklyFraction: viewModel.currentWeeklyFraction,
-                hasError: viewModel.lastRefreshError != nil
+                hasError: viewModel.lastRefreshError != nil || viewModel.refreshWarningMessage != nil
             )
         }
         .menuBarExtraStyle(.window)

@@ -6,6 +6,7 @@ final class UsageMenuViewModel: ObservableObject {
     @Published private(set) var profiles: [ProfileUsage] = []
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastRefreshError: String?
+    @Published private(set) var refreshWarningMessage: String?
     @Published private(set) var lastUpdatedAt: Date?
     @Published private(set) var switchingProfileName: String?
     @Published private(set) var cliResolutionHint: String?
@@ -26,6 +27,7 @@ final class UsageMenuViewModel: ObservableObject {
     @Published private(set) var isAdvancedSettingsVisible: Bool
     @Published private(set) var menuDensity: MenuDensity
     @Published private(set) var usageBarStyle: UsageBarStyle
+    @Published private(set) var limitsCacheTTLSeconds: Int
     @Published private(set) var pendingProfileRemovalRequest: PendingProfileRemovalRequest?
 
     private let cli = MultiCodexCLI()
@@ -44,6 +46,7 @@ final class UsageMenuViewModel: ObservableObject {
         static let isAdvancedSettingsVisible = "multicodexMenu.isAdvancedSettingsVisible"
         static let menuDensity = "multicodexMenu.menuDensity"
         static let usageBarStyle = "multicodexMenu.usageBarStyle"
+        static let limitsCacheTTLSeconds = "multicodexMenu.limitsCacheTTLSeconds"
     }
     private var refreshLoopTask: Task<Void, Never>?
     private var didBecomeActiveObserver: NSObjectProtocol?
@@ -66,6 +69,10 @@ final class UsageMenuViewModel: ObservableObject {
         isAdvancedSettingsVisible = defaults.bool(forKey: DefaultsKey.isAdvancedSettingsVisible)
         menuDensity = MenuDensity(rawValue: defaults.string(forKey: DefaultsKey.menuDensity) ?? "") ?? .compact
         usageBarStyle = UsageBarStyle(rawValue: defaults.string(forKey: DefaultsKey.usageBarStyle) ?? "") ?? .depleting
+        let persistedTTL = defaults.integer(forKey: DefaultsKey.limitsCacheTTLSeconds)
+        limitsCacheTTLSeconds = MultiCodexCLI.normalizedLimitsCacheTTLSeconds(
+            persistedTTL > 0 ? persistedTTL : MultiCodexCLI.defaultLimitsCacheTTLSeconds
+        )
         pendingProfileRemovalRequest = nil
         if !isAdvancedSettingsVisible, selectedSettingsSection == .advanced {
             selectedSettingsSection = .dashboard
@@ -78,6 +85,7 @@ final class UsageMenuViewModel: ObservableObject {
         temporaryAuthSandboxHome = nil
 #endif
         cli.customNodePath = customNodePath.isEmpty ? nil : customNodePath
+        cli.limitsCacheTTLSeconds = limitsCacheTTLSeconds
         configureSandboxEnvironment()
         refreshRuntimeProbe()
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
@@ -227,6 +235,10 @@ final class UsageMenuViewModel: ObservableObject {
         }
     }
 
+    var limitsCacheTTLMinutes: Int {
+        max(1, Int(round(Double(limitsCacheTTLSeconds) / 60.0)))
+    }
+
     var settingsSections: [SettingsSection] {
         var sections: [SettingsSection] = [
             .dashboard,
@@ -254,10 +266,13 @@ final class UsageMenuViewModel: ObservableObject {
         }
 
         triggerRefresh(refreshLive: false)
+        startRefreshLoop()
+    }
 
+    private func startRefreshLoop() {
         refreshLoopTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(MultiCodexCLI.limitsCacheTTLSeconds))
+                try? await Task.sleep(for: .seconds(limitsCacheTTLSeconds))
                 if Task.isCancelled {
                     break
                 }
@@ -329,6 +344,21 @@ final class UsageMenuViewModel: ObservableObject {
         }
         usageBarStyle = style
         defaults.set(style.rawValue, forKey: DefaultsKey.usageBarStyle)
+    }
+
+    func setLimitsCacheTTLSeconds(_ seconds: Int) {
+        let normalized = MultiCodexCLI.normalizedLimitsCacheTTLSeconds(seconds)
+        guard normalized != limitsCacheTTLSeconds else {
+            return
+        }
+        limitsCacheTTLSeconds = normalized
+        defaults.set(normalized, forKey: DefaultsKey.limitsCacheTTLSeconds)
+        cli.limitsCacheTTLSeconds = normalized
+
+        // Refresh cadence is tied to TTL, so restart the loop when this changes.
+        refreshLoopTask?.cancel()
+        refreshLoopTask = nil
+        startRefreshLoop()
     }
 
     func progressValue(for metric: UsageMetric) -> Double {
@@ -558,11 +588,17 @@ final class UsageMenuViewModel: ObservableObject {
         isRefreshing = true
         defer { isRefreshing = false }
 
+        let previousProfiles = profiles
+
         do {
             let accounts = try await cli.fetchAccounts()
             let limits = try await cli.fetchLimits(refreshLive: refreshLive)
 
-            profiles = UsageDataService.mergeProfiles(accounts: accounts, limits: limits)
+            profiles = UsageDataService.mergeProfiles(
+                accounts: accounts,
+                limits: limits,
+                previousProfiles: previousProfiles
+            )
             if let focused = focusedProfileName, !profiles.contains(where: { $0.name == focused }) {
                 focusedProfileName = nil
             }
@@ -575,14 +611,22 @@ final class UsageMenuViewModel: ObservableObject {
 
             if limits.errors.isEmpty {
                 lastRefreshError = nil
+                refreshWarningMessage = nil
             } else {
                 let count = limits.errors.count
                 let suffix = count == 1 ? "profile" : "profiles"
-                lastRefreshError = "Usage fetch failed for \(count) \(suffix)."
+                lastRefreshError = nil
+                refreshWarningMessage = "Showing latest data. Could not refresh \(count) \(suffix)."
             }
         } catch {
-            lastRefreshError = error.localizedDescription
             cliResolutionHint = cli.resolutionHint
+            if previousProfiles.isEmpty {
+                lastRefreshError = error.localizedDescription
+                refreshWarningMessage = nil
+            } else {
+                lastRefreshError = nil
+                refreshWarningMessage = "Refresh failed. Showing latest data."
+            }
         }
     }
 

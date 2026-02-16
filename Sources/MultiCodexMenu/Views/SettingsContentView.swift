@@ -106,12 +106,21 @@ struct SettingsContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                if let warning = viewModel.refreshWarningMessage {
+                    subtleWarningRow(warning)
+                }
+
                 HStack(spacing: 8) {
-                    ActionPillButton(title: "Refresh", symbol: "arrow.clockwise") {
+                    ActionPillButton(
+                        title: "Refresh",
+                        symbol: "arrow.clockwise",
+                        role: .secondary,
+                        layout: .iconOnly
+                    ) {
                         viewModel.refresh()
                     }
 
-                    ActionPillButton(title: "Refresh Live", symbol: "bolt.horizontal.fill", prominent: true) {
+                    ActionPillButton(title: "Refresh Live", symbol: "bolt.horizontal.fill", role: .secondary) {
                         viewModel.refreshLive()
                     }
                 }
@@ -175,7 +184,7 @@ struct SettingsContentView: View {
 
             Spacer()
 
-            ActionPillButton(title: alert.actionTitle, symbol: "arrow.right.circle.fill", prominent: true) {
+            ActionPillButton(title: alert.actionTitle, symbol: "arrow.right.circle.fill", role: .primary) {
                 handleAlertAction(alert)
             }
         }
@@ -204,15 +213,15 @@ struct SettingsContentView: View {
                 HStack(spacing: 8) {
                     switch viewModel.onboardingState.step {
                     case .runtime:
-                        ActionPillButton(title: "Open Runtime", symbol: "terminal", prominent: true) {
+                        ActionPillButton(title: "Open Runtime", symbol: "terminal", role: .primary) {
                             viewModel.selectSettingsSection(.runtime)
                         }
                     case .login:
-                        ActionPillButton(title: "Login First Profile", symbol: "person.crop.circle.badge.plus", prominent: true) {
+                        ActionPillButton(title: "Login First Profile", symbol: "person.crop.circle.badge.plus", role: .primary) {
                             viewModel.startNewProfileLogin()
                         }
                     case .verify:
-                        ActionPillButton(title: "Check Status", symbol: "person.crop.circle.badge.checkmark", prominent: true) {
+                        ActionPillButton(title: "Check Status", symbol: "person.crop.circle.badge.checkmark", role: .primary) {
                             if let current = viewModel.currentProfile {
                                 viewModel.checkLoginStatus(for: current.name)
                             } else {
@@ -220,7 +229,7 @@ struct SettingsContentView: View {
                             }
                         }
                     case .done:
-                        ActionPillButton(title: "Finish", symbol: "checkmark.circle.fill", prominent: true) {
+                        ActionPillButton(title: "Finish", symbol: "checkmark.circle.fill", role: .primary) {
                             viewModel.markOnboardingCompleted()
                         }
                     }
@@ -256,7 +265,7 @@ struct SettingsContentView: View {
 
                     Spacer()
 
-                    ActionPillButton(title: "Login New Profile", symbol: "person.crop.circle.badge.plus", prominent: true, isDisabled: isProfileActionRunning) {
+                    ActionPillButton(title: "Login New Profile", symbol: "person.crop.circle.badge.plus", role: .primary, isDisabled: isProfileActionRunning) {
                         viewModel.startNewProfileLogin()
                     }
                 }
@@ -412,7 +421,7 @@ struct SettingsContentView: View {
 
             HStack(spacing: 8) {
                 if !profile.isCurrent {
-                    ActionPillButton(title: "Use", symbol: "checkmark.circle.fill", prominent: true) {
+                    ActionPillButton(title: "Use", symbol: "checkmark.circle.fill", role: .secondary) {
                         viewModel.switchToProfile(named: profile.name)
                     }
                     .disabled(isProfileActionRunning)
@@ -421,7 +430,7 @@ struct SettingsContentView: View {
                 ActionPillButton(
                     title: profile.connectionState == .needsLogin ? "Re-login" : "Login",
                     symbol: "person.crop.circle.badge.plus",
-                    prominent: profile.connectionState == .needsLogin
+                    role: .secondary
                 ) {
                     viewModel.openLoginInTerminal(for: profile.name)
                 }
@@ -531,7 +540,7 @@ struct SettingsContentView: View {
                     .textFieldStyle(.roundedBorder)
 
                 HStack(spacing: 8) {
-                    ActionPillButton(title: "Save", symbol: "checkmark", prominent: true) {
+                    ActionPillButton(title: "Save", symbol: "checkmark", role: .primary) {
                         viewModel.updateCustomNodePath(codexPathDraft)
                     }
                     .disabled(normalized(codexPathDraft) == viewModel.customNodePath)
@@ -619,12 +628,24 @@ struct SettingsContentView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                displayOptionRow("Cache TTL") {
+                    Stepper(value: limitsCacheTTLMinutesBinding, in: 1...120) {
+                        Text("\(viewModel.limitsCacheTTLMinutes) min")
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                    }
+                }
+
+                Text("Controls cached limits freshness and auto-refresh cadence.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
                 HStack(spacing: 8) {
                     ActionPillButton(title: "Open Config Directory", symbol: "folder.fill") {
                         viewModel.openMulticodexConfigDirectory()
                     }
 
-                    ActionPillButton(title: "Refresh Live", symbol: "bolt.horizontal.fill", prominent: true) {
+                    ActionPillButton(title: "Refresh Live", symbol: "bolt.horizontal.fill", role: .secondary) {
                         viewModel.refreshLive()
                     }
                 }
@@ -709,7 +730,7 @@ struct SettingsContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                ActionPillButton(title: "Show Advanced", symbol: "gearshape.2", prominent: true) {
+                ActionPillButton(title: "Show Advanced", symbol: "gearshape.2", role: .secondary) {
                     viewModel.setAdvancedSettingsVisible(true)
                     viewModel.selectSettingsSection(.advanced)
                 }
@@ -790,6 +811,21 @@ struct SettingsContentView: View {
         }
     }
 
+    private func subtleWarningRow(_ text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.orange)
+            Text(text)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
     private func displayOptionRow<Control: View>(
         _ label: String,
         @ViewBuilder control: () -> Control
@@ -835,6 +871,13 @@ struct SettingsContentView: View {
         Binding(
             get: { viewModel.usageBarStyle },
             set: { viewModel.setUsageBarStyle($0) }
+        )
+    }
+
+    private var limitsCacheTTLMinutesBinding: Binding<Int> {
+        Binding(
+            get: { viewModel.limitsCacheTTLMinutes },
+            set: { viewModel.setLimitsCacheTTLSeconds($0 * 60) }
         )
     }
 

@@ -20,6 +20,10 @@ struct UsageMenuContentView: View {
                     alertBanner(alert)
                 }
 
+                if viewModel.prioritizedMenuAlert == nil, let warning = viewModel.refreshWarningMessage {
+                    subtleWarningRow(warning)
+                }
+
                 if viewModel.profiles.isEmpty {
                     emptyStateCard
                 } else {
@@ -76,7 +80,8 @@ struct UsageMenuContentView: View {
             ActionPillButton(
                 title: "Refresh",
                 symbol: "arrow.clockwise",
-                prominent: true,
+                role: .secondary,
+                layout: .iconOnly,
                 isDisabled: viewModel.isRefreshing
             ) {
                 viewModel.refreshLive()
@@ -107,7 +112,7 @@ struct UsageMenuContentView: View {
             ActionPillButton(
                 title: alert.actionTitle,
                 symbol: "arrow.right.circle.fill",
-                prominent: true,
+                role: .primary,
                 isDisabled: isActionBusy
             ) {
                 performAlertAction(alert)
@@ -120,6 +125,22 @@ struct UsageMenuContentView: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(alertColor(for: alert.severity).opacity(0.24), lineWidth: 1)
         )
+    }
+
+    private func subtleWarningRow(_ text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.orange)
+            Text(text)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private func currentProfileCard(_ profile: ProfileUsage) -> some View {
@@ -235,7 +256,7 @@ struct UsageMenuContentView: View {
                 ActionPillButton(
                     title: viewModel.isCodexRuntimeAvailable ? "Login First Profile" : "Fix Runtime",
                     symbol: viewModel.isCodexRuntimeAvailable ? "person.crop.circle.badge.plus" : "terminal",
-                    prominent: true,
+                    role: .primary,
                     isDisabled: isActionBusy
                 ) {
                     if viewModel.isCodexRuntimeAvailable {
@@ -267,7 +288,7 @@ struct UsageMenuContentView: View {
             ActionPillButton(
                 title: "Login New",
                 symbol: "person.crop.circle.badge.plus",
-                prominent: true,
+                role: loginNewFooterRole,
                 isDisabled: isActionBusy
             ) {
                 viewModel.startNewProfileLogin()
@@ -289,6 +310,13 @@ struct UsageMenuContentView: View {
 
     private var hiddenProfilesCount: Int {
         max(0, viewModel.profiles.count - visibleRows.count)
+    }
+
+    private var loginNewFooterRole: ActionPillRole {
+        if viewModel.prioritizedMenuAlert != nil || viewModel.profiles.isEmpty {
+            return .secondary
+        }
+        return .primary
     }
 
     private var onboardingCopy: String {
@@ -604,22 +632,21 @@ private struct MenuProfileQuickRow: View {
                 Spacer(minLength: 8)
 
                 if row.primaryAction != .none {
-                    Button(action: onPrimaryAction) {
-                        if row.primaryAction == .switchProfile, isSwitching {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else if row.primaryAction == .relogin, isAuthRunning {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Label(row.primaryAction.title, systemImage: row.primaryAction.symbol)
-                                .font(.caption.weight(.semibold))
-                                .labelStyle(.titleAndIcon)
-                        }
+                    if row.primaryAction == .switchProfile, isSwitching {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else if row.primaryAction == .relogin, isAuthRunning {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        ActionPillButton(
+                            title: row.primaryAction.title,
+                            symbol: row.primaryAction.symbol,
+                            role: .secondary,
+                            isDisabled: isBusy,
+                            action: onPrimaryAction
+                        )
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(isBusy)
                 }
 
                 Button(action: onToggleExpanded) {
