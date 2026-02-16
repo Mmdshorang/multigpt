@@ -183,6 +183,8 @@ struct UsageMenuContentView: View {
                         row: row,
                         isSelected: row.name == selectedProfileName,
                         isExpanded: expandedProfileNames.contains(row.name),
+                        fiveHourProgressValue: viewModel.progressValue(for: row.profile.usage.fiveHour),
+                        weeklyProgressValue: viewModel.progressValue(for: row.profile.usage.weekly),
                         isBusy: isActionBusy,
                         isSwitching: viewModel.switchingProfileName == row.name,
                         isAuthRunning: viewModel.profileActionInFlightName == row.name,
@@ -566,6 +568,8 @@ private struct MenuProfileQuickRow: View {
     let row: ProfileRowState
     let isSelected: Bool
     let isExpanded: Bool
+    let fiveHourProgressValue: Double
+    let weeklyProgressValue: Double
     let isBusy: Bool
     let isSwitching: Bool
     let isAuthRunning: Bool
@@ -630,9 +634,19 @@ private struct MenuProfileQuickRow: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 10) {
-                        remainingChip(title: "5h remaining", value: remainingPercentText(for: row.profile.usage.fiveHour))
-                        remainingChip(title: "weekly remaining", value: remainingPercentText(for: row.profile.usage.weekly))
+                    HStack(spacing: 8) {
+                        CompactUsageMetric(
+                            title: "5h",
+                            metric: row.profile.usage.fiveHour,
+                            resetDisplayMode: row.resetDisplayMode,
+                            progressValue: fiveHourProgressValue
+                        )
+                        CompactUsageMetric(
+                            title: "weekly",
+                            metric: row.profile.usage.weekly,
+                            resetDisplayMode: row.resetDisplayMode,
+                            progressValue: weeklyProgressValue
+                        )
                     }
 
                     if let hint = row.profile.connectionHint {
@@ -657,27 +671,6 @@ private struct MenuProfileQuickRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
-    }
-
-    private func remainingPercentText(for metric: UsageMetric) -> String {
-        guard let usedPercent = metric.usedPercent else {
-            return "-"
-        }
-        let remaining = min(100, max(0, 100 - usedPercent))
-        return "\(Int(remaining.rounded()))%"
-    }
-
-    private func remainingChip(title: String, value: String) -> some View {
-        HStack(spacing: 4) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.caption.weight(.semibold))
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(Color.secondary.opacity(0.07), in: Capsule())
     }
 
     private func statusColor(for state: ProfileConnectionState) -> Color {
