@@ -2,10 +2,21 @@ import Darwin
 import Foundation
 
 final class MultiCodexCLI {
-    static let limitsCacheTTLSeconds = 1_200
+    static let defaultLimitsCacheTTLSeconds = 1_200
+    static let minLimitsCacheTTLSeconds = 60
+    static let maxLimitsCacheTTLSeconds = 7_200
+    private static let usageURLString = "https://chatgpt.com/backend-api/wham/usage"
+    private static let refreshTokenURLString = "https://auth.openai.com/oauth/token"
+    private static let refreshClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
+    private static let refreshAgeSeconds = 8 * 24 * 60 * 60
     private static let nowFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    private static let plainISOFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
         return formatter
     }()
 
@@ -58,6 +69,12 @@ final class MultiCodexCLI {
         var accounts: [String: LimitsCacheEntry]
     }
 
+    private struct UsageHTTPResponse {
+        let statusCode: Int
+        let headers: [AnyHashable: Any]
+        let data: Data
+    }
+
     private struct CodexRuntime {
         let executableURL: URL
         let prefixArguments: [String]
@@ -108,11 +125,17 @@ final class MultiCodexCLI {
     var customNodePath: String?
     var sandboxHomeDirectory: String?
     var sandboxMulticodexHomeDirectory: String?
+    var limitsCacheTTLSeconds: Int = defaultLimitsCacheTTLSeconds
 
     private(set) var resolutionHint: String?
 
     init() {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        limitsCacheTTLSeconds = Self.normalizedLimitsCacheTTLSeconds(limitsCacheTTLSeconds)
+    }
+
+    static func normalizedLimitsCacheTTLSeconds(_ seconds: Int) -> Int {
+        min(max(seconds, minLimitsCacheTTLSeconds), maxLimitsCacheTTLSeconds)
     }
 
     func fetchAccounts() async throws -> AccountsListPayload {
@@ -386,7 +409,8 @@ final class MultiCodexCLI {
 
         for account in targets {
             do {
-                if !refreshLive, let cached = try getCachedLimits(account: account, ttlMs: Double(Self.limitsCacheTTLSeconds * 1000), paths: paths) {
+                let ttlSeconds = Self.normalizedLimitsCacheTTLSeconds(limitsCacheTTLSeconds)
+                if !refreshLive, let cached = try getCachedLimits(account: account, ttlMs: Double(ttlSeconds * 1000), paths: paths) {
                     let ageSec = Int((cached.ageMs / 1000.0).rounded())
                     results.append(
                         LimitsResult(
@@ -399,22 +423,45 @@ final class MultiCodexCLI {
                     continue
                 }
 
-                let snapshot = try withAccountAuth(account: account, forceLock: false, restorePreviousAuth: true, paths: paths) {
-                    try fetchRateLimitsViaRpc()
-                }
-
-                try setCachedLimits(account: account, snapshot: snapshot, provider: "rpc", paths: paths)
-
-                results.append(
-                    LimitsResult(
-                        account: account,
-                        source: "live-rpc",
-                        snapshot: snapshot,
-                        ageSec: nil
+                do {
+                    let snapshot = try fetchRateLimitsViaApiForAuthPath(paths.accountAuthPath(account))
+                    try setCachedLimits(account: account, snapshot: snapshot, provider: "api", paths: paths)
+                    results.append(
+                        LimitsResult(
+                            account: account,
+                            source: "live-api",
+                            snapshot: snapshot,
+                            ageSec: nil
+                        )
                     )
-                )
-            } catch {
-                errors.append(LimitsErrorEntry(account: account, message: error.localizedDescription))
+                    continue
+                } catch {
+                    let apiError = error
+
+                    do {
+                        let snapshot = try withAccountAuth(account: account, forceLock: false, restorePreviousAuth: true, paths: paths) {
+                            try fetchRateLimitsViaRpc()
+                        }
+
+                        try setCachedLimits(account: account, snapshot: snapshot, provider: "rpc", paths: paths)
+                        results.append(
+                            LimitsResult(
+                                account: account,
+                                source: "live-rpc",
+                                snapshot: snapshot,
+                                ageSec: nil
+                            )
+                        )
+                        continue
+                    } catch {
+                        errors.append(
+                            LimitsErrorEntry(
+                                account: account,
+                                message: "API failed (\(apiError.localizedDescription)); RPC fallback failed (\(error.localizedDescription))"
+                            )
+                        )
+                    }
+                }
             }
         }
 
@@ -562,6 +609,447 @@ final class MultiCodexCLI {
 
         let data = try JSONSerialization.data(withJSONObject: rateLimitsObject, options: [])
         return try decoder.decode(RateLimitSnapshot.self, from: data)
+    }
+
+    // MARK: - Usage API (primary limits path)
+
+    private func fetchRateLimitsViaApiForAuthPath(_ authPath: String) throws -> RateLimitSnapshot {
+        var authPayload = try loadAuthPayload(from: authPath)
+
+        if let apiKey = authPayload["OPENAI_API_KEY"] as? String,
+           !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            throw MultiCodexCLIError(message: "Usage not available for API key.")
+        }
+
+        guard let tokens = asObject(authPayload["tokens"]),
+              let rawAccessToken = tokens["access_token"] as? String
+        else {
+            throw MultiCodexCLIError(message: "Not logged in. Run `codex` to authenticate.")
+        }
+
+        var accessToken = rawAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !accessToken.isEmpty else {
+            throw MultiCodexCLIError(message: "Not logged in. Run `codex` to authenticate.")
+        }
+
+        let accountID = (tokens["account_id"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedAccountID = (accountID?.isEmpty == false) ? accountID : nil
+
+        if shouldRefreshToken(authPayload),
+           let refreshed = try refreshAccessToken(authPayload: &authPayload, authPath: authPath)
+        {
+            accessToken = refreshed
+        }
+
+        var usageResponse = try fetchUsage(accessToken: accessToken, accountID: normalizedAccountID)
+
+        if usageResponse.statusCode == 401 || usageResponse.statusCode == 403 {
+            if let refreshed = try refreshAccessToken(authPayload: &authPayload, authPath: authPath) {
+                accessToken = refreshed
+                usageResponse = try fetchUsage(accessToken: accessToken, accountID: normalizedAccountID)
+            }
+        }
+
+        if usageResponse.statusCode == 401 || usageResponse.statusCode == 403 {
+            throw MultiCodexCLIError(message: "Token expired. Run `codex` to log in again.")
+        }
+
+        guard (200...299).contains(usageResponse.statusCode) else {
+            throw MultiCodexCLIError(message: "Usage request failed (HTTP \(usageResponse.statusCode)). Try again later.")
+        }
+
+        guard let usageBody = parseJSONRecord(usageResponse.data) else {
+            throw MultiCodexCLIError(message: "Usage response invalid. Try again later.")
+        }
+
+        return parseUsageSnapshotFromWhamResponse(
+            headers: usageResponse.headers,
+            data: usageBody
+        )
+    }
+
+    private func fetchUsage(accessToken: String, accountID: String?) throws -> UsageHTTPResponse {
+        guard let url = URL(string: Self.usageURLString) else {
+            throw MultiCodexCLIError(message: "Usage request URL is invalid.")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("multicodex", forHTTPHeaderField: "User-Agent")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        if let accountID, !accountID.isEmpty {
+            request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
+        }
+
+        return try performHTTPRequest(request: request, timeoutSeconds: 10)
+    }
+
+    private func refreshAccessToken(authPayload: inout [String: Any], authPath: String) throws -> String? {
+        guard var tokens = asObject(authPayload["tokens"]),
+              let refreshToken = tokens["refresh_token"] as? String,
+              !refreshToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return nil
+        }
+
+        guard let url = URL(string: Self.refreshTokenURLString) else {
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = buildRefreshRequestBody(refreshToken: refreshToken)
+
+        let response: UsageHTTPResponse
+        do {
+            response = try performHTTPRequest(request: request, timeoutSeconds: 15)
+        } catch {
+            return nil
+        }
+
+        let responseBody = parseJSONRecord(response.data)
+        if response.statusCode == 400 || response.statusCode == 401 {
+            let code = refreshErrorCode(from: responseBody)
+            throw MultiCodexCLIError(message: tokenErrorMessage(forRefreshCode: code))
+        }
+
+        guard (200...299).contains(response.statusCode) else {
+            return nil
+        }
+        guard let responseBody,
+              let nextAccessToken = responseBody["access_token"] as? String,
+              !nextAccessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return nil
+        }
+
+        tokens["access_token"] = nextAccessToken
+        if let nextRefreshToken = responseBody["refresh_token"] as? String,
+           !nextRefreshToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            tokens["refresh_token"] = nextRefreshToken
+        }
+        if let nextIDToken = responseBody["id_token"] as? String,
+           !nextIDToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            tokens["id_token"] = nextIDToken
+        }
+
+        authPayload["tokens"] = tokens
+        authPayload["last_refresh"] = Self.nowISO()
+        try? persistAuthPayload(authPayload, path: authPath)
+        return nextAccessToken
+    }
+
+    private func performHTTPRequest(request: URLRequest, timeoutSeconds: TimeInterval) throws -> UsageHTTPResponse {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = timeoutSeconds
+        configuration.timeoutIntervalForResource = timeoutSeconds
+        let session = URLSession(configuration: configuration)
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var responseData = Data()
+        var responseObject: HTTPURLResponse?
+        var responseError: Error?
+
+        let task = session.dataTask(with: request) { data, response, error in
+            if let data {
+                responseData = data
+            }
+            responseObject = response as? HTTPURLResponse
+            responseError = error
+            semaphore.signal()
+        }
+        task.resume()
+
+        let waitResult = semaphore.wait(timeout: .now() + timeoutSeconds + 1)
+        session.finishTasksAndInvalidate()
+
+        if waitResult == .timedOut {
+            task.cancel()
+            throw MultiCodexCLIError(message: "Usage request timed out. Try again later.")
+        }
+        if let responseError {
+            throw MultiCodexCLIError(message: "Usage request failed: \(responseError.localizedDescription)")
+        }
+        guard let responseObject else {
+            throw MultiCodexCLIError(message: "Usage response invalid. Try again later.")
+        }
+
+        return UsageHTTPResponse(
+            statusCode: responseObject.statusCode,
+            headers: responseObject.allHeaderFields,
+            data: responseData
+        )
+    }
+
+    private func loadAuthPayload(from path: String) throws -> [String: Any] {
+        guard let rawData = readFileIfExists(path), !rawData.isEmpty else {
+            throw MultiCodexCLIError(message: "Not logged in. Run `codex` to authenticate.")
+        }
+
+        if let parsed = parseJSONRecord(rawData) {
+            return parsed
+        }
+
+        if let rawText = String(data: rawData, encoding: .utf8),
+           let decodedHexText = decodeHexUTF8(rawText),
+           let decoded = parseJSONRecord(Data(decodedHexText.utf8))
+        {
+            return decoded
+        }
+
+        throw MultiCodexCLIError(message: "Not logged in. Run `codex` to authenticate.")
+    }
+
+    private func persistAuthPayload(_ payload: [String: Any], path: String) throws {
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+        try writeFileAtomic(data: data + Data("\n".utf8), path: path, mode: 0o600)
+    }
+
+    private func parseUsageSnapshotFromWhamResponse(
+        headers: [AnyHashable: Any],
+        data: [String: Any]
+    ) -> RateLimitSnapshot {
+        let nowSec = Int(Date().timeIntervalSince1970)
+        let rateLimit = asObject(data["rate_limit"])
+        let primaryWindow = asObject(rateLimit?["primary_window"])
+        let secondaryWindow = asObject(rateLimit?["secondary_window"])
+        let reviewWindow = asObject(asObject(data["code_review_rate_limit"])?["primary_window"])
+
+        let primaryHeaderUsedPercent = readHeaderNumber(headers: headers, name: "x-codex-primary-used-percent")
+        let secondaryHeaderUsedPercent = readHeaderNumber(headers: headers, name: "x-codex-secondary-used-percent")
+
+        let primary = buildWindow(
+            usedPercent: primaryHeaderUsedPercent ?? readNumber(primaryWindow?["used_percent"]),
+            windowDurationMins: readDurationMins(window: primaryWindow, fallbackMins: 300),
+            resetsAt: readResetsAt(window: primaryWindow, nowSec: nowSec)
+        )
+
+        let secondaryCandidate = secondaryWindow ?? reviewWindow
+        let secondary = buildWindow(
+            usedPercent: secondaryHeaderUsedPercent
+                ?? readNumber(secondaryWindow?["used_percent"])
+                ?? readNumber(reviewWindow?["used_percent"]),
+            windowDurationMins: readDurationMins(window: secondaryCandidate, fallbackMins: 10_080),
+            resetsAt: readResetsAt(window: secondaryCandidate, nowSec: nowSec)
+        )
+
+        let bodyCredits = asObject(data["credits"])
+        let creditsFromHeader = readHeaderNumber(headers: headers, name: "x-codex-credits-balance")
+        let creditsFromBody = readNumber(bodyCredits?["balance"])
+        let hasCredits = readBoolean(bodyCredits?["has_credits"])
+        let unlimited = readBoolean(bodyCredits?["unlimited"])
+
+        let credits: CreditsSnapshot?
+        if creditsFromHeader != nil || creditsFromBody != nil || hasCredits != nil || unlimited != nil {
+            let balance = creditsFromHeader.map(numberString) ?? creditsFromBody.map(numberString)
+            credits = CreditsSnapshot(hasCredits: hasCredits, unlimited: unlimited, balance: balance)
+        } else {
+            credits = nil
+        }
+
+        return RateLimitSnapshot(primary: primary, secondary: secondary, credits: credits)
+    }
+
+    private func shouldRefreshToken(_ authPayload: [String: Any]) -> Bool {
+        guard let raw = authPayload["last_refresh"] as? String,
+              let parsed = parseISODate(raw)
+        else {
+            return true
+        }
+        return Date().timeIntervalSince(parsed) > Double(Self.refreshAgeSeconds)
+    }
+
+    private func parseISODate(_ raw: String) -> Date? {
+        if let parsed = Self.nowFormatter.date(from: raw) {
+            return parsed
+        }
+        return Self.plainISOFormatter.date(from: raw)
+    }
+
+    private func refreshErrorCode(from body: [String: Any]?) -> String? {
+        if let errorObject = asObject(body?["error"]),
+           let code = errorObject["code"] as? String
+        {
+            return code
+        }
+        if let error = body?["error"] as? String {
+            return error
+        }
+        if let code = body?["code"] as? String {
+            return code
+        }
+        return nil
+    }
+
+    private func tokenErrorMessage(forRefreshCode code: String?) -> String {
+        switch code {
+        case "refresh_token_expired":
+            return "Session expired. Run `codex` to log in again."
+        case "refresh_token_reused":
+            return "Token conflict. Run `codex` to log in again."
+        case "refresh_token_invalidated":
+            return "Token revoked. Run `codex` to log in again."
+        default:
+            return "Token expired. Run `codex` to log in again."
+        }
+    }
+
+    private func buildRefreshRequestBody(refreshToken: String) -> Data {
+        let body = [
+            "grant_type=refresh_token",
+            "client_id=\(formURLEncode(Self.refreshClientID))",
+            "refresh_token=\(formURLEncode(refreshToken))",
+        ].joined(separator: "&")
+        return Data(body.utf8)
+    }
+
+    private func formURLEncode(_ value: String) -> String {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&+=?")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+
+    private func parseJSONRecord(_ data: Data) -> [String: Any]? {
+        guard !data.isEmpty else { return nil }
+        guard let object = try? JSONSerialization.jsonObject(with: data, options: []),
+              let record = object as? [String: Any]
+        else {
+            return nil
+        }
+        return record
+    }
+
+    private func decodeHexUTF8(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleaned: String
+        if trimmed.hasPrefix("0x") || trimmed.hasPrefix("0X") {
+            cleaned = String(trimmed.dropFirst(2))
+        } else {
+            cleaned = trimmed
+        }
+
+        guard !cleaned.isEmpty,
+              cleaned.count.isMultiple(of: 2),
+              cleaned.range(of: "^[0-9a-fA-F]+$", options: .regularExpression) != nil
+        else {
+            return nil
+        }
+
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(cleaned.count / 2)
+        var index = cleaned.startIndex
+        while index < cleaned.endIndex {
+            let next = cleaned.index(index, offsetBy: 2)
+            let pair = cleaned[index..<next]
+            guard let value = UInt8(pair, radix: 16) else {
+                return nil
+            }
+            bytes.append(value)
+            index = next
+        }
+
+        return String(data: Data(bytes), encoding: .utf8)
+    }
+
+    private func asObject(_ value: Any?) -> [String: Any]? {
+        value as? [String: Any]
+    }
+
+    private func readNumber(_ value: Any?) -> Double? {
+        if let number = value as? NSNumber {
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                return nil
+            }
+            return number.doubleValue
+        }
+        if let text = value as? String {
+            return Double(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return nil
+    }
+
+    private func readBoolean(_ value: Any?) -> Bool? {
+        if let bool = value as? Bool {
+            return bool
+        }
+        if let number = value as? NSNumber,
+           CFGetTypeID(number) == CFBooleanGetTypeID()
+        {
+            return number.boolValue
+        }
+        if let text = value as? String {
+            switch text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "true", "1":
+                return true
+            case "false", "0":
+                return false
+            default:
+                return nil
+            }
+        }
+        return nil
+    }
+
+    private func readHeaderNumber(headers: [AnyHashable: Any], name: String) -> Double? {
+        guard let value = readHeaderValue(headers: headers, name: name) else {
+            return nil
+        }
+        return Double(value.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private func readHeaderValue(headers: [AnyHashable: Any], name: String) -> String? {
+        for (key, rawValue) in headers {
+            let keyString = String(describing: key)
+            if keyString.caseInsensitiveCompare(name) != .orderedSame {
+                continue
+            }
+            if let stringValue = rawValue as? String {
+                return stringValue
+            }
+            return String(describing: rawValue)
+        }
+        return nil
+    }
+
+    private func readDurationMins(window: [String: Any]?, fallbackMins: Int) -> Int? {
+        if let seconds = readNumber(window?["limit_window_seconds"]), seconds > 0 {
+            return max(1, Int((seconds / 60.0).rounded()))
+        }
+        return fallbackMins
+    }
+
+    private func readResetsAt(window: [String: Any]?, nowSec: Int) -> Double? {
+        if let resetAt = readNumber(window?["reset_at"]) {
+            return floor(resetAt)
+        }
+        if let resetAfter = readNumber(window?["reset_after_seconds"]) {
+            return floor(Double(nowSec) + resetAfter)
+        }
+        return nil
+    }
+
+    private func buildWindow(usedPercent: Double?, windowDurationMins: Int?, resetsAt: Double?) -> RateLimitWindow? {
+        if usedPercent == nil, windowDurationMins == nil, resetsAt == nil {
+            return nil
+        }
+        return RateLimitWindow(
+            usedPercent: usedPercent,
+            windowDurationMins: windowDurationMins,
+            resetsAt: resetsAt
+        )
+    }
+
+    private func numberString(_ value: Double) -> String {
+        if value.rounded() == value {
+            return String(Int(value))
+        }
+        return String(value)
     }
 
     private func writeRpcMessage(_ payload: [String: Any], to handle: FileHandle) throws {
