@@ -283,7 +283,11 @@ struct AccountsMenuContentView: View {
 
             Spacer()
 
-            ActionPillButton(title: "Open Settings", symbol: "gearshape.fill") {
+            ActionPillButton(
+                title: "Open Settings",
+                symbol: "gearshape.fill",
+                layout: .iconOnly
+            ) {
                 openSettingsWindow()
             }
             .keyboardShortcut(",", modifiers: [.command])
