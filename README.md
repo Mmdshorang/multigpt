@@ -1,23 +1,50 @@
 # MultiCodex (macOS Menu Bar App)
 
-Native macOS SwiftUI menu bar app for managing multiple Codex profiles.
+Native macOS SwiftUI menu bar app for managing multiple Codex accounts.
 
 ## What It Does
 
 - Shows 5h and weekly usage in a compact menu bar view.
-- Lets you switch profiles and re-login when a profile needs auth.
+- Lets you switch accounts and re-login when an account needs auth.
 - Opens browser-based `codex login` flows through Terminal.
-- Provides profile operations in Settings: use, rename, remove, import auth, and status check.
+- Provides account operations in Settings: use, rename, remove, import auth, and status check.
 - Uses a fully native Swift runtime (no bundled JavaScript CLI runtime).
 
-## Storage Layout
+## Architecture
 
-MultiCodex follows the same storage layout as the `multicodex` CLI:
+The app stays in a single SwiftPM executable target and is organized into clear layers:
 
-- `~/.config/multicodex` (or `MULTICODEX_HOME`)
-- `~/.codex/auth.json`
+- `Sources/MultiCodexMenu/App`
+  - App lifecycle and top-level scene wiring.
+- `Sources/MultiCodexMenu/Core/Accounts`
+  - Account-focused domain payloads, UI state models, merge policy, alert prioritization.
+- `Sources/MultiCodexMenu/Core/Usage`
+  - Usage/rate-limit models and formatting helpers.
+- `Sources/MultiCodexMenu/Infrastructure/Accounts`
+  - Account config/auth persistence, preferences, and account service facade.
+- `Sources/MultiCodexMenu/Infrastructure/Runtime`
+  - Codex runtime resolution and process execution.
+- `Sources/MultiCodexMenu/Infrastructure/Usage`
+  - Usage API request builders, RPC helpers, and limits cache codecs.
+- `Sources/MultiCodexMenu/Features/MenuBar`
+  - Menu bar content and status UI.
+- `Sources/MultiCodexMenu/Features/Settings`
+  - Settings screens and account management UI.
+- `Sources/MultiCodexMenu/Features/Shared`
+  - Shared view model and reusable UI presentation components.
 
-Note: the temporary test config/sandbox flow is debug-only.
+## Compatibility and Migration Notes
+
+This refactor is compatibility-first:
+
+- No forced account migration steps.
+- No forced re-login due to this refactor.
+- Storage paths remain unchanged:
+  - `MULTICODEX_HOME` (default `~/.config/multicodex`)
+  - `~/.codex/auth.json`
+- Account/auth continuity is preserved for existing on-disk data.
+- `config.json` schema/version and account auth/meta/cache file locations remain unchanged.
+- Legacy defaults keys are still read for compatibility, while canonical account-first keys are now written.
 
 ## Requirements
 
@@ -69,6 +96,6 @@ just release v0.2.0
 
 ## Troubleshooting
 
-- `codex` not found: install `codex` or set the runtime path in Settings > Codex Runtime.
-- Profile says auth is needed: use `Re-login` on that profile.
+- `codex` not found: install `codex` or set the runtime path in Settings > Runtime.
+- Account says auth is needed: use `Re-login` on that account.
 - Swift build fails with module/PCH cache path errors after moving clones: run `just clean` and build again.
