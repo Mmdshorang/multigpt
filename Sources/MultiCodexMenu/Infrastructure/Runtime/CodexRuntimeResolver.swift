@@ -47,6 +47,14 @@ enum CodexRuntimeResolver {
             return try runtimeForRaw(envRaw, source: "MULTICODEX_CODEX")
         }
 
+        if let resolvedFromWhich = resolveCodexPathUsingWhich(environment: environment, fileManager: fileManager) {
+            return CodexRuntimeDescriptor(
+                executableURL: URL(fileURLWithPath: resolvedFromWhich),
+                prefixArguments: [],
+                display: "\(resolvedFromWhich) (from which)"
+            )
+        }
+
         let knownPaths = [
             "/opt/homebrew/bin/codex",
             "/usr/local/bin/codex",
@@ -66,5 +74,46 @@ enum CodexRuntimeResolver {
             prefixArguments: ["codex"],
             display: "codex (from PATH)"
         )
+    }
+
+    private static func resolveCodexPathUsingWhich(
+        environment: [String: String],
+        fileManager: FileManager
+    ) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["codex"]
+
+        var commandEnvironment = environment
+        if commandEnvironment["PATH"]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            commandEnvironment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        }
+        process.environment = commandEnvironment
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
+
+        let stdout = String(
+            data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        ) ?? ""
+        let resolvedPath = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !resolvedPath.isEmpty, fileManager.isExecutableFile(atPath: resolvedPath) else {
+            return nil
+        }
+        return resolvedPath
     }
 }
