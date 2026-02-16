@@ -11,9 +11,15 @@ Native menu bar app release.
 
 ### Install
 
+Important (unsigned app): run this after dragging to Applications.
+
 1. Download `MultiCodex.dmg` from this release.
 2. Open the DMG and drag `MultiCodex.app` into Applications.
-3. Launch the app from Applications.
+3. Run once in Terminal (unsigned app):
+   ```bash
+   sudo xattr -dr com.apple.quarantine /Applications/MultiCodex.app
+   ```
+4. Launch the app from Applications.
 
 ### Requirements
 

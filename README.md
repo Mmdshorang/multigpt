@@ -53,6 +53,12 @@ just kickoff-release
 - Tag format: `vMAJOR.MINOR.PATCH`
 - Artifact: `build/dist/MultiCodex.dmg`
 
+Important (unsigned app): run after install.
+
+```bash
+sudo xattr -dr com.apple.quarantine /Applications/MultiCodex.app
+```
+
 To create a release tag and trigger GitHub Actions:
 
 ```bash
