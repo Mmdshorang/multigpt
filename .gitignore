@@ -14,3 +14,6 @@ build/
 .DS_Store
 .vscode/
 .idea/
+
+# Node (tooling removed, keep local installs ignored)
+node_modules/
