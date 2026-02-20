@@ -9,22 +9,15 @@ struct AppPreferencesStore {
 
     var customCodexPath: String {
         get {
-            defaults.string(forKey: Keys.customCodexPath)
-                ?? defaults.string(forKey: Keys.legacyCustomNodePath)
-                ?? defaults.string(forKey: Keys.legacyCustomExecutablePath)
-                ?? ""
+            defaults.string(forKey: Keys.customCodexPath) ?? ""
         }
         set {
             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
                 defaults.removeObject(forKey: Keys.customCodexPath)
-                defaults.removeObject(forKey: Keys.legacyCustomNodePath)
-                defaults.removeObject(forKey: Keys.legacyCustomExecutablePath)
                 return
             }
             defaults.set(trimmed, forKey: Keys.customCodexPath)
-            defaults.removeObject(forKey: Keys.legacyCustomNodePath)
-            defaults.removeObject(forKey: Keys.legacyCustomExecutablePath)
         }
     }
 
@@ -51,12 +44,10 @@ struct AppPreferencesStore {
     var selectedSettingsAccountName: String? {
         get {
             defaults.string(forKey: Keys.selectedSettingsAccountName)
-                ?? defaults.string(forKey: Keys.legacySelectedSettingsAccountKey)
         }
         set {
             if let newValue {
                 defaults.set(newValue, forKey: Keys.selectedSettingsAccountName)
-                defaults.removeObject(forKey: Keys.legacySelectedSettingsAccountKey)
             } else {
                 defaults.removeObject(forKey: Keys.selectedSettingsAccountName)
             }
@@ -120,14 +111,11 @@ struct AppPreferencesStore {
 
     enum Keys {
         static let customCodexPath = "multicodexMenu.customCodexPath"
-        static let legacyCustomNodePath = "multicodexMenu.customNodePath"
-        static let legacyCustomExecutablePath = "multicodexMenu.customExecutablePath"
         static let resetDisplayMode = "multicodexMenu.resetDisplayMode"
         static let temporaryAuthSandboxEnabled = "multicodexMenu.temporaryAuthSandboxEnabled"
         static let temporaryAuthSandboxHome = "multicodexMenu.temporaryAuthSandboxHome"
         static let selectedSettingsSection = "multicodexMenu.selectedSettingsSection"
         static let selectedSettingsAccountName = "multicodexMenu.selectedSettingsAccountName"
-        static let legacySelectedSettingsAccountKey = "multicodexMenu.selectedSettingsProfileName"
         static let hasCompletedOnboarding = "multicodexMenu.hasCompletedOnboarding"
         static let isAdvancedSettingsVisible = "multicodexMenu.isAdvancedSettingsVisible"
         static let menuDensity = "multicodexMenu.menuDensity"

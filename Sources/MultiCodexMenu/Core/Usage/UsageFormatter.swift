@@ -44,8 +44,8 @@ enum UsageFormatter {
     static func usageSummary(from snapshot: RateLimitSnapshot?) -> UsageSummary {
         guard let snapshot else {
             return UsageSummary(
-                fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil, paceStatus: nil),
-                weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil, paceStatus: nil),
+                fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+                weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
                 credits: "-"
             )
         }
@@ -125,8 +125,7 @@ enum UsageFormatter {
             percentText: formatPercent(window?.usedPercent),
             usedPercent: window?.usedPercent,
             periodMinutes: window?.windowDurationMins,
-            resetsAt: resetDate,
-            paceStatus: paceStatus(for: window)
+            resetsAt: resetDate
         )
     }
 
@@ -170,52 +169,6 @@ enum UsageFormatter {
 
         let dayText = resetMonthDayFormatter.string(from: resetDate)
         return "Resets \(dayText) at \(timeText)"
-    }
-
-    private static func paceStatus(for window: RateLimitWindow?) -> PaceStatus? {
-        guard let window,
-              let usedPercent = window.usedPercent,
-              let resetsAt = window.resetsAt,
-              let durationMins = window.windowDurationMins
-        else {
-            return nil
-        }
-
-        let periodDuration = Double(durationMins) * 60
-        guard periodDuration > 0 else {
-            return nil
-        }
-
-        let now = Date().timeIntervalSince1970
-        let periodStart = resetsAt - periodDuration
-        let elapsed = now - periodStart
-
-        guard elapsed > 0, now < resetsAt else {
-            return nil
-        }
-
-        if usedPercent <= 0 {
-            return .ahead
-        }
-        if usedPercent >= 100 {
-            return .behind
-        }
-
-        let elapsedFraction = elapsed / periodDuration
-        if elapsedFraction < 0.05 {
-            return nil
-        }
-
-        let usageRate = usedPercent / elapsed
-        let projected = usageRate * periodDuration
-
-        if projected <= 80 {
-            return .ahead
-        }
-        if projected <= 100 {
-            return .onTrack
-        }
-        return .behind
     }
 
     private static func formatCredits(_ credits: CreditsSnapshot?) -> String {
