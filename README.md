@@ -53,16 +53,24 @@ This cleanup intentionally favors simpler internals over legacy compatibility br
 
 ## Development
 
+Quickstart:
+
 ```bash
 just doctor
 just dev
 ```
 
-Swift-only equivalents:
+Local CI gate:
 
 ```bash
-swift build -c debug
-swift test --parallel
+just ci
+```
+
+Swift-only equivalents (same safe behavior used by `just`):
+
+```bash
+bash scripts/swift-safe.sh swift build -c debug
+bash scripts/swift-safe.sh swift test --parallel
 ```
 
 Useful commands:
@@ -84,6 +92,10 @@ just kickoff-release
 - Workflow: `.github/workflows/release-macos.yml`
 - Tag format: `vMAJOR.MINOR.PATCH`
 - Artifact: `build/dist/MultiCodex.dmg`
+- `scripts/release.sh` enforces:
+  - current branch is `main`
+  - clean working tree
+  - tag must not already exist locally or on `origin`
 
 Important (unsigned app): run after install.
 
