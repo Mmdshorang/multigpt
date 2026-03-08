@@ -103,4 +103,6 @@ just release v0.2.0
 
 - `codex` not found: install `codex` or set the runtime path in Settings > Runtime.
 - Account says auth is needed: use `Re-login` on that account.
-- Swift build fails with module/PCH cache path errors after moving clones: run `just clean` and build again.
+- Swift build fails with module/PCH cache path errors after moving clones:
+  - Normal build flows auto-recover and retry once.
+  - For manual recovery, run `just clean` and build again.

@@ -16,7 +16,7 @@ validate_configuration() {
 }
 
 build_binary() {
-  swift build -c "$configuration"
+  bash scripts/swift-safe.sh swift build -c "$configuration"
 
   if [[ ! -x ".build/$configuration/$app_name" ]]; then
     echo "Expected executable not found: .build/$configuration/$app_name"

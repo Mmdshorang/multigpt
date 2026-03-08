@@ -54,12 +54,13 @@ dmg:
 
 ci:
     just doctor
-    swift build -c debug
-    if [[ -d "Tests" ]]; then swift test; else echo "ci: no Swift tests found"; fi
+    bash scripts/swift-safe.sh swift build -c debug
+    if [[ -d "Tests" ]]; then bash scripts/swift-safe.sh swift test; else echo "ci: no Swift tests found"; fi
 
 clean:
     swift package clean || true
     swift package reset || true
+    rm -rf .build
     if [[ -d "{{build_root}}" ]]; then find "{{build_root}}" -mindepth 1 -delete; fi
 
 release version:
