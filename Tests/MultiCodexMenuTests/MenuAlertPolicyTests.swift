@@ -46,8 +46,8 @@ final class MenuAlertPolicyTests: XCTestCase {
             lastUsedAt: nil,
             lastLoginStatus: nil,
             usage: UsageSummary(
-                fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil, paceStatus: nil),
-                weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil, paceStatus: nil),
+                fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+                weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
                 credits: "-"
             ),
             source: "-",

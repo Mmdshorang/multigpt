@@ -15,7 +15,7 @@ enum AccountConfigStore {
             return AccountConfigRecord(currentAccount: nil, accounts: [])
         }
 
-        if let version = json["version"] as? Int, (version == 1 || version == 2) {
+        if let version = json["version"] as? Int, version == 2 {
             let current = json["currentAccount"] as? String
             let accountObjects = json["accounts"] as? [String: Any] ?? [:]
             return AccountConfigRecord(currentAccount: current, accounts: Set(accountObjects.keys))

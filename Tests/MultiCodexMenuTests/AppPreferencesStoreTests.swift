@@ -2,33 +2,51 @@ import XCTest
 @testable import MultiCodexMenu
 
 final class AppPreferencesStoreTests: XCTestCase {
-    func testCustomCodexPathFallsBackToLegacyNodeKey() {
+    func testCustomCodexPathDefaultsToEmptyWhenUnset() {
         let defaults = ephemeralDefaults()
-        defaults.set("/opt/homebrew/bin/codex", forKey: AppPreferencesStore.Keys.legacyCustomNodePath)
 
         let store = AppPreferencesStore(defaults: defaults)
-        XCTAssertEqual(store.customCodexPath, "/opt/homebrew/bin/codex")
+        XCTAssertEqual(store.customCodexPath, "")
     }
 
-    func testSelectedSettingsAccountFallsBackToLegacyKey() {
+    func testSelectedSettingsAccountDefaultsToNilWhenUnset() {
         let defaults = ephemeralDefaults()
-        defaults.set("alpha", forKey: AppPreferencesStore.Keys.legacySelectedSettingsAccountKey)
 
         let store = AppPreferencesStore(defaults: defaults)
-        XCTAssertEqual(store.selectedSettingsAccountName, "alpha")
+        XCTAssertNil(store.selectedSettingsAccountName)
     }
 
-    func testSettingCustomCodexPathClearsLegacyKeys() {
+    func testSettingCustomCodexPathPersistsCanonicalKey() {
         let defaults = ephemeralDefaults()
-        defaults.set("legacy", forKey: AppPreferencesStore.Keys.legacyCustomNodePath)
-        defaults.set("legacy2", forKey: AppPreferencesStore.Keys.legacyCustomExecutablePath)
 
         var store = AppPreferencesStore(defaults: defaults)
         store.customCodexPath = "/usr/local/bin/codex"
 
         XCTAssertEqual(defaults.string(forKey: AppPreferencesStore.Keys.customCodexPath), "/usr/local/bin/codex")
-        XCTAssertNil(defaults.string(forKey: AppPreferencesStore.Keys.legacyCustomNodePath))
-        XCTAssertNil(defaults.string(forKey: AppPreferencesStore.Keys.legacyCustomExecutablePath))
+    }
+
+    func testDefaultsForDisplayAndSandboxSettings() {
+        let defaults = ephemeralDefaults()
+        var store = AppPreferencesStore(defaults: defaults)
+
+        XCTAssertEqual(store.resetDisplayMode, .relative)
+        XCTAssertEqual(store.menuDensity, .compact)
+        XCTAssertEqual(store.usageBarStyle, .depleting)
+        XCTAssertFalse(store.temporaryAuthSandboxEnabled)
+        XCTAssertNil(store.temporaryAuthSandboxHome)
+
+        store.resetDisplayMode = .absolute
+        store.menuDensity = .comfortable
+        store.usageBarStyle = .filling
+        store.temporaryAuthSandboxEnabled = true
+        store.temporaryAuthSandboxHome = "/tmp/multicodex-test-home"
+
+        let persisted = AppPreferencesStore(defaults: defaults)
+        XCTAssertEqual(persisted.resetDisplayMode, .absolute)
+        XCTAssertEqual(persisted.menuDensity, .comfortable)
+        XCTAssertEqual(persisted.usageBarStyle, .filling)
+        XCTAssertTrue(persisted.temporaryAuthSandboxEnabled)
+        XCTAssertEqual(persisted.temporaryAuthSandboxHome, "/tmp/multicodex-test-home")
     }
 
     private func ephemeralDefaults() -> UserDefaults {

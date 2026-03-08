@@ -1,18 +1,5 @@
 import Foundation
 
-struct CommandEnvelope<T: Codable>: Codable {
-    let schemaVersion: Int?
-    let command: String?
-    let ok: Bool
-    let data: T?
-    let error: CommandErrorPayload?
-}
-
-struct CommandErrorPayload: Codable {
-    let message: String
-    let code: String?
-}
-
 struct AccountsListPayload: Codable {
     let accounts: [AccountEntry]
     let currentAccount: String?

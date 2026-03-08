@@ -1,22 +1,5 @@
 import Foundation
 
-enum PaceStatus: String {
-    case ahead
-    case onTrack = "on-track"
-    case behind
-
-    var label: String {
-        switch self {
-        case .ahead:
-            return "ahead"
-        case .onTrack:
-            return "on track"
-        case .behind:
-            return "behind"
-        }
-    }
-}
-
 enum UsageLevel {
     case normal
     case warning
@@ -82,7 +65,6 @@ struct UsageMetric {
     let usedPercent: Double?
     let periodMinutes: Int?
     let resetsAt: Date?
-    let paceStatus: PaceStatus?
 
     var normalizedFraction: Double {
         guard let usedPercent else {

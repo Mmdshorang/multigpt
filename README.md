@@ -33,18 +33,16 @@ The app stays in a single SwiftPM executable target and is organized into clear 
 - `Sources/MultiCodexMenu/Features/Shared`
   - Shared view model and reusable UI presentation components.
 
-## Compatibility and Migration Notes
+## Simplification Notes
 
-This refactor is compatibility-first:
+This cleanup intentionally favors simpler internals over legacy compatibility branches:
 
-- No forced account migration steps.
-- No forced re-login due to this refactor.
 - Storage paths remain unchanged:
   - `MULTICODEX_HOME` (default `~/.config/multicodex`)
   - `~/.codex/auth.json`
-- Account/auth continuity is preserved for existing on-disk data.
-- `config.json` schema/version and account auth/meta/cache file locations remain unchanged.
-- Legacy defaults keys are still read for compatibility, while canonical account-first keys are now written.
+- `config.json` continues to use schema version `2`.
+- Legacy schema version `1` config parsing and legacy `UserDefaults` fallback keys were removed.
+- Build/dev workflow is Swift + `just` only (no npm layer).
 
 ## Requirements
 
@@ -58,6 +56,13 @@ This refactor is compatibility-first:
 ```bash
 just doctor
 just dev
+```
+
+Swift-only equivalents:
+
+```bash
+swift build -c debug
+swift test --parallel
 ```
 
 Useful commands:
@@ -98,4 +103,6 @@ just release v0.2.0
 
 - `codex` not found: install `codex` or set the runtime path in Settings > Runtime.
 - Account says auth is needed: use `Re-login` on that account.
-- Swift build fails with module/PCH cache path errors after moving clones: run `just clean` and build again.
+- Swift build fails with module/PCH cache path errors after moving clones:
+  - Normal build flows auto-recover and retry once.
+  - For manual recovery, run `just clean` and build again.

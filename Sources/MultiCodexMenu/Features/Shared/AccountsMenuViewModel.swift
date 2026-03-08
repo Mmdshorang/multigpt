@@ -3,41 +3,41 @@ import Foundation
 
 @MainActor
 final class AccountsMenuViewModel: ObservableObject {
-    @Published private(set) var accounts: [AccountUsage] = []
-    @Published private(set) var isRefreshing = false
-    @Published private(set) var lastRefreshError: String?
-    @Published private(set) var refreshWarningMessage: String?
-    @Published private(set) var lastUpdatedAt: Date?
-    @Published private(set) var switchingAccountName: String?
-    @Published private(set) var cliResolutionHint: String?
-    @Published private(set) var accountActionInFlightName: String?
-    @Published private(set) var accountActionMessage: String?
-    @Published private(set) var accountActionError: String?
-    @Published private(set) var runtimeProbeSummary: String?
-    @Published private(set) var isCodexRuntimeAvailable = false
-    @Published private(set) var focusedAccountName: String?
-    @Published private(set) var isUsingTemporaryAuthSandbox = false
-    @Published private(set) var temporaryAuthSandboxHome: String?
+    @Published var accounts: [AccountUsage] = []
+    @Published var isRefreshing = false
+    @Published var lastRefreshError: String?
+    @Published var refreshWarningMessage: String?
+    @Published var lastUpdatedAt: Date?
+    @Published var switchingAccountName: String?
+    @Published var cliResolutionHint: String?
+    @Published var accountActionInFlightName: String?
+    @Published var accountActionMessage: String?
+    @Published var accountActionError: String?
+    @Published var runtimeProbeSummary: String?
+    @Published var isCodexRuntimeAvailable = false
+    @Published var focusedAccountName: String?
+    @Published var isUsingTemporaryAuthSandbox = false
+    @Published var temporaryAuthSandboxHome: String?
     @Published var customCodexPath: String
     @Published var resetDisplayMode: ResetDisplayMode
-    @Published private(set) var selectedSettingsSection: SettingsSection
-    @Published private(set) var selectedSettingsAccountName: String?
-    @Published private(set) var accountSearchQuery: String
-    @Published private(set) var hasCompletedOnboarding: Bool
-    @Published private(set) var isAdvancedSettingsVisible: Bool
-    @Published private(set) var menuDensity: MenuDensity
-    @Published private(set) var usageBarStyle: UsageBarStyle
-    @Published private(set) var limitsCacheTTLSeconds: Int
-    @Published private(set) var pendingAccountRemovalRequest: PendingAccountRemovalRequest?
+    @Published var selectedSettingsSection: SettingsSection
+    @Published var selectedSettingsAccountName: String?
+    @Published var accountSearchQuery: String
+    @Published var hasCompletedOnboarding: Bool
+    @Published var isAdvancedSettingsVisible: Bool
+    @Published var menuDensity: MenuDensity
+    @Published var usageBarStyle: UsageBarStyle
+    @Published var limitsCacheTTLSeconds: Int
+    @Published var pendingAccountRemovalRequest: PendingAccountRemovalRequest?
 
-    private let accountService: any CodexAccountServicing
-    private let fileManager: FileManager
-    private var preferences: AppPreferencesStore
+    let accountService: any CodexAccountServicing
+    let fileManager: FileManager
+    var preferences: AppPreferencesStore
 
-    private var refreshLoopTask: Task<Void, Never>?
-    private var didBecomeActiveObserver: NSObjectProtocol?
-    private var pendingInteractiveLoginAccount: String?
-    private var feedbackAutoClearTask: Task<Void, Never>?
+    var refreshLoopTask: Task<Void, Never>?
+    var didBecomeActiveObserver: NSObjectProtocol?
+    var pendingInteractiveLoginAccount: String?
+    var feedbackAutoClearTask: Task<Void, Never>?
 
     init(
         accountService: any CodexAccountServicing = CodexAccountService(),
@@ -235,7 +235,7 @@ final class AccountsMenuViewModel: ObservableObject {
         startRefreshLoop()
     }
 
-    private func startRefreshLoop() {
+    func startRefreshLoop() {
         refreshLoopTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(limitsCacheTTLSeconds))
@@ -497,354 +497,4 @@ final class AccountsMenuViewModel: ObservableObject {
         }
     }
 
-    func openTemporaryAuthSandboxDirectory() {
-        guard let sandbox = temporaryAuthSandboxHome, !sandbox.isEmpty else { return }
-        NSWorkspace.shared.open(URL(fileURLWithPath: sandbox, isDirectory: true))
-    }
-
-    func updateCustomCodexPath(_ value: String) {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        customCodexPath = trimmed
-        preferences.customCodexPath = trimmed
-        accountService.customCodexPath = trimmed.isEmpty ? nil : trimmed
-        refreshRuntimeProbe()
-        refresh()
-    }
-
-    func clearCustomCodexPath() {
-        updateCustomCodexPath("")
-    }
-
-    func dismissFocusHint() {
-        focusedAccountName = nil
-    }
-
-    func chooseCustomCodexPath() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.prompt = "Use"
-        panel.message = "Choose the codex executable"
-
-        if panel.runModal() == .OK, let path = panel.url?.path {
-            updateCustomCodexPath(path)
-        }
-    }
-
-    private func performRefresh(refreshLive: Bool) async {
-        if pendingInteractiveLoginAccount != nil {
-            return
-        }
-
-        if isRefreshing {
-            return
-        }
-
-        isRefreshing = true
-        defer { isRefreshing = false }
-
-        let previousAccounts = accounts
-
-        do {
-            let fetchedAccounts = try await accountService.fetchAccounts()
-            let limits = try await accountService.fetchLimits(refreshLive: refreshLive)
-
-            accounts = AccountUsageMergeService.mergeAccounts(
-                accounts: fetchedAccounts,
-                limits: limits,
-                previousAccounts: previousAccounts
-            )
-            if let focused = focusedAccountName, !accounts.contains(where: { $0.name == focused }) {
-                focusedAccountName = nil
-            }
-            syncSelectedSettingsAccount()
-            if !hasCompletedOnboarding && onboardingState.step == .done {
-                markOnboardingCompleted()
-            }
-            lastUpdatedAt = Date()
-            cliResolutionHint = accountService.resolutionHint
-
-            if limits.errors.isEmpty {
-                lastRefreshError = nil
-                refreshWarningMessage = nil
-            } else {
-                let count = limits.errors.count
-                let suffix = count == 1 ? "account" : "accounts"
-                lastRefreshError = nil
-                refreshWarningMessage = "Showing latest data. Could not refresh \(count) \(suffix)."
-            }
-        } catch {
-            cliResolutionHint = accountService.resolutionHint
-            if previousAccounts.isEmpty {
-                lastRefreshError = error.localizedDescription
-                refreshWarningMessage = nil
-            } else {
-                lastRefreshError = nil
-                refreshWarningMessage = "Refresh failed. Showing latest data."
-            }
-        }
-    }
-
-    private enum AccountActionOutcome {
-        case success(String)
-        case failure(String)
-    }
-
-    private func setAccountFeedback(message: String?, error: String?) {
-        accountActionMessage = message
-        accountActionError = error
-        feedbackAutoClearTask?.cancel()
-        feedbackAutoClearTask = nil
-        guard message != nil else {
-            return
-        }
-        feedbackAutoClearTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(5))
-            if Task.isCancelled {
-                return
-            }
-            accountActionMessage = nil
-        }
-    }
-
-    private func triggerRefresh(refreshLive: Bool) {
-        Task {
-            await performRefresh(refreshLive: refreshLive)
-        }
-    }
-
-    private func startLoginFlow(accountName: String, createIfNeeded: Bool) {
-        guard accountActionInFlightName == nil, pendingInteractiveLoginAccount == nil else {
-            return
-        }
-
-        Task {
-            accountActionInFlightName = accountName
-            focusedAccountName = accountName
-            feedbackAutoClearTask?.cancel()
-            feedbackAutoClearTask = nil
-            accountActionMessage = "Opening browser login for \(accountName)..."
-            accountActionError = nil
-
-            defer {
-                accountActionInFlightName = nil
-            }
-
-            do {
-                _ = try await accountService.loginInApp(account: accountName, createIfNeeded: createIfNeeded)
-                _ = try await accountService.importDefaultAuth(into: accountName)
-                let status = try await accountService.fetchStatus(name: accountName)
-
-                switch statusOutcome(
-                    for: accountName,
-                    status: status,
-                    successFallback: "Login synced to \(accountName)."
-                ) {
-                case let .success(message):
-                    setAccountFeedback(message: message, error: nil)
-                case let .failure(message):
-                    setAccountFeedback(message: nil, error: message)
-                }
-
-                await performRefresh(refreshLive: true)
-            } catch {
-                if shouldFallbackToTerminal(error) {
-                    launchTerminalLoginFallback(accountName: accountName, createIfNeeded: createIfNeeded, rootError: error)
-                } else {
-                    setAccountFeedback(message: nil, error: error.localizedDescription)
-                }
-            }
-        }
-    }
-
-    private func shouldFallbackToTerminal(_ error: Error) -> Bool {
-        let text = error.localizedDescription.lowercased()
-        return text.contains("tty")
-            || text.contains("not interactive")
-            || text.contains("stdin")
-            || text.contains("standard input")
-    }
-
-    private func launchTerminalLoginFallback(accountName: String, createIfNeeded: Bool, rootError: Error) {
-        do {
-            if createIfNeeded {
-                try accountService.openNewAccountLoginInTerminal(newAccountName: accountName)
-            } else {
-                try accountService.openLoginInTerminal(account: accountName)
-            }
-            pendingInteractiveLoginAccount = accountName
-            setAccountFeedback(
-                message: "Using Terminal fallback for \(accountName). Complete login and return to MultiCodex.",
-                error: nil
-            )
-        } catch {
-            setAccountFeedback(
-                message: nil,
-                error: "\(rootError.localizedDescription) (Fallback failed: \(error.localizedDescription))"
-            )
-        }
-    }
-
-    private func statusOutcome(
-        for accountName: String,
-        status: AccountStatusPayload,
-        successFallback: String
-    ) -> AccountActionOutcome {
-        let summary = status.output.trimmingCharacters(in: .whitespacesAndNewlines)
-        if status.exitCode == 0 {
-            return .success(summary.isEmpty ? successFallback : "\(accountName): \(summary)")
-        }
-        return .failure(summary.isEmpty ? "\(accountName): login check failed." : "\(accountName): \(summary)")
-    }
-
-    private func runAccountAction(
-        for accountName: String,
-        operation: @escaping () async throws -> AccountActionOutcome
-    ) {
-        guard accountActionInFlightName == nil else {
-            return
-        }
-
-        Task {
-            accountActionInFlightName = accountName
-            defer { accountActionInFlightName = nil }
-
-            do {
-                switch try await operation() {
-                case let .success(message):
-                    setAccountFeedback(message: message, error: nil)
-                case let .failure(message):
-                    setAccountFeedback(message: nil, error: message)
-                }
-                await performRefresh(refreshLive: false)
-            } catch {
-                setAccountFeedback(message: nil, error: error.localizedDescription)
-            }
-        }
-    }
-
-    private func runSwitchAction(
-        named name: String,
-        operation: @escaping () async throws -> Void
-    ) {
-        guard switchingAccountName == nil else {
-            return
-        }
-
-        Task {
-            switchingAccountName = name
-            defer { switchingAccountName = nil }
-
-            do {
-                try await operation()
-            } catch {
-                lastRefreshError = error.localizedDescription
-                cliResolutionHint = accountService.resolutionHint
-            }
-        }
-    }
-
-    private func handleDidBecomeActive() {
-        guard let pendingAccount = pendingInteractiveLoginAccount else {
-            refreshLive()
-            return
-        }
-
-        pendingInteractiveLoginAccount = nil
-        focusedAccountName = pendingAccount
-        runAccountAction(for: pendingAccount) {
-            _ = try await self.accountService.importDefaultAuth(into: pendingAccount)
-            let status = try await self.accountService.fetchStatus(name: pendingAccount)
-            return self.statusOutcome(
-                for: pendingAccount,
-                status: status,
-                successFallback: "Login synced to \(pendingAccount). You can rename it anytime."
-            )
-        }
-    }
-
-    private func refreshRuntimeProbe() {
-        let probe = accountService.probeRuntime()
-        isCodexRuntimeAvailable = probe.isAvailable
-        runtimeProbeSummary = probe.summary
-    }
-
-    private func configureSandboxEnvironment() {
-        guard isUsingTemporaryAuthSandbox else {
-            accountService.sandboxHomeDirectory = nil
-            accountService.sandboxMulticodexHomeDirectory = nil
-            return
-        }
-
-        if let sandboxHome = temporaryAuthSandboxHome?.trimmingCharacters(in: .whitespacesAndNewlines), !sandboxHome.isEmpty {
-            do {
-                try ensureSandboxDirectories(homePath: sandboxHome)
-                accountService.sandboxHomeDirectory = sandboxHome
-                accountService.sandboxMulticodexHomeDirectory = (sandboxHome as NSString).appendingPathComponent(".config/multicodex")
-                return
-            } catch {
-                setAccountFeedback(message: nil, error: "Could not prepare temporary auth sandbox: \(error.localizedDescription)")
-            }
-        }
-
-        isUsingTemporaryAuthSandbox = false
-        preferences.temporaryAuthSandboxEnabled = false
-        accountService.sandboxHomeDirectory = nil
-        accountService.sandboxMulticodexHomeDirectory = nil
-    }
-
-    private func prepareFreshTemporaryAuthSandbox() throws -> String {
-        let rootURL = fileManager.temporaryDirectory
-            .appendingPathComponent("multicodex-test-\(UUID().uuidString)", isDirectory: true)
-        try ensureSandboxDirectories(homePath: rootURL.path)
-        return rootURL.path
-    }
-
-    private func ensureSandboxDirectories(homePath: String) throws {
-        let homeURL = URL(fileURLWithPath: homePath, isDirectory: true)
-        let codexURL = homeURL.appendingPathComponent(".codex", isDirectory: true)
-        let multicodexURL = homeURL.appendingPathComponent(".config/multicodex", isDirectory: true)
-        try fileManager.createDirectory(at: homeURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: codexURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: multicodexURL, withIntermediateDirectories: true)
-    }
-
-    private func syncSelectedSettingsAccount() {
-        let candidates = filteredAccounts
-        guard !candidates.isEmpty else {
-            selectedSettingsAccountName = nil
-            preferences.selectedSettingsAccountName = nil
-            return
-        }
-
-        if let selectedSettingsAccountName,
-           candidates.contains(where: { $0.name == selectedSettingsAccountName })
-        {
-            return
-        }
-
-        if let currentAccount,
-           candidates.contains(where: { $0.name == currentAccount.name })
-        {
-            selectSettingsAccount(named: currentAccount.name)
-            return
-        }
-
-        selectSettingsAccount(named: candidates.first?.name)
-    }
-
-    private func generateRandomAccountName() -> String {
-        let existing = Set(accounts.map(\.name))
-        for _ in 0..<20 {
-            let random = UUID().uuidString
-                .replacingOccurrences(of: "-", with: "")
-                .lowercased()
-            let candidate = "account-\(random.prefix(6))"
-            if !existing.contains(candidate) {
-                return candidate
-            }
-        }
-        return "account-\(Int(Date().timeIntervalSince1970))"
-    }
 }

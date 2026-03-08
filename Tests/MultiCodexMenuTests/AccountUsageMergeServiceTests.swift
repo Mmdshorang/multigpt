@@ -10,8 +10,8 @@ final class AccountUsageMergeServiceTests: XCTestCase {
             lastUsedAt: nil,
             lastLoginStatus: nil,
             usage: UsageSummary(
-                fiveHour: UsageMetric(label: "5h", percentText: "35%", usedPercent: 35, periodMinutes: 300, resetsAt: nil, paceStatus: nil),
-                weekly: UsageMetric(label: "weekly", percentText: "50%", usedPercent: 50, periodMinutes: 10_080, resetsAt: nil, paceStatus: nil),
+                fiveHour: UsageMetric(label: "5h", percentText: "35%", usedPercent: 35, periodMinutes: 300, resetsAt: nil),
+                weekly: UsageMetric(label: "weekly", percentText: "50%", usedPercent: 50, periodMinutes: 10_080, resetsAt: nil),
                 credits: "unlimited"
             ),
             source: "cached 30s",
