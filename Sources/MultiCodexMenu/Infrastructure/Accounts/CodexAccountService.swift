@@ -107,6 +107,18 @@ final class CodexAccountService {
     let fileManager = FileManager.default
     let decoder = JSONDecoder()
     let encoder = JSONEncoder()
+    var processEnvironmentProvider: () -> [String: String] = { ProcessInfo.processInfo.environment } {
+        didSet {
+            invalidateResolvedLoginShellPath()
+        }
+    }
+    var loginShellPathResolver: ([String: String]) -> String? = { environment in
+        LoginShellPathResolver.resolvePath(from: environment)
+    } {
+        didSet {
+            invalidateResolvedLoginShellPath()
+        }
+    }
 
     // Kept for backward compatibility with existing settings key.
     // This now points to a codex executable path/name (not Node).
@@ -117,6 +129,9 @@ final class CodexAccountService {
 
     var resolutionHint: String?
 
+    private var cachedLoginShellPath: String?
+    private var hasResolvedLoginShellPath = false
+
     init() {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         limitsCacheTTLSeconds = Self.normalizedLimitsCacheTTLSeconds(limitsCacheTTLSeconds)
@@ -124,6 +139,21 @@ final class CodexAccountService {
 
     static func normalizedLimitsCacheTTLSeconds(_ seconds: Int) -> Int {
         min(max(seconds, minLimitsCacheTTLSeconds), maxLimitsCacheTTLSeconds)
+    }
+
+    private func invalidateResolvedLoginShellPath() {
+        cachedLoginShellPath = nil
+        hasResolvedLoginShellPath = false
+    }
+
+    func resolvedLoginShellPath(using environment: [String: String]) -> String? {
+        if hasResolvedLoginShellPath {
+            return cachedLoginShellPath
+        }
+
+        cachedLoginShellPath = loginShellPathResolver(environment)
+        hasResolvedLoginShellPath = true
+        return cachedLoginShellPath
     }
 
     func fetchAccounts() async throws -> AccountsListPayload {

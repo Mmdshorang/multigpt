@@ -11,10 +11,7 @@ final class CodexAccountServiceTests: XCTestCase {
     }
 
     func testAddAccountNormalizesNameAndRejectsInvalidCharacters() async throws {
-        let service = CodexAccountService()
-        let sandbox = makeSandboxDirectory()
-        service.sandboxHomeDirectory = sandbox
-        service.sandboxMulticodexHomeDirectory = (sandbox as NSString).appendingPathComponent(".config/multicodex")
+        let service = makeSandboxedService()
 
         _ = try await service.addAccount(name: "  alpha_1  ")
 
@@ -50,10 +47,7 @@ final class CodexAccountServiceTests: XCTestCase {
     }
 
     func testFetchLimitsUsesCachedSnapshotWhenTTLIsValid() async throws {
-        let service = CodexAccountService()
-        let sandbox = makeSandboxDirectory()
-        service.sandboxHomeDirectory = sandbox
-        service.sandboxMulticodexHomeDirectory = (sandbox as NSString).appendingPathComponent(".config/multicodex")
+        let service = makeSandboxedService()
         service.limitsCacheTTLSeconds = 600
 
         _ = try await service.addAccount(name: "alpha")
@@ -69,10 +63,7 @@ final class CodexAccountServiceTests: XCTestCase {
     }
 
     func testFetchLimitsReportsApiThenRpcFallbackFailure() async throws {
-        let service = CodexAccountService()
-        let sandbox = makeSandboxDirectory()
-        service.sandboxHomeDirectory = sandbox
-        service.sandboxMulticodexHomeDirectory = (sandbox as NSString).appendingPathComponent(".config/multicodex")
+        let service = makeSandboxedService()
         service.customCodexPath = "/not/a/real/codex/path"
 
         _ = try await service.addAccount(name: "alpha")
@@ -101,10 +92,7 @@ final class CodexAccountServiceTests: XCTestCase {
     }
 
     func testSwitchRenameRemoveUpdateConfigAndMeta() async throws {
-        let service = CodexAccountService()
-        let sandbox = makeSandboxDirectory()
-        service.sandboxHomeDirectory = sandbox
-        service.sandboxMulticodexHomeDirectory = (sandbox as NSString).appendingPathComponent(".config/multicodex")
+        let service = makeSandboxedService()
 
         _ = try await service.addAccount(name: "alpha")
         _ = try await service.addAccount(name: "beta")
@@ -128,11 +116,10 @@ final class CodexAccountServiceTests: XCTestCase {
     }
 
     func testFetchStatusRestoresDefaultAuthAfterCommandFailure() async throws {
-        let service = CodexAccountService()
-        let sandbox = makeSandboxDirectory()
-        service.sandboxHomeDirectory = sandbox
-        service.sandboxMulticodexHomeDirectory = (sandbox as NSString).appendingPathComponent(".config/multicodex")
+        let service = makeSandboxedService()
         service.customCodexPath = "/not/a/real/codex/path"
+
+        let sandbox = try XCTUnwrap(service.sandboxHomeDirectory)
 
         _ = try await service.addAccount(name: "alpha")
 
@@ -155,11 +142,80 @@ final class CodexAccountServiceTests: XCTestCase {
         XCTAssertTrue(defaultAfter.contains("default"))
     }
 
+    func testBaseEnvironmentMergesLoginShellPathAheadOfGuiPath() {
+        let service = CodexAccountService()
+        configureEnvironment(
+            for: service,
+            path: "/usr/bin:/bin",
+            loginShellPath: "/Users/tester/.bun/bin:/Users/tester/.local/share/mise/installs/node/24.13.0/bin:/usr/bin"
+        )
+
+        let environment = service.baseEnvironment()
+        let pathComponents = (environment["PATH"] ?? "").split(separator: ":").map(String.init)
+
+        XCTAssertEqual(pathComponents.prefix(2), [
+            "/Users/tester/.bun/bin",
+            "/Users/tester/.local/share/mise/installs/node/24.13.0/bin",
+        ])
+        XCTAssertEqual(pathComponents.filter { $0 == "/usr/bin" }.count, 1)
+        XCTAssertTrue(pathComponents.contains("/opt/homebrew/bin"))
+    }
+
+    func testResolveCodexRuntimeAutoDetectsExecutableFromLoginShellPath() throws {
+        let service = CodexAccountService()
+        let binDirectory = URL(fileURLWithPath: makeSandboxDirectory(), isDirectory: true)
+            .appendingPathComponent("bin", isDirectory: true)
+        let codexPath = try makeExecutable(named: "codex", in: binDirectory)
+
+        configureEnvironment(for: service, path: "/usr/bin:/bin", loginShellPath: binDirectory.path)
+
+        let runtime = try service.resolveCodexRuntime()
+
+        XCTAssertEqual(runtime.executableURL.path, codexPath)
+        XCTAssertEqual(runtime.prefixArguments, [])
+        XCTAssertTrue(runtime.display.contains("(from which)"))
+    }
+
+    private func makeSandboxedService() -> CodexAccountService {
+        let service = CodexAccountService()
+        let sandbox = makeSandboxDirectory()
+        service.sandboxHomeDirectory = sandbox
+        service.sandboxMulticodexHomeDirectory = (sandbox as NSString).appendingPathComponent(".config/multicodex")
+        return service
+    }
+
+    private func configureEnvironment(
+        for service: CodexAccountService,
+        path: String,
+        loginShellPath: String,
+        home: String = "/Users/tester"
+    ) {
+        service.processEnvironmentProvider = {
+            [
+                "PATH": path,
+                "HOME": home,
+            ]
+        }
+        service.loginShellPathResolver = { _ in loginShellPath }
+    }
+
     private func makeSandboxDirectory() -> String {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("multicodex-tests-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         return root.path
+    }
+
+    private func makeExecutable(named name: String, in directory: URL) throws -> String {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let executableURL = directory.appendingPathComponent(name)
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executableURL)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: Int16(0o755))],
+            ofItemAtPath: executableURL.path
+        )
+        return executableURL.path
     }
 
     private func seedCachedLimits(multicodexHome: String, account: String, ageSeconds: Double) throws {

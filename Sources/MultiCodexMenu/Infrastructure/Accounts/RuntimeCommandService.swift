@@ -2,7 +2,6 @@ import Foundation
 
 // RuntimeCommandService
 extension CodexAccountService {
-
     func launchTerminal(script: String) throws {
         let escaped = script
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -61,10 +60,14 @@ extension CodexAccountService {
     // MARK: - Runtime and process
 
     func resolveCodexRuntime() throws -> CodexRuntime {
+        try resolveCodexRuntime(environment: baseEnvironment())
+    }
+
+    private func resolveCodexRuntime(environment: [String: String]) throws -> CodexRuntime {
         let runtime = try CodexRuntimeResolver.resolve(
             customCodexPath: customCodexPath,
             fileManager: fileManager,
-            environment: ProcessInfo.processInfo.environment
+            environment: environment
         )
         updateResolutionHint(runtime: runtime)
         return runtime
@@ -79,20 +82,20 @@ extension CodexAccountService {
     }
 
     func runCodexCapture(arguments: [String]) throws -> ProcessResult {
-        let runtime = try resolveCodexRuntime()
+        let context = try resolvedRuntimeContext()
         return try CodexCommandRunner.runSync(
-            runtime: runtime,
+            runtime: context.runtime,
             arguments: arguments,
-            environment: baseEnvironment()
+            environment: context.environment
         )
     }
 
     func runCodexCaptureAsync(arguments: [String]) async throws -> ProcessResult {
-        let runtime = try resolveCodexRuntime()
+        let context = try resolvedRuntimeContext()
         return try await CodexCommandRunner.runAsync(
-            runtime: runtime,
+            runtime: context.runtime,
             arguments: arguments,
-            environment: baseEnvironment()
+            environment: context.environment
         )
     }
 
@@ -103,12 +106,18 @@ extension CodexAccountService {
     }
 
     func baseEnvironment() -> [String: String] {
-        var env = ProcessInfo.processInfo.environment
-        if let existingPath = env["PATH"], !existingPath.contains("/opt/homebrew/bin") {
-            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:" + existingPath
-        }
+        var env = processEnvironmentProvider()
+        env["PATH"] = mergedExecutableSearchPath(for: env)
         applySandboxEnvironment(to: &env)
         return env
+    }
+
+    func mergedExecutableSearchPath(for environment: [String: String]) -> String {
+        ExecutableSearchPath.merge([
+            resolvedLoginShellPath(using: environment),
+            environment["PATH"],
+            ExecutableSearchPath.fallback,
+        ])
     }
 
     func applySandboxEnvironment(to env: inout [String: String]) {
@@ -119,11 +128,18 @@ extension CodexAccountService {
 
     func terminalPreambleLines() -> [String] {
         let paths = currentPaths()
+        let shellPath = mergedExecutableSearchPath(for: processEnvironmentProvider())
         return [
-            "export PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH\"",
+            "export PATH=\(shellQuote(shellPath))",
             "export HOME=\(shellQuote(paths.homeDir))",
             "export MULTICODEX_HOME=\(shellQuote(paths.multicodexHome))",
         ]
+    }
+
+    private func resolvedRuntimeContext() throws -> (runtime: CodexRuntime, environment: [String: String]) {
+        let environment = baseEnvironment()
+        let runtime = try resolveCodexRuntime(environment: environment)
+        return (runtime, environment)
     }
 
 }
