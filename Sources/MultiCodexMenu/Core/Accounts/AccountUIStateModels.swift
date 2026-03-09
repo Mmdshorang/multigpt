@@ -27,6 +27,23 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
+    var summary: String {
+        switch self {
+        case .dashboard:
+            return "Overview and setup progress"
+        case .accounts:
+            return "Manage identities and auth"
+        case .runtime:
+            return "Configure the Codex CLI path"
+        case .display:
+            return "Adjust density and visuals"
+        case .troubleshooting:
+            return "Refresh and diagnostic tools"
+        case .advanced:
+            return "Sandbox and test controls"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .dashboard:
