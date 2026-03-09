@@ -40,21 +40,21 @@ enum ResetDisplayMode: String, CaseIterable {
     case relative
     case absolute
 
-    var buttonLabel: String {
+    var title: String {
         switch self {
         case .relative:
-            return "Reset: Relative"
+            return "Relative"
         case .absolute:
-            return "Reset: Absolute"
+            return "Absolute"
         }
     }
 
-    var next: Self {
+    var descriptionText: String {
         switch self {
         case .relative:
-            return .absolute
+            return "Show reset times as relative values like \"in 2h\"."
         case .absolute:
-            return .relative
+            return "Show reset times as exact dates and clock times."
         }
     }
 }

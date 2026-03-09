@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension SettingsContentView {
-    var settingsContentMaxWidth: CGFloat { 900 }
+    var settingsContentMaxWidth: CGFloat { 640 }
 
     var settingsBackground: some View {
         Color(nsColor: .windowBackgroundColor)
@@ -14,10 +14,10 @@ extension SettingsContentView {
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.title3.weight(.semibold))
+                .font(.headline)
 
             Text(description)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -28,15 +28,15 @@ extension SettingsContentView {
         description: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             if let title {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.caption.weight(.semibold))
             }
 
             if let description {
                 Text(description)
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -44,8 +44,8 @@ extension SettingsContentView {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(10)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     func settingsFormRow<Control: View>(
@@ -53,14 +53,14 @@ extension SettingsContentView {
         detail: String? = nil,
         @ViewBuilder control: () -> Control
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.caption.weight(.semibold))
 
                 if let detail {
                     Text(detail)
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -72,12 +72,12 @@ extension SettingsContentView {
     }
 
     func settingsInfoRow(symbol: String, text: String, color: Color = .secondary) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: symbol)
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(color)
             Text(text)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
         }

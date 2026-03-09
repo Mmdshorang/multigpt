@@ -32,6 +32,13 @@ extension SettingsContentView {
         )
     }
 
+    var resetDisplayModeBinding: Binding<ResetDisplayMode> {
+        Binding(
+            get: { viewModel.resetDisplayMode },
+            set: { viewModel.setResetDisplayMode($0) }
+        )
+    }
+
     var limitsCacheTTLMinutesBinding: Binding<Int> {
         Binding(
             get: { viewModel.limitsCacheTTLMinutes },

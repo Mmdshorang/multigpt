@@ -61,10 +61,10 @@ extension SettingsContentView {
 
     var runtimePage: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Runtime",
-                    description: "Choose a custom Codex CLI path or use automatic detection."
+                    description: "Choose a custom CLI path or use auto-detect."
                 )
 
                 settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
@@ -105,36 +105,50 @@ extension SettingsContentView {
 
     var displayPage: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Display",
-                    description: "Adjust how usage and status information is shown."
+                    description: "Choose how the menu feels and how usage information is shown."
                 )
 
-                settingsFormRow("Menu density", detail: "Choose how compact the menu should feel.") {
-                    Picker("Menu density", selection: menuDensityBinding) {
-                        ForEach(MenuDensity.allCases) { density in
-                            Text(density.title).tag(density)
+                settingsInsetPanel(
+                    title: "Menu Layout",
+                    description: "Controls how dense the menu feels and how reset times are presented."
+                ) {
+                    settingsFormRow("Density", detail: "Compact shows more at once. Comfortable adds breathing room.") {
+                        Picker("Menu density", selection: menuDensityBinding) {
+                            ForEach(MenuDensity.allCases) { density in
+                                Text(density.title).tag(density)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
+
+                    settingsFormRow("Reset time style", detail: viewModel.resetDisplayMode.descriptionText) {
+                        Picker("Reset time style", selection: resetDisplayModeBinding) {
+                            ForEach(ResetDisplayMode.allCases, id: \.self) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
                 }
 
-                settingsFormRow("Reset labels", detail: "Switch how reset times are described.") {
-                    ActionPillButton(title: viewModel.resetDisplayMode.buttonLabel, symbol: "clock") {
-                        viewModel.toggleResetDisplayMode()
-                    }
-                }
-
-                settingsFormRow("Usage bar mode", detail: viewModel.usageBarStyle.descriptionText) {
-                    Picker("Usage bars", selection: usageBarStyleBinding) {
-                        ForEach(UsageBarStyle.allCases) { style in
-                            Text(style.title).tag(style)
+                settingsInsetPanel(
+                    title: "Usage Indicators",
+                    description: "Pick whether the bars emphasize remaining budget or usage consumed."
+                ) {
+                    settingsFormRow("Usage bars", detail: viewModel.usageBarStyle.descriptionText) {
+                        Picker("Usage bars", selection: usageBarStyleBinding) {
+                            ForEach(UsageBarStyle.allCases) { style in
+                                Text(style.title).tag(style)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
                 }
             }
         }
@@ -142,10 +156,10 @@ extension SettingsContentView {
 
     var troubleshootingPage: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Troubleshooting",
-                    description: "Use these controls when runtime resolution or cached data needs attention."
+                    description: "Diagnostics and refresh controls."
                 )
 
                 if let hint = viewModel.cliResolutionHint {
@@ -181,10 +195,10 @@ extension SettingsContentView {
 
     var advancedPage: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Advanced",
-                    description: "Debug and sandbox controls live here when you need them."
+                    description: "Debug and sandbox controls."
                 )
 
 #if DEBUG
@@ -205,7 +219,7 @@ extension SettingsContentView {
                         settingsInfoRow(symbol: "folder", text: "\(sandbox)/.config/multicodex")
                     }
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         ActionPillButton(title: "Reset Sandbox", symbol: "arrow.clockwise") {
                             viewModel.resetTemporaryAuthSandbox()
                         }
@@ -234,10 +248,10 @@ extension SettingsContentView {
 
     var hiddenAdvancedPage: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Advanced",
-                    description: "Advanced controls are hidden until you choose to show them."
+                    description: "Currently hidden."
                 )
 
                 ActionPillButton(title: "Show Advanced", symbol: "gearshape.2", role: .primary) {
@@ -249,7 +263,7 @@ extension SettingsContentView {
     }
 
     var removalConfirmationSheet: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             if let request = viewModel.pendingAccountRemovalRequest {
                 Text(request.deleteData ? "Remove account and delete data" : "Remove account")
                     .font(.headline)
@@ -290,8 +304,8 @@ extension SettingsContentView {
                 }
             }
         }
-        .padding(18)
-        .frame(width: 430)
+        .padding(16)
+        .frame(width: 390)
     }
 
     func canConfirmRemoval(_ request: PendingAccountRemovalRequest) -> Bool {

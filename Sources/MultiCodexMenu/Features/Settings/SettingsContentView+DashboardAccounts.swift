@@ -3,12 +3,10 @@ import SwiftUI
 extension SettingsContentView {
     var headerCard: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 16) {
-                    settingsSectionIntro(
-                        title: "Settings",
-                        description: "Manage accounts, runtime setup, display preferences, and troubleshooting."
-                    )
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
+                    settingsInfoRow(symbol: "person.2.fill", text: "\(viewModel.accounts.count) accounts")
+                    settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
 
                     Spacer(minLength: 0)
 
@@ -28,12 +26,6 @@ extension SettingsContentView {
                     }
                 }
 
-                HStack(spacing: 12) {
-                    settingsInfoRow(symbol: "person.2.fill", text: "\(viewModel.accounts.count) accounts")
-                    settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
-                    settingsInfoRow(symbol: "clock", text: viewModel.lastUpdatedLabel)
-                }
-
                 if let warning = viewModel.refreshWarningMessage {
                     SubtleWarningRow(text: warning)
                 }
@@ -42,15 +34,15 @@ extension SettingsContentView {
     }
 
     var dashboardPage: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
                     settingsSectionIntro(
                         title: "Overview",
-                        description: "A quick status summary for accounts, runtime health, and first-run setup."
+                        description: "Quick status for this install."
                     )
 
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         dashboardMetric(title: "Current Account", value: viewModel.currentAccount?.name ?? "None")
                         dashboardMetric(title: "Needs Login", value: "\(viewModel.accountsNeedingLogin.count)")
                         dashboardMetric(title: "Setup", value: viewModel.onboardingState.step.title)
@@ -75,12 +67,12 @@ extension SettingsContentView {
                 .foregroundStyle(.secondary)
 
             Text(value)
-                .font(.subheadline.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(10)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
     func dashboardAlert(_ alert: MenuAlertState) -> some View {
@@ -91,13 +83,13 @@ extension SettingsContentView {
 
     var onboardingWizardCard: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "First-Run Setup",
-                    description: "Follow the steps below to get MultiCodex ready."
+                    description: "Finish the initial setup."
                 )
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     onboardingStepRow(.runtime, isActive: viewModel.onboardingState.step == .runtime)
                     onboardingStepRow(.login, isActive: viewModel.onboardingState.step == .login)
                     onboardingStepRow(.verify, isActive: viewModel.onboardingState.step == .verify)
@@ -154,11 +146,11 @@ extension SettingsContentView {
 
     var accountsPage: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
                     settingsSectionIntro(
                         title: "Accounts",
-                        description: "Search, inspect, and manage your saved accounts."
+                        description: "Manage saved accounts."
                     )
 
                     Spacer(minLength: 0)
@@ -179,13 +171,13 @@ extension SettingsContentView {
                 if viewModel.accounts.isEmpty {
                     noAccountsState
                 } else {
-                    HStack(alignment: .top, spacing: 14) {
+                    HStack(alignment: .top, spacing: 10) {
                         accountListPane
-                            .frame(width: 280)
+                            .frame(width: 200)
 
                         accountDetailPane
                     }
-                    .frame(minHeight: 400)
+                    .frame(minHeight: 280)
                 }
             }
         }
@@ -211,7 +203,7 @@ extension SettingsContentView {
                     .foregroundStyle(.secondary)
             } else {
                 ScrollView {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 6) {
                         ForEach(viewModel.filteredAccounts) { account in
                             accountListRow(account)
                         }
@@ -245,11 +237,11 @@ extension SettingsContentView {
                     AccountStatusPill(text: "Current", color: .accentColor)
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(isSelectedAccount(account.name) ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.03))
             )
         }
@@ -260,7 +252,7 @@ extension SettingsContentView {
     var accountDetailPane: some View {
         if let account = viewModel.selectedSettingsAccount {
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     accountIdentitySection(account)
                     accountAuthSection(account)
                     accountUsageSection(account)
@@ -311,7 +303,7 @@ extension SettingsContentView {
             title: "Authentication",
             description: "Switch, log in again, or import auth for this account."
         ) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 if !account.isCurrent {
                     ActionPillButton(title: "Use", symbol: "checkmark.circle.fill", role: .primary) {
                         viewModel.switchToAccount(named: account.name)
@@ -347,4 +339,5 @@ extension SettingsContentView {
             }
         }
     }
+
 }

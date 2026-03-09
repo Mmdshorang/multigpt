@@ -445,10 +445,12 @@ final class AccountsMenuViewModel: ObservableObject {
         setAccountFeedback(message: nil, error: nil)
     }
 
-    func toggleResetDisplayMode() {
-        let nextMode = resetDisplayMode.next
-        resetDisplayMode = nextMode
-        preferences.resetDisplayMode = nextMode
+    func setResetDisplayMode(_ mode: ResetDisplayMode) {
+        guard mode != resetDisplayMode else {
+            return
+        }
+        resetDisplayMode = mode
+        preferences.resetDisplayMode = mode
     }
 
     func openMulticodexConfigDirectory() {

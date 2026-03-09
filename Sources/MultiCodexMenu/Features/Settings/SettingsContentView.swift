@@ -10,7 +10,7 @@ struct SettingsContentView: View {
     var body: some View {
         NavigationSplitView {
             sidebar
-                .frame(minWidth: 268, idealWidth: 288)
+                .frame(minWidth: 168, idealWidth: 176)
                 .background(sidebarBackground)
         } detail: {
             ZStack {
@@ -44,20 +44,16 @@ struct SettingsContentView: View {
     }
 
     var sidebar: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Settings")
-                    .font(.title2.weight(.semibold))
-
-                Text("Tune MultiCodex for daily usage, account management, and local diagnostics.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(.headline)
 
                 HStack(spacing: 8) {
                     AccountStatusPill(text: runtimeStatus.text, color: runtimeStatus.color)
                 }
             }
+            .padding(.horizontal, 10)
 
             List(selection: sidebarSelectionBinding) {
                 ForEach(viewModel.settingsSections) { section in
@@ -67,47 +63,36 @@ struct SettingsContentView: View {
             }
             .listStyle(.sidebar)
 
-            SettingsPanelCard(padding: 14) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Advanced Tools")
-                                .font(.subheadline.weight(.semibold))
-                            Text("Keep these controls tucked away unless you need them.")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer(minLength: 8)
-
-                        Button(viewModel.isAdvancedSettingsVisible ? "Hide" : "Show") {
-                            viewModel.setAdvancedSettingsVisible(!viewModel.isAdvancedSettingsVisible)
-                        }
-                        .buttonStyle(.plain)
+            SettingsPanelCard(padding: 10) {
+                HStack {
+                    Text("Advanced")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                    }
 
-                    if viewModel.isAdvancedSettingsVisible {
-                        settingsInfoRow(symbol: "checkmark.circle.fill", text: "Advanced section is available in the sidebar.", color: .green)
-                    } else {
-                        settingsInfoRow(symbol: "eye.slash", text: "Advanced section is currently hidden.", color: .secondary)
+                    Spacer(minLength: 8)
+
+                    Button(viewModel.isAdvancedSettingsVisible ? "Hide" : "Show") {
+                        viewModel.setAdvancedSettingsVisible(!viewModel.isAdvancedSettingsVisible)
                     }
+                    .buttonStyle(.plain)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
                 }
             }
+            .padding(.horizontal, 10)
         }
-        .padding(16)
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder
     var detailContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                headerCard
-
+            VStack(alignment: .leading, spacing: 10) {
                 switch viewModel.selectedSettingsSection {
                 case .dashboard:
-                    dashboardPage
+                    VStack(alignment: .leading, spacing: 10) {
+                        headerCard
+                        dashboardPage
+                    }
                 case .accounts:
                     accountsPage
                 case .runtime:
@@ -125,9 +110,9 @@ struct SettingsContentView: View {
                 }
             }
             .frame(maxWidth: settingsContentMaxWidth, alignment: .leading)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
     }
