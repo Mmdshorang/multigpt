@@ -39,14 +39,7 @@ struct SettingsContentView: View {
     }
 
     var sidebarBackground: some View {
-        LinearGradient(
-            colors: [
-                Color(nsColor: .underPageBackgroundColor),
-                Color(nsColor: .windowBackgroundColor),
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        Color(nsColor: .underPageBackgroundColor)
         .ignoresSafeArea()
     }
 
@@ -63,22 +56,16 @@ struct SettingsContentView: View {
 
                 HStack(spacing: 8) {
                     AccountStatusPill(text: runtimeStatus.text, color: runtimeStatus.color)
-                    Text(viewModel.lastUpdatedLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
             }
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(viewModel.settingsSections) { section in
-                        sidebarSectionRow(section)
-                    }
+            List(selection: sidebarSelectionBinding) {
+                ForEach(viewModel.settingsSections) { section in
+                    Label(section.title, systemImage: section.symbol)
+                        .tag(section)
                 }
-                .padding(.vertical, 2)
             }
-            .scrollIndicators(.hidden)
+            .listStyle(.sidebar)
 
             SettingsPanelCard(padding: 14) {
                 VStack(alignment: .leading, spacing: 10) {
@@ -112,54 +99,6 @@ struct SettingsContentView: View {
         .padding(16)
     }
 
-    func sidebarSectionRow(_ section: SettingsSection) -> some View {
-        Button {
-            viewModel.selectSettingsSection(section)
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(isSidebarSectionSelected(section) ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.05))
-                        .frame(width: 34, height: 34)
-
-                    Image(systemName: section.symbol)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(isSidebarSectionSelected(section) ? Color.accentColor : Color.secondary)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(section.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Text(section.summary)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                Spacer(minLength: 8)
-
-                if isSidebarSectionSelected(section) {
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 7, height: 7)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSidebarSectionSelected(section) ? Color.accentColor.opacity(0.08) : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isSidebarSectionSelected(section) ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.05), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
     @ViewBuilder
     var detailContent: some View {
         ScrollView {
@@ -191,9 +130,5 @@ struct SettingsContentView: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .scrollIndicators(.hidden)
-    }
-
-    func isSidebarSectionSelected(_ section: SettingsSection) -> Bool {
-        viewModel.selectedSettingsSection == section
     }
 }

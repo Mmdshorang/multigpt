@@ -35,21 +35,19 @@ struct ActionPillButton: View {
             Label(title, systemImage: symbol)
                 .font(.caption.weight(role == .primary ? .semibold : .medium))
                 .labelStyle(.titleAndIcon)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(backgroundShape)
                 .overlay(borderShape)
                 .foregroundStyle(foregroundColor)
-                .shadow(color: shadowColor, radius: 7, x: 0, y: 2)
         case .iconOnly:
             Image(systemName: symbol)
                 .font(.caption.weight(role == .primary ? .semibold : .medium))
                 .frame(width: 16, height: 16)
-                .padding(8)
+                .padding(7)
                 .background(backgroundShape)
                 .overlay(borderShape)
                 .foregroundStyle(foregroundColor)
-                .shadow(color: shadowColor, radius: 7, x: 0, y: 2)
         }
     }
 
@@ -58,24 +56,10 @@ struct ActionPillButton: View {
             .fill(
                 role == .primary
                     ? AnyShapeStyle(
-                        LinearGradient(
-                            colors: [
-                                Color.accentColor,
-                                Color.accentColor.opacity(0.82),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                        Color.accentColor
                     )
                     : AnyShapeStyle(
-                        LinearGradient(
-                            colors: [
-                                Color(nsColor: .controlBackgroundColor),
-                                Color(nsColor: .windowBackgroundColor).opacity(0.86),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                        Color(nsColor: .controlBackgroundColor).opacity(0.72)
                     )
             )
     }
@@ -87,9 +71,5 @@ struct ActionPillButton: View {
 
     private var foregroundColor: Color {
         role == .primary ? .white : .primary
-    }
-
-    private var shadowColor: Color {
-        role == .primary ? Color.accentColor.opacity(0.18) : Color.black.opacity(0.04)
     }
 }

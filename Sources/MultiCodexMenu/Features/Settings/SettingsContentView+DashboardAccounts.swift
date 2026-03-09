@@ -3,23 +3,12 @@ import SwiftUI
 extension SettingsContentView {
     var headerCard: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        settingsSectionIntro(
-                            eyebrow: "Workspace",
-                            title: "A calmer control center for MultiCodex",
-                            description: "Everything here is organized around the tasks people actually do: checking account health, fixing runtime setup, and adjusting everyday preferences."
-                        )
-
-                        HStack(spacing: 8) {
-                            AccountStatusPill(text: runtimeStatus.text, color: runtimeStatus.color)
-
-                            if viewModel.isRefreshing {
-                                AccountStatusPill(text: "Refreshing", color: .accentColor)
-                            }
-                        }
-                    }
+                    settingsSectionIntro(
+                        title: "Settings",
+                        description: "Manage accounts, runtime setup, display preferences, and troubleshooting."
+                    )
 
                     Spacer(minLength: 0)
 
@@ -40,23 +29,9 @@ extension SettingsContentView {
                 }
 
                 HStack(spacing: 12) {
-                    settingsMetricTile(
-                        title: "Accounts",
-                        value: "\(viewModel.accounts.count)",
-                        detail: viewModel.accounts.isEmpty ? "No accounts connected yet" : "\(viewModel.accountsNeedingLogin.count) need attention"
-                    )
-                    settingsMetricTile(
-                        title: "Current",
-                        value: viewModel.currentAccount?.name ?? "None",
-                        detail: viewModel.currentAccount?.connectionState.label ?? "Select or add an account",
-                        tint: .green
-                    )
-                    settingsMetricTile(
-                        title: "Updated",
-                        value: viewModel.lastUpdatedLabel.replacingOccurrences(of: "Updated ", with: ""),
-                        detail: viewModel.runtimeProbeSummary ?? "Runtime status will appear here",
-                        tint: runtimeStatus.color
-                    )
+                    settingsInfoRow(symbol: "person.2.fill", text: "\(viewModel.accounts.count) accounts")
+                    settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
+                    settingsInfoRow(symbol: "clock", text: viewModel.lastUpdatedLabel)
                 }
 
                 if let warning = viewModel.refreshWarningMessage {
@@ -67,34 +42,18 @@ extension SettingsContentView {
     }
 
     var dashboardPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     settingsSectionIntro(
-                        eyebrow: "Overview",
-                        title: "System status at a glance",
-                        description: "Use the dashboard to see account readiness, onboarding progress, and any issues that need quick action."
+                        title: "Overview",
+                        description: "A quick status summary for accounts, runtime health, and first-run setup."
                     )
 
                     HStack(spacing: 12) {
-                        settingsMetricTile(
-                            title: "Needs Login",
-                            value: "\(viewModel.accountsNeedingLogin.count)",
-                            detail: viewModel.accountsNeedingLogin.isEmpty ? "All connected accounts look healthy" : "Accounts needing re-authentication",
-                            tint: viewModel.accountsNeedingLogin.isEmpty ? .green : .orange
-                        )
-                        settingsMetricTile(
-                            title: "Runtime",
-                            value: viewModel.isCodexRuntimeAvailable ? "Ready" : "Check Required",
-                            detail: runtimeStatus.text,
-                            tint: runtimeStatus.color
-                        )
-                        settingsMetricTile(
-                            title: "Setup",
-                            value: viewModel.onboardingState.step.title,
-                            detail: viewModel.onboardingState.isComplete ? "Initial setup is complete" : "Continue the guided first-run flow",
-                            tint: viewModel.onboardingState.isComplete ? .green : .accentColor
-                        )
+                        dashboardMetric(title: "Current Account", value: viewModel.currentAccount?.name ?? "None")
+                        dashboardMetric(title: "Needs Login", value: "\(viewModel.accountsNeedingLogin.count)")
+                        dashboardMetric(title: "Setup", value: viewModel.onboardingState.step.title)
                     }
 
                     if let alert = viewModel.prioritizedMenuAlert {
@@ -109,6 +68,21 @@ extension SettingsContentView {
         }
     }
 
+    func dashboardMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
     func dashboardAlert(_ alert: MenuAlertState) -> some View {
         AlertActionCard(alert: alert) {
             handleAlertAction(alert)
@@ -117,11 +91,10 @@ extension SettingsContentView {
 
     var onboardingWizardCard: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
                 settingsSectionIntro(
-                    eyebrow: "First Run",
-                    title: "Finish the initial setup",
-                    description: "The wizard keeps the basics in the right order so new accounts come online smoothly."
+                    title: "First-Run Setup",
+                    description: "Follow the steps below to get MultiCodex ready."
                 )
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -130,8 +103,6 @@ extension SettingsContentView {
                     onboardingStepRow(.verify, isActive: viewModel.onboardingState.step == .verify)
                     onboardingStepRow(.done, isActive: viewModel.onboardingState.step == .done)
                 }
-                .padding(12)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 HStack(spacing: 8) {
                     switch viewModel.onboardingState.step {
@@ -177,25 +148,17 @@ extension SettingsContentView {
                 .foregroundStyle(isActive ? Color.primary : Color.secondary)
 
             Spacer()
-
-            if isActive {
-                Text("Current")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
-            }
         }
-        .padding(.horizontal, 4)
         .padding(.vertical, 2)
     }
 
     var accountsPage: some View {
         SettingsPanelCard {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 16) {
                     settingsSectionIntro(
-                        eyebrow: "Accounts",
-                        title: "Manage identities with less friction",
-                        description: "Search, switch, repair, and clean up accounts from one place without losing context."
+                        title: "Accounts",
+                        description: "Search, inspect, and manage your saved accounts."
                     )
 
                     Spacer(minLength: 0)
@@ -216,13 +179,13 @@ extension SettingsContentView {
                 if viewModel.accounts.isEmpty {
                     noAccountsState
                 } else {
-                    HStack(alignment: .top, spacing: 16) {
+                    HStack(alignment: .top, spacing: 14) {
                         accountListPane
-                            .frame(width: 290)
+                            .frame(width: 280)
 
                         accountDetailPane
                     }
-                    .frame(minHeight: 420)
+                    .frame(minHeight: 400)
                 }
             }
         }
@@ -230,36 +193,22 @@ extension SettingsContentView {
 
     var noAccountsState: some View {
         settingsInsetPanel(
-            title: "No accounts connected",
-            description: "Connect your first account to unlock switching, usage tracking, and live diagnostics.",
-            tint: .accentColor
+            title: "No accounts yet",
+            description: "Connect your first account to start tracking usage and switching identities."
         ) {
             settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
-
-            Text("Use \"Login New Account\" once the runtime is ready.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
     var accountListPane: some View {
-        settingsInsetPanel(
-            title: "Account Directory",
-            description: "Search across saved accounts and pick one to inspect in detail.",
-            tint: .accentColor
-        ) {
+        settingsInsetPanel(title: "Saved Accounts") {
             TextField("Search accounts", text: accountSearchBinding)
                 .textFieldStyle(.roundedBorder)
-
-            Text("\(viewModel.filteredAccounts.count) visible")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
 
             if viewModel.filteredAccounts.isEmpty {
                 Text("No accounts match your search.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .padding(.top, 4)
             } else {
                 ScrollView {
                     VStack(spacing: 8) {
@@ -279,16 +228,6 @@ extension SettingsContentView {
             viewModel.selectSettingsAccount(named: account.name)
         } label: {
             HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(AccountPresentation.statusColor(for: account.connectionState).opacity(0.15))
-                        .frame(width: 30, height: 30)
-
-                    Image(systemName: account.isCurrent ? "person.crop.circle.fill" : "person.crop.circle")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
-                }
-
                 VStack(alignment: .leading, spacing: 3) {
                     Text(account.name)
                         .font(.caption.weight(.semibold))
@@ -302,27 +241,16 @@ extension SettingsContentView {
 
                 Spacer(minLength: 8)
 
-                VStack(alignment: .trailing, spacing: 4) {
-                    if account.isCurrent {
-                        AccountStatusPill(text: "Current", color: .accentColor)
-                    }
-
-                    Text(account.lastUsedLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                if account.isCurrent {
+                    AccountStatusPill(text: "Current", color: .accentColor)
                 }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelectedAccount(account.name) ? Color.accentColor.opacity(0.11) : Color.primary.opacity(0.04))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isSelectedAccount(account.name) ? Color.accentColor.opacity(0.24) : Color.primary.opacity(0.06), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isSelectedAccount(account.name) ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.03))
             )
         }
         .buttonStyle(.plain)
@@ -333,22 +261,6 @@ extension SettingsContentView {
         if let account = viewModel.selectedSettingsAccount {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    settingsInsetPanel(
-                        title: account.name,
-                        description: account.isCurrent ? "This account is currently active in MultiCodex." : "Review account state and switch to it when needed.",
-                        tint: AccountPresentation.statusColor(for: account.connectionState)
-                    ) {
-                        HStack(spacing: 8) {
-                            AccountStatusPill(text: account.connectionState.label, color: AccountPresentation.statusColor(for: account.connectionState))
-
-                            if account.isCurrent {
-                                AccountStatusPill(text: "Current", color: .accentColor)
-                            }
-                        }
-
-                        settingsInfoRow(symbol: "clock", text: "Last used \(account.lastUsedLabel)")
-                    }
-
                     accountIdentitySection(account)
                     accountAuthSection(account)
                     accountUsageSection(account)
@@ -359,10 +271,9 @@ extension SettingsContentView {
         } else {
             settingsInsetPanel(
                 title: "Select an account",
-                description: "Choose an account from the directory to manage its name, authentication, and stored data.",
-                tint: .accentColor
+                description: "Choose an account from the list to manage it."
             ) {
-                settingsInfoRow(symbol: "sidebar.left", text: "The left column keeps the account list available while you work.")
+                EmptyView()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -371,15 +282,20 @@ extension SettingsContentView {
     func accountIdentitySection(_ account: AccountUsage) -> some View {
         settingsInsetPanel(
             title: "Identity",
-            description: "Keep account names recognizable so switching is fast and low-risk.",
-            tint: .accentColor
+            description: "Rename the account so it is easy to recognize."
         ) {
-            settingsFormRow("Display name", detail: "Shown across the menu bar and settings views.") {
+            settingsFormRow("Display name") {
                 TextField("Rename account", text: renameBinding(for: account.name))
                     .textFieldStyle(.roundedBorder)
             }
 
             HStack(spacing: 8) {
+                AccountStatusPill(text: account.connectionState.label, color: AccountPresentation.statusColor(for: account.connectionState))
+
+                if account.isCurrent {
+                    AccountStatusPill(text: "Current", color: .accentColor)
+                }
+
                 Spacer()
 
                 ActionPillButton(title: "Rename", symbol: "pencil") {
@@ -393,8 +309,7 @@ extension SettingsContentView {
     func accountAuthSection(_ account: AccountUsage) -> some View {
         settingsInsetPanel(
             title: "Authentication",
-            description: "Use these actions when you need to switch, re-check login state, or import existing auth.",
-            tint: AccountPresentation.statusColor(for: account.connectionState)
+            description: "Switch, log in again, or import auth for this account."
         ) {
             HStack(spacing: 8) {
                 if !account.isCurrent {

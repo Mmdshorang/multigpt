@@ -20,21 +20,11 @@ struct SettingsPanelCard<Content: View>: View {
         .padding(padding)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(nsColor: .controlBackgroundColor),
-                            Color(nsColor: .windowBackgroundColor).opacity(0.82),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.88))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.05), radius: 14, x: 0, y: 6)
     }
 }
