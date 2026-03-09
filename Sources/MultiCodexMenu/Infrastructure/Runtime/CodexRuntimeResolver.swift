@@ -35,8 +35,15 @@ enum CodexRuntimeResolver {
             )
         }
 
+        func runtimeForDetectedExecutable(_ path: String, source: String?) -> CodexRuntimeDescriptor {
+            CodexRuntimeDescriptor(
+                executableURL: URL(fileURLWithPath: path),
+                prefixArguments: [],
+                display: source.map { "\(path) (\($0))" } ?? path
+            )
+        }
+
         if let custom = customCodexPath?.trimmingCharacters(in: .whitespacesAndNewlines), !custom.isEmpty {
-            // Migration guard: ignore legacy Node path values.
             let lower = custom.lowercased()
             if !lower.hasSuffix("/node") && lower != "node" {
                 return try runtimeForRaw(custom, source: "custom")
@@ -48,25 +55,26 @@ enum CodexRuntimeResolver {
         }
 
         if let resolvedFromWhich = resolveCodexPathUsingWhich(environment: environment, fileManager: fileManager) {
-            return CodexRuntimeDescriptor(
-                executableURL: URL(fileURLWithPath: resolvedFromWhich),
-                prefixArguments: [],
-                display: "\(resolvedFromWhich) (from which)"
-            )
+            return runtimeForDetectedExecutable(resolvedFromWhich, source: "from which")
+        }
+
+        if let resolvedFromWhere = resolveCodexPathUsingWhere(environment: environment, fileManager: fileManager) {
+            return runtimeForDetectedExecutable(resolvedFromWhere, source: "from where")
+        }
+
+        if let resolvedFromPathScan = resolveCodexPathFromPATH(environment: environment, fileManager: fileManager) {
+            return runtimeForDetectedExecutable(resolvedFromPathScan, source: "from PATH scan")
         }
 
         let knownPaths = [
             "/opt/homebrew/bin/codex",
             "/usr/local/bin/codex",
             "/usr/bin/codex",
+            "/Applications/Codex.app/Contents/Resources/codex",
         ]
 
         for codexPath in knownPaths where fileManager.isExecutableFile(atPath: codexPath) {
-            return CodexRuntimeDescriptor(
-                executableURL: URL(fileURLWithPath: codexPath),
-                prefixArguments: [],
-                display: codexPath
-            )
+            return runtimeForDetectedExecutable(codexPath, source: nil)
         }
 
         return CodexRuntimeDescriptor(
@@ -80,40 +88,66 @@ enum CodexRuntimeResolver {
         environment: [String: String],
         fileManager: FileManager
     ) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = ["codex"]
+        let output = ProcessOutputReader.run(
+            executableURL: URL(fileURLWithPath: "/usr/bin/which"),
+            arguments: ["-a", "codex"],
+            environment: ExecutableSearchPath.environment(from: environment)
+        )
+        return firstExecutablePath(in: output, fileManager: fileManager)
+    }
 
-        var commandEnvironment = environment
-        if commandEnvironment["PATH"]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
-            commandEnvironment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-        }
-        process.environment = commandEnvironment
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try process.run()
-        } catch {
+    private static func resolveCodexPathUsingWhere(
+        environment: [String: String],
+        fileManager: FileManager
+    ) -> String? {
+        guard fileManager.isExecutableFile(atPath: "/bin/zsh") else {
             return nil
         }
 
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
+        let output = ProcessOutputReader.run(
+            executableURL: URL(fileURLWithPath: "/bin/zsh"),
+            arguments: ["-lc", "where codex"],
+            environment: ExecutableSearchPath.environment(from: environment)
+        )
+        return firstExecutablePath(in: output, fileManager: fileManager)
+    }
+
+    private static func resolveCodexPathFromPATH(
+        environment: [String: String],
+        fileManager: FileManager
+    ) -> String? {
+        let pathValue = ExecutableSearchPath.environment(from: environment)["PATH"]
+        for pathEntry in ExecutableSearchPath.components(from: pathValue) {
+            let expandedEntry = (pathEntry as NSString).expandingTildeInPath
+            let candidate = (expandedEntry as NSString).appendingPathComponent("codex")
+            if fileManager.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+
+        return nil
+    }
+
+    private static func firstExecutablePath(
+        in output: String?,
+        fileManager: FileManager
+    ) -> String? {
+        guard let output else {
             return nil
         }
 
-        let stdout = String(
-            data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(),
-            encoding: .utf8
-        ) ?? ""
-        let resolvedPath = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !resolvedPath.isEmpty, fileManager.isExecutableFile(atPath: resolvedPath) else {
-            return nil
+        var seen = Set<String>()
+
+        for token in output.split(whereSeparator: \.isWhitespace) {
+            let candidate = (String(token) as NSString).expandingTildeInPath
+            guard candidate.contains("/"), seen.insert(candidate).inserted else {
+                continue
+            }
+            if fileManager.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
         }
-        return resolvedPath
+
+        return nil
     }
 }
