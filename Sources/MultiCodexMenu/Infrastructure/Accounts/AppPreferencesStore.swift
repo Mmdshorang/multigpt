@@ -84,6 +84,16 @@ struct AppPreferencesStore {
         }
     }
 
+    var accountSwitchingStrategy: AccountSwitchingStrategy {
+        get {
+            let raw = defaults.string(forKey: Keys.accountSwitchingStrategy) ?? ""
+            return AccountSwitchingStrategy(rawValue: raw) ?? .manual
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.accountSwitchingStrategy)
+        }
+    }
+
     var limitsCacheTTLSeconds: Int {
         get {
             defaults.integer(forKey: Keys.limitsCacheTTLSeconds)
@@ -120,6 +130,7 @@ struct AppPreferencesStore {
         static let isAdvancedSettingsVisible = "multicodexMenu.isAdvancedSettingsVisible"
         static let menuDensity = "multicodexMenu.menuDensity"
         static let usageBarStyle = "multicodexMenu.usageBarStyle"
+        static let accountSwitchingStrategy = "multicodexMenu.accountSwitchingStrategy"
         static let limitsCacheTTLSeconds = "multicodexMenu.limitsCacheTTLSeconds"
     }
 }
