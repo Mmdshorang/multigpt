@@ -24,6 +24,25 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(persisted.limitsCacheTTLSeconds, CodexAccountService.minLimitsCacheTTLSeconds)
     }
 
+    func testSwitchingStrategyDefaultsToManualAndPersistsChanges() {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        XCTAssertEqual(viewModel.accountSwitchingStrategy, .manual)
+
+        viewModel.setAccountSwitchingStrategy(.expiryAware)
+
+        XCTAssertEqual(viewModel.accountSwitchingStrategy, .expiryAware)
+        let persisted = AppPreferencesStore(defaults: defaults)
+        XCTAssertEqual(persisted.accountSwitchingStrategy, .expiryAware)
+    }
+
     func testSelectSettingsSectionPersistsSelection() {
         let defaults = ephemeralDefaults()
         let service = MockCodexAccountService()
@@ -146,6 +165,128 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertNil(viewModel.lastRefreshError)
         XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha"])
+    }
+
+    func testManualStrategyDoesNotAutoSwitch() async {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: "expired"),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 10, weeklyUsed: 10), ageSec: nil),
+                LimitsResult(account: "beta", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 20, weeklyUsed: 20), ageSec: nil),
+            ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.refreshLive()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !viewModel.accounts.isEmpty
+        }
+
+        XCTAssertTrue(service.switchCalls.isEmpty)
+    }
+
+    func testFailoverStrategyAutomaticallySwitchesWhenCurrentNeedsLogin() async {
+        let defaults = ephemeralDefaults()
+        var preferences = AppPreferencesStore(defaults: defaults)
+        preferences.accountSwitchingStrategy = .failover
+
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: "expired"),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 40, weeklyUsed: 40), ageSec: nil),
+                LimitsResult(account: "beta", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 15, weeklyUsed: 25), ageSec: nil),
+            ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: preferences,
+            startImmediately: false
+        )
+
+        viewModel.refreshLive()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.switchCalls.contains("beta")
+        }
+
+        XCTAssertEqual(service.switchCalls.last, "beta")
+        XCTAssertEqual(viewModel.accountActionMessage, "Auto-switched to beta. alpha needs login, so MultiCodex moved to a healthy account.")
+    }
+
+    func testExpiryAwareStrategyAutomaticallySwitchesToSoonerExpiringHeadroom() async {
+        let defaults = ephemeralDefaults()
+        var preferences = AppPreferencesStore(defaults: defaults)
+        preferences.accountSwitchingStrategy = .expiryAware
+
+        let now = Date()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(
+                    account: "alpha",
+                    source: "live-api",
+                    snapshot: makeSnapshot(
+                        fiveHourUsed: 55,
+                        fiveHourReset: now.addingTimeInterval(4 * 3_600),
+                        weeklyUsed: 45,
+                        weeklyReset: now.addingTimeInterval(6 * 24 * 3_600)
+                    ),
+                    ageSec: nil
+                ),
+                LimitsResult(
+                    account: "beta",
+                    source: "live-api",
+                    snapshot: makeSnapshot(
+                        fiveHourUsed: 15,
+                        fiveHourReset: now.addingTimeInterval(30 * 60),
+                        weeklyUsed: 35,
+                        weeklyReset: now.addingTimeInterval(4 * 24 * 3_600)
+                    ),
+                    ageSec: nil
+                ),
+                ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: preferences,
+            startImmediately: false
+        )
+
+        viewModel.refreshLive()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.switchCalls.contains("beta")
+        }
+
+        XCTAssertEqual(service.switchCalls.last, "beta")
+        XCTAssertEqual(viewModel.accountActionMessage, "Auto-switched to beta. beta has 5h headroom that is more likely to expire unused.")
     }
 
     func testTemporaryAuthSandboxToggleUpdatesEnvironmentAndPreferences() async throws {
@@ -296,6 +437,27 @@ final class AccountsMenuViewModelTests: XCTestCase {
             try? await Task.sleep(for: .milliseconds(20))
         }
     }
+
+    private func makeSnapshot(
+        fiveHourUsed: Double,
+        fiveHourReset: Date? = nil,
+        weeklyUsed: Double,
+        weeklyReset: Date? = nil
+    ) -> RateLimitSnapshot {
+        RateLimitSnapshot(
+            primary: RateLimitWindow(
+                usedPercent: fiveHourUsed,
+                windowDurationMins: 300,
+                resetsAt: fiveHourReset?.timeIntervalSince1970
+            ),
+            secondary: RateLimitWindow(
+                usedPercent: weeklyUsed,
+                windowDurationMins: 10_080,
+                resetsAt: weeklyReset?.timeIntervalSince1970
+            ),
+            credits: nil
+        )
+    }
 }
 
 private final class MockCodexAccountService: CodexAccountServicing {
@@ -353,9 +515,18 @@ private final class MockCodexAccountService: CodexAccountServicing {
     }
 
     func switchAccount(name: String) async throws {
-        switchCalls.append(name)
         if let switchError {
             throw switchError
+        }
+        switchCalls.append(name)
+        stubbedAccounts = stubbedAccounts.map { account in
+            AccountEntry(
+                name: account.name,
+                isCurrent: account.name == name,
+                hasAuth: account.hasAuth,
+                lastUsedAt: account.lastUsedAt,
+                lastLoginStatus: account.lastLoginStatus
+            )
         }
     }
 

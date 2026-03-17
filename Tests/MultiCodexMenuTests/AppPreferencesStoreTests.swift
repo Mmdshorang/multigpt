@@ -32,12 +32,14 @@ final class AppPreferencesStoreTests: XCTestCase {
         XCTAssertEqual(store.resetDisplayMode, .relative)
         XCTAssertEqual(store.menuDensity, .compact)
         XCTAssertEqual(store.usageBarStyle, .depleting)
+        XCTAssertEqual(store.accountSwitchingStrategy, .manual)
         XCTAssertFalse(store.temporaryAuthSandboxEnabled)
         XCTAssertNil(store.temporaryAuthSandboxHome)
 
         store.resetDisplayMode = .absolute
         store.menuDensity = .comfortable
         store.usageBarStyle = .filling
+        store.accountSwitchingStrategy = .expiryAware
         store.temporaryAuthSandboxEnabled = true
         store.temporaryAuthSandboxHome = "/tmp/multicodex-test-home"
 
@@ -45,6 +47,7 @@ final class AppPreferencesStoreTests: XCTestCase {
         XCTAssertEqual(persisted.resetDisplayMode, .absolute)
         XCTAssertEqual(persisted.menuDensity, .comfortable)
         XCTAssertEqual(persisted.usageBarStyle, .filling)
+        XCTAssertEqual(persisted.accountSwitchingStrategy, .expiryAware)
         XCTAssertTrue(persisted.temporaryAuthSandboxEnabled)
         XCTAssertEqual(persisted.temporaryAuthSandboxHome, "/tmp/multicodex-test-home")
     }
