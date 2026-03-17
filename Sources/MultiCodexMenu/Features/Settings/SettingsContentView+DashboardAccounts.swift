@@ -232,6 +232,11 @@ extension SettingsContentView {
                     }
                 }
             }
+
+            settingsInfoRow(
+                symbol: "info.circle",
+                text: "If Codex is already running, you may need to restart that session after login or account switching."
+            )
         }
     }
 
