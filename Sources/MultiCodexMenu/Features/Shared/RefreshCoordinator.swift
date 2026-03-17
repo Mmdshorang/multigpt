@@ -3,7 +3,7 @@ import Foundation
 private enum RefreshCoordinator {}
 
 extension AccountsMenuViewModel {
-    func performRefresh(refreshLive: Bool) async {
+    func performRefresh(refreshLive: Bool, allowAutoSwitch: Bool = true) async {
         if pendingInteractiveLoginAccount != nil {
             return
         }
@@ -13,9 +13,14 @@ extension AccountsMenuViewModel {
         }
 
         isRefreshing = true
-        defer { isRefreshing = false }
-
         let previousAccounts = accounts
+        var switchRecommendation: AccountSwitchRecommendation?
+        defer {
+            isRefreshing = false
+            if let switchRecommendation {
+                applyAutomaticSwitch(recommendation: switchRecommendation)
+            }
+        }
 
         do {
             let fetchedAccounts = try await accountService.fetchAccounts()
@@ -35,6 +40,12 @@ extension AccountsMenuViewModel {
             }
             lastUpdatedAt = Date()
             cliResolutionHint = accountService.resolutionHint
+            if allowAutoSwitch, switchingAccountName == nil {
+                switchRecommendation = AccountSwitchRecommendationService.recommendation(
+                    for: accountSwitchingStrategy,
+                    accounts: accounts
+                )
+            }
 
             if limits.errors.isEmpty {
                 lastRefreshError = nil
@@ -56,11 +67,25 @@ extension AccountsMenuViewModel {
             }
         }
     }
+
     func triggerRefresh(refreshLive: Bool) {
         Task {
             await performRefresh(refreshLive: refreshLive)
         }
     }
+
+    func applyAutomaticSwitch(recommendation: AccountSwitchRecommendation) {
+        runSwitchAction(named: recommendation.accountName) {
+            try await self.accountService.switchAccount(name: recommendation.accountName)
+            self.lastRefreshError = nil
+            self.setAccountFeedback(
+                message: "Auto-switched to \(recommendation.accountName). \(recommendation.reason)",
+                error: nil
+            )
+            await self.performRefresh(refreshLive: true, allowAutoSwitch: false)
+        }
+    }
+
     func handleDidBecomeActive() {
         guard let pendingAccount = pendingInteractiveLoginAccount else {
             refreshLive()

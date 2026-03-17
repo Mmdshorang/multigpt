@@ -168,6 +168,8 @@ extension SettingsContentView {
                     feedbackRow(error, color: .red)
                 }
 
+                accountSwitchingSection
+
                 if viewModel.accounts.isEmpty {
                     noAccountsState
                 } else {
@@ -189,6 +191,51 @@ extension SettingsContentView {
             description: "Connect your first account to start tracking usage and switching identities."
         ) {
             settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
+        }
+    }
+
+    var accountSwitchingSection: some View {
+        settingsInsetPanel(
+            title: "Switching Strategy",
+            description: "Choose how MultiCodex should decide when to move between accounts."
+        ) {
+            settingsFormRow("Strategy", detail: viewModel.accountSwitchingStrategy.descriptionText) {
+                Picker("Switching strategy", selection: accountSwitchingStrategyBinding) {
+                    ForEach(AccountSwitchingStrategy.allCases) { strategy in
+                        Text(strategy.title).tag(strategy)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(AccountSwitchingStrategy.allCases) { strategy in
+                    switchingStrategyRow(strategy)
+                }
+            }
+        }
+    }
+
+    func switchingStrategyRow(_ strategy: AccountSwitchingStrategy) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: strategy == viewModel.accountSwitchingStrategy ? "checkmark.circle.fill" : "circle")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(strategy == viewModel.accountSwitchingStrategy ? Color.accentColor : Color.secondary)
+                .frame(width: 14, alignment: .top)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(strategy.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text(strategy.descriptionText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
         }
     }
 

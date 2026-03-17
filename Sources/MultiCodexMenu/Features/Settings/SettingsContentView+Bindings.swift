@@ -32,6 +32,13 @@ extension SettingsContentView {
         )
     }
 
+    var accountSwitchingStrategyBinding: Binding<AccountSwitchingStrategy> {
+        Binding(
+            get: { viewModel.accountSwitchingStrategy },
+            set: { viewModel.setAccountSwitchingStrategy($0) }
+        )
+    }
+
     var resetDisplayModeBinding: Binding<ResetDisplayMode> {
         Binding(
             get: { viewModel.resetDisplayMode },

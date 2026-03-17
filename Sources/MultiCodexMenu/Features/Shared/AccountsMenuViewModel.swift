@@ -27,6 +27,7 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var isAdvancedSettingsVisible: Bool
     @Published var menuDensity: MenuDensity
     @Published var usageBarStyle: UsageBarStyle
+    @Published var accountSwitchingStrategy: AccountSwitchingStrategy
     @Published var limitsCacheTTLSeconds: Int
     @Published var pendingAccountRemovalRequest: PendingAccountRemovalRequest?
 
@@ -58,6 +59,7 @@ final class AccountsMenuViewModel: ObservableObject {
         isAdvancedSettingsVisible = preferences.isAdvancedSettingsVisible
         menuDensity = preferences.menuDensity
         usageBarStyle = preferences.usageBarStyle
+        accountSwitchingStrategy = preferences.accountSwitchingStrategy
         let persistedTTL = preferences.limitsCacheTTLSeconds
         limitsCacheTTLSeconds = CodexAccountService.normalizedLimitsCacheTTLSeconds(
             persistedTTL > 0 ? persistedTTL : CodexAccountService.defaultLimitsCacheTTLSeconds
@@ -308,6 +310,14 @@ final class AccountsMenuViewModel: ObservableObject {
         preferences.usageBarStyle = style
     }
 
+    func setAccountSwitchingStrategy(_ strategy: AccountSwitchingStrategy) {
+        guard strategy != accountSwitchingStrategy else {
+            return
+        }
+        accountSwitchingStrategy = strategy
+        preferences.accountSwitchingStrategy = strategy
+    }
+
     func setLimitsCacheTTLSeconds(_ seconds: Int) {
         let normalized = CodexAccountService.normalizedLimitsCacheTTLSeconds(seconds)
         guard normalized != limitsCacheTTLSeconds else {
@@ -376,7 +386,7 @@ final class AccountsMenuViewModel: ObservableObject {
             try await self.accountService.switchAccount(name: name)
             self.lastRefreshError = nil
             self.setAccountFeedback(message: "Now using \(name).", error: nil)
-            await self.performRefresh(refreshLive: true)
+            await self.performRefresh(refreshLive: true, allowAutoSwitch: false)
         }
     }
 
