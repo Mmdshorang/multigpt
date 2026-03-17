@@ -33,6 +33,7 @@ final class AppPreferencesStoreTests: XCTestCase {
         XCTAssertEqual(store.menuDensity, .compact)
         XCTAssertEqual(store.usageBarStyle, .depleting)
         XCTAssertEqual(store.accountSwitchingStrategy, .manual)
+        XCTAssertFalse(store.autoSwitchNotificationsEnabled)
         XCTAssertFalse(store.temporaryAuthSandboxEnabled)
         XCTAssertNil(store.temporaryAuthSandboxHome)
 
@@ -40,6 +41,7 @@ final class AppPreferencesStoreTests: XCTestCase {
         store.menuDensity = .comfortable
         store.usageBarStyle = .filling
         store.accountSwitchingStrategy = .expiryAware
+        store.autoSwitchNotificationsEnabled = true
         store.temporaryAuthSandboxEnabled = true
         store.temporaryAuthSandboxHome = "/tmp/multicodex-test-home"
 
@@ -48,6 +50,7 @@ final class AppPreferencesStoreTests: XCTestCase {
         XCTAssertEqual(persisted.menuDensity, .comfortable)
         XCTAssertEqual(persisted.usageBarStyle, .filling)
         XCTAssertEqual(persisted.accountSwitchingStrategy, .expiryAware)
+        XCTAssertTrue(persisted.autoSwitchNotificationsEnabled)
         XCTAssertTrue(persisted.temporaryAuthSandboxEnabled)
         XCTAssertEqual(persisted.temporaryAuthSandboxHome, "/tmp/multicodex-test-home")
     }

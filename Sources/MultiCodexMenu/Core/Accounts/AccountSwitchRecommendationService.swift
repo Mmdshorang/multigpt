@@ -1,6 +1,7 @@
 import Foundation
 
 struct AccountSwitchRecommendation: Equatable {
+    let previousAccountName: String?
     let accountName: String
     let reason: String
 }
@@ -39,29 +40,33 @@ enum AccountSwitchRecommendationService {
 
         guard let current else {
             return AccountSwitchRecommendation(
+                previousAccountName: nil,
                 accountName: candidate.name,
-                reason: "No current account is active, so MultiCodex picked the healthiest available one."
+                reason: "No active account"
             )
         }
 
         if current.connectionState == .needsLogin {
             return AccountSwitchRecommendation(
+                previousAccountName: current.name,
                 accountName: candidate.name,
-                reason: "\(current.name) needs login, so MultiCodex moved to a healthy account."
+                reason: "Needs login"
             )
         }
 
         if current.connectionState == .error {
             return AccountSwitchRecommendation(
+                previousAccountName: current.name,
                 accountName: candidate.name,
-                reason: "\(current.name) could not refresh cleanly, so MultiCodex failed over."
+                reason: "Refresh error"
             )
         }
 
         if isEffectivelyExhausted(current) {
             return AccountSwitchRecommendation(
+                previousAccountName: current.name,
                 accountName: candidate.name,
-                reason: "\(current.name) is at or near its limit, so MultiCodex failed over."
+                reason: "Near limit"
             )
         }
 
@@ -95,15 +100,17 @@ enum AccountSwitchRecommendationService {
 
         guard let current else {
             return AccountSwitchRecommendation(
+                previousAccountName: nil,
                 accountName: best.account.name,
-                reason: "MultiCodex picked the account that can use the most quota before the next reset."
+                reason: "Best available fit"
             )
         }
 
         guard let currentScore = scored.first(where: { $0.account.name == current.name })?.score else {
             return AccountSwitchRecommendation(
+                previousAccountName: current.name,
                 accountName: best.account.name,
-                reason: "\(current.name) is not eligible for automatic use, so MultiCodex picked the best available account."
+                reason: "Current account unavailable"
             )
         }
 
@@ -116,7 +123,11 @@ enum AccountSwitchRecommendationService {
         }
 
         let reason = expiryAwareReason(candidate: best.account, current: current, now: now)
-        return AccountSwitchRecommendation(accountName: best.account.name, reason: reason)
+        return AccountSwitchRecommendation(
+            previousAccountName: current.name,
+            accountName: best.account.name,
+            reason: reason
+        )
     }
 
     private static func eligibleAccounts(from accounts: [AccountUsage], excluding name: String? = nil) -> [AccountUsage] {
@@ -184,10 +195,10 @@ enum AccountSwitchRecommendationService {
         )
 
         if candidateFiveHourUrgency > currentFiveHourUrgency {
-            return "\(candidate.name) has 5h headroom that is more likely to expire unused."
+            return "5h window expiring"
         }
 
-        return "\(candidate.name) is better positioned to use weekly quota before it resets."
+        return "Weekly window expiring"
     }
 
     private static func remainingFraction(for metric: UsageMetric) -> Double {

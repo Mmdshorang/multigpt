@@ -214,6 +214,24 @@ extension SettingsContentView {
                     switchingStrategyRow(strategy)
                 }
             }
+
+            settingsFormRow(
+                "Auto-switch notifications",
+                detail: "Optional silent notification when MultiCodex switches accounts for you."
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Show silent notifications", isOn: autoSwitchNotificationsBinding)
+                        .toggleStyle(.switch)
+
+                    ActionPillButton(
+                        title: "Send Test Notification",
+                        symbol: "bell.badge",
+                        isDisabled: !viewModel.autoSwitchNotificationsEnabled
+                    ) {
+                        viewModel.sendTestAutoSwitchNotification()
+                    }
+                }
+            }
         }
     }
 

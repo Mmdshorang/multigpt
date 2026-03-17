@@ -94,6 +94,11 @@ struct AppPreferencesStore {
         }
     }
 
+    var autoSwitchNotificationsEnabled: Bool {
+        get { defaults.bool(forKey: Keys.autoSwitchNotificationsEnabled) }
+        set { defaults.set(newValue, forKey: Keys.autoSwitchNotificationsEnabled) }
+    }
+
     var limitsCacheTTLSeconds: Int {
         get {
             defaults.integer(forKey: Keys.limitsCacheTTLSeconds)
@@ -131,6 +136,7 @@ struct AppPreferencesStore {
         static let menuDensity = "multicodexMenu.menuDensity"
         static let usageBarStyle = "multicodexMenu.usageBarStyle"
         static let accountSwitchingStrategy = "multicodexMenu.accountSwitchingStrategy"
+        static let autoSwitchNotificationsEnabled = "multicodexMenu.autoSwitchNotificationsEnabled"
         static let limitsCacheTTLSeconds = "multicodexMenu.limitsCacheTTLSeconds"
     }
 }

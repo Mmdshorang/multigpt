@@ -39,6 +39,13 @@ extension SettingsContentView {
         )
     }
 
+    var autoSwitchNotificationsBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.autoSwitchNotificationsEnabled },
+            set: { viewModel.setAutoSwitchNotificationsEnabled($0) }
+        )
+    }
+
     var resetDisplayModeBinding: Binding<ResetDisplayMode> {
         Binding(
             get: { viewModel.resetDisplayMode },

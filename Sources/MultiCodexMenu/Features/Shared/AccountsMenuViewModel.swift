@@ -28,26 +28,31 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var menuDensity: MenuDensity
     @Published var usageBarStyle: UsageBarStyle
     @Published var accountSwitchingStrategy: AccountSwitchingStrategy
+    @Published var autoSwitchNotificationsEnabled: Bool
     @Published var limitsCacheTTLSeconds: Int
     @Published var pendingAccountRemovalRequest: PendingAccountRemovalRequest?
 
     let accountService: any CodexAccountServicing
     let fileManager: FileManager
+    private let autoSwitchNotifierFactory: () -> any AutoSwitchNotificationSending
     var preferences: AppPreferencesStore
 
     var refreshLoopTask: Task<Void, Never>?
     var didBecomeActiveObserver: NSObjectProtocol?
     var pendingInteractiveLoginAccount: String?
     var feedbackAutoClearTask: Task<Void, Never>?
+    lazy var autoSwitchNotifier: any AutoSwitchNotificationSending = autoSwitchNotifierFactory()
 
     init(
         accountService: any CodexAccountServicing = CodexAccountService(),
         fileManager: FileManager = .default,
+        autoSwitchNotifier: @escaping () -> any AutoSwitchNotificationSending = { AutoSwitchNotificationCenter.shared },
         preferences: AppPreferencesStore = AppPreferencesStore(),
         startImmediately: Bool = true
     ) {
         self.accountService = accountService
         self.fileManager = fileManager
+        autoSwitchNotifierFactory = autoSwitchNotifier
         self.preferences = preferences
 
         customCodexPath = preferences.customCodexPath
@@ -60,6 +65,7 @@ final class AccountsMenuViewModel: ObservableObject {
         menuDensity = preferences.menuDensity
         usageBarStyle = preferences.usageBarStyle
         accountSwitchingStrategy = preferences.accountSwitchingStrategy
+        autoSwitchNotificationsEnabled = preferences.autoSwitchNotificationsEnabled
         let persistedTTL = preferences.limitsCacheTTLSeconds
         limitsCacheTTLSeconds = CodexAccountService.normalizedLimitsCacheTTLSeconds(
             persistedTTL > 0 ? persistedTTL : CodexAccountService.defaultLimitsCacheTTLSeconds
@@ -77,6 +83,9 @@ final class AccountsMenuViewModel: ObservableObject {
 #endif
         self.accountService.customCodexPath = customCodexPath.isEmpty ? nil : customCodexPath
         self.accountService.limitsCacheTTLSeconds = limitsCacheTTLSeconds
+        if autoSwitchNotificationsEnabled {
+            self.autoSwitchNotifier.requestAuthorizationIfNeeded()
+        }
         configureSandboxEnvironment()
         refreshRuntimeProbe()
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
@@ -318,6 +327,17 @@ final class AccountsMenuViewModel: ObservableObject {
         preferences.accountSwitchingStrategy = strategy
     }
 
+    func setAutoSwitchNotificationsEnabled(_ isEnabled: Bool) {
+        guard isEnabled != autoSwitchNotificationsEnabled else {
+            return
+        }
+        autoSwitchNotificationsEnabled = isEnabled
+        preferences.autoSwitchNotificationsEnabled = isEnabled
+        if isEnabled {
+            autoSwitchNotifier.requestAuthorizationIfNeeded()
+        }
+    }
+
     func setLimitsCacheTTLSeconds(_ seconds: Int) {
         let normalized = CodexAccountService.normalizedLimitsCacheTTLSeconds(seconds)
         guard normalized != limitsCacheTTLSeconds else {
@@ -453,6 +473,27 @@ final class AccountsMenuViewModel: ObservableObject {
         feedbackAutoClearTask?.cancel()
         feedbackAutoClearTask = nil
         setAccountFeedback(message: nil, error: nil)
+    }
+
+    func sendTestAutoSwitchNotification() {
+        guard autoSwitchNotificationsEnabled else {
+            setAccountFeedback(message: nil, error: "Enable auto-switch notifications to send a test.")
+            return
+        }
+
+        let previousAccountName = currentAccount?.name ?? accounts.first?.name ?? "alpha"
+        let newAccountName = accounts.first(where: { $0.name != previousAccountName })?.name ?? "beta"
+        let payload = AutoSwitchNotificationPayload(
+            previousAccountName: previousAccountName,
+            newAccountName: newAccountName,
+            reason: "5h window expiring"
+        )
+
+        autoSwitchNotifier.send(payload)
+        setAccountFeedback(
+            message: "Sent test notification \(previousAccountName) -> \(newAccountName).",
+            error: nil
+        )
     }
 
     func setResetDisplayMode(_ mode: ResetDisplayMode) {

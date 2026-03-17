@@ -78,10 +78,25 @@ extension AccountsMenuViewModel {
         runSwitchAction(named: recommendation.accountName) {
             try await self.accountService.switchAccount(name: recommendation.accountName)
             self.lastRefreshError = nil
+            let message: String
+            if let previousAccountName = recommendation.previousAccountName {
+                message = "Auto-switched \(previousAccountName) -> \(recommendation.accountName). \(recommendation.reason)."
+            } else {
+                message = "Auto-switched to \(recommendation.accountName). \(recommendation.reason)."
+            }
             self.setAccountFeedback(
-                message: "Auto-switched to \(recommendation.accountName). \(recommendation.reason)",
+                message: message,
                 error: nil
             )
+            if self.autoSwitchNotificationsEnabled {
+                self.autoSwitchNotifier.send(
+                    AutoSwitchNotificationPayload(
+                        previousAccountName: recommendation.previousAccountName,
+                        newAccountName: recommendation.accountName,
+                        reason: recommendation.reason
+                    )
+                )
+            }
             await self.performRefresh(refreshLive: true, allowAutoSwitch: false)
         }
     }

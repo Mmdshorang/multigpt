@@ -27,28 +27,37 @@ final class AccountsMenuViewModelTests: XCTestCase {
     func testSwitchingStrategyDefaultsToManualAndPersistsChanges() {
         let defaults = ephemeralDefaults()
         let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
 
         XCTAssertEqual(viewModel.accountSwitchingStrategy, .manual)
+        XCTAssertFalse(viewModel.autoSwitchNotificationsEnabled)
 
         viewModel.setAccountSwitchingStrategy(.expiryAware)
+        viewModel.setAutoSwitchNotificationsEnabled(true)
 
         XCTAssertEqual(viewModel.accountSwitchingStrategy, .expiryAware)
+        XCTAssertTrue(viewModel.autoSwitchNotificationsEnabled)
+        XCTAssertEqual(notifier.authorizationRequests, 1)
         let persisted = AppPreferencesStore(defaults: defaults)
         XCTAssertEqual(persisted.accountSwitchingStrategy, .expiryAware)
+        XCTAssertTrue(persisted.autoSwitchNotificationsEnabled)
     }
 
     func testSelectSettingsSectionPersistsSelection() {
         let defaults = ephemeralDefaults()
         let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -204,6 +213,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         preferences.accountSwitchingStrategy = .failover
 
         let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: "expired"),
             AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -219,6 +229,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: preferences,
             startImmediately: false
         )
@@ -230,16 +241,66 @@ final class AccountsMenuViewModelTests: XCTestCase {
         }
 
         XCTAssertEqual(service.switchCalls.last, "beta")
-        XCTAssertEqual(viewModel.accountActionMessage, "Auto-switched to beta. alpha needs login, so MultiCodex moved to a healthy account.")
+        XCTAssertEqual(viewModel.accountActionMessage, "Auto-switched alpha -> beta. Needs login.")
+        XCTAssertTrue(notifier.sentPayloads.isEmpty)
+    }
+
+    func testSendTestAutoSwitchNotificationUsesCurrentAndNextAccount() {
+        let defaults = ephemeralDefaults()
+        var preferences = AppPreferencesStore(defaults: defaults)
+        preferences.autoSwitchNotificationsEnabled = true
+
+        let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 25, weeklyUsed: 35), ageSec: nil),
+                LimitsResult(account: "beta", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 15, weeklyUsed: 20), ageSec: nil),
+            ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: preferences,
+            startImmediately: false
+        )
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+            limits: service.stubbedLimits
+        )
+
+        viewModel.sendTestAutoSwitchNotification()
+
+        XCTAssertEqual(viewModel.accountActionMessage, "Sent test notification alpha -> beta.")
+        XCTAssertEqual(notifier.authorizationRequests, 1)
+        XCTAssertEqual(
+            notifier.sentPayloads,
+            [
+                AutoSwitchNotificationPayload(
+                    previousAccountName: "alpha",
+                    newAccountName: "beta",
+                    reason: "5h window expiring"
+                ),
+            ]
+        )
     }
 
     func testExpiryAwareStrategyAutomaticallySwitchesToSoonerExpiringHeadroom() async {
         let defaults = ephemeralDefaults()
         var preferences = AppPreferencesStore(defaults: defaults)
         preferences.accountSwitchingStrategy = .expiryAware
+        preferences.autoSwitchNotificationsEnabled = true
 
         let now = Date()
         let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
             AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -275,6 +336,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: preferences,
             startImmediately: false
         )
@@ -286,7 +348,17 @@ final class AccountsMenuViewModelTests: XCTestCase {
         }
 
         XCTAssertEqual(service.switchCalls.last, "beta")
-        XCTAssertEqual(viewModel.accountActionMessage, "Auto-switched to beta. beta has 5h headroom that is more likely to expire unused.")
+        XCTAssertEqual(viewModel.accountActionMessage, "Auto-switched alpha -> beta. 5h window expiring.")
+        XCTAssertEqual(
+            notifier.sentPayloads,
+            [
+                AutoSwitchNotificationPayload(
+                    previousAccountName: "alpha",
+                    newAccountName: "beta",
+                    reason: "5h window expiring"
+                ),
+            ]
+        )
     }
 
     func testTemporaryAuthSandboxToggleUpdatesEnvironmentAndPreferences() async throws {
@@ -597,5 +669,18 @@ private final class MockCodexAccountService: CodexAccountServicing {
 
     func probeRuntime() -> CodexAccountService.RuntimeProbe {
         probeRuntimeResult
+    }
+}
+
+private final class MockAutoSwitchNotifier: AutoSwitchNotificationSending {
+    private(set) var authorizationRequests = 0
+    private(set) var sentPayloads: [AutoSwitchNotificationPayload] = []
+
+    func requestAuthorizationIfNeeded() {
+        authorizationRequests += 1
+    }
+
+    func send(_ payload: AutoSwitchNotificationPayload) {
+        sentPayloads.append(payload)
     }
 }
