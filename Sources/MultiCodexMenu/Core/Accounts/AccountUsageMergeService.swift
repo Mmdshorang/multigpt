@@ -14,7 +14,7 @@ enum AccountUsageMergeService {
             let result = resultByAccount[account.name]
             let usageError = errorsByAccount[account.name]
             let previous = previousByAccount[account.name]
-            let shouldKeepPreviousUsage = result == nil && usageError != nil && previous != nil
+            let shouldKeepPreviousUsage = result == nil && previous != nil
             let preservedUsage = shouldKeepPreviousUsage ? previous : nil
             let usage = preservedUsage?.usage ?? UsageFormatter.usageSummary(from: result?.snapshot)
             let source = preservedUsage?.source ?? UsageFormatter.sourceLabel(from: result)

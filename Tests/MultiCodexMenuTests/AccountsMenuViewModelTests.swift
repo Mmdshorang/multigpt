@@ -165,6 +165,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
             viewModel.accounts.count == 1 && viewModel.lastRefreshError == nil
         }
 
+        let previousFiveHour = viewModel.accounts.first?.usage.fiveHour.percentText
+
         service.fetchLimitsError = NSError(domain: "test", code: 2, userInfo: [NSLocalizedDescriptionKey: "limits failed"])
         viewModel.refresh()
 
@@ -174,6 +176,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertNil(viewModel.lastRefreshError)
         XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha"])
+        XCTAssertEqual(viewModel.accounts.first?.usage.fiveHour.percentText, previousFiveHour)
     }
 
     func testPerformRefreshPublishesAccountsBeforeSlowLimitsComplete() async throws {

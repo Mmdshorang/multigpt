@@ -55,4 +55,37 @@ final class AccountUsageMergeServiceTests: XCTestCase {
 
         XCTAssertEqual(merged.map(\.name), ["alpha", "beta", "charlie"])
     }
+
+    func testMergeAccountsPreservesPreviousUsageWhileFreshResultsAreStillLoading() {
+        let previous = AccountUsage(
+            name: "alpha",
+            isCurrent: true,
+            hasAuth: true,
+            lastUsedAt: nil,
+            lastLoginStatus: nil,
+            usage: UsageSummary(
+                fiveHour: UsageMetric(label: "5h", percentText: "61%", usedPercent: 61, periodMinutes: 300, resetsAt: nil),
+                weekly: UsageMetric(label: "weekly", percentText: "44%", usedPercent: 44, periodMinutes: 10_080, resetsAt: nil),
+                credits: "unlimited"
+            ),
+            source: "live-api",
+            usageError: nil
+        )
+
+        let merged = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(
+                accounts: [
+                    AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+                ],
+                currentAccount: "alpha"
+            ),
+            limits: LimitsPayload(results: [], errors: []),
+            previousAccounts: [previous]
+        )
+
+        XCTAssertEqual(merged[0].usage.fiveHour.percentText, "61%")
+        XCTAssertEqual(merged[0].usage.weekly.percentText, "44%")
+        XCTAssertEqual(merged[0].source, "live-api")
+        XCTAssertNil(merged[0].usageError)
+    }
 }
