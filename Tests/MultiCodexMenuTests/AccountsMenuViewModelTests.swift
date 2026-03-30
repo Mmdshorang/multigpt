@@ -176,6 +176,32 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha"])
     }
 
+    func testPerformRefreshPublishesAccountsBeforeSlowLimitsComplete() async throws {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [LimitsResult(account: "alpha", source: "live-api", snapshot: nil, ageSec: nil)],
+            errors: []
+        )
+        service.fetchLimitsDelayNanoseconds = 400_000_000
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.refresh()
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha"])
+        XCTAssertTrue(viewModel.isRefreshing)
+    }
+
     func testManualStrategyDoesNotAutoSwitch() async {
         let defaults = ephemeralDefaults()
         let service = MockCodexAccountService()
@@ -245,6 +271,71 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertTrue(notifier.sentPayloads.isEmpty)
     }
 
+    func testFailoverStrategyAutomaticallySwitchesWhenCurrentRefreshErrorsButUsageIsPreserved() async {
+        let defaults = ephemeralDefaults()
+        var preferences = AppPreferencesStore(defaults: defaults)
+        preferences.accountSwitchingStrategy = .failover
+
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "beta", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 15, weeklyUsed: 15), ageSec: nil),
+            ],
+            errors: [
+                LimitsErrorEntry(account: "alpha", message: "Codex RPC timed out"),
+            ]
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: preferences,
+            startImmediately: false
+        )
+        viewModel.accounts = [
+            AccountUsage(
+                name: "alpha",
+                isCurrent: true,
+                hasAuth: true,
+                lastUsedAt: nil,
+                lastLoginStatus: nil,
+                usage: UsageSummary(
+                    fiveHour: UsageMetric(label: "5h", percentText: "40%", usedPercent: 40, periodMinutes: 300, resetsAt: nil),
+                    weekly: UsageMetric(label: "weekly", percentText: "35%", usedPercent: 35, periodMinutes: 10_080, resetsAt: nil),
+                    credits: "unlimited"
+                ),
+                source: "cached 30s",
+                usageError: nil
+            ),
+            AccountUsage(
+                name: "beta",
+                isCurrent: false,
+                hasAuth: true,
+                lastUsedAt: nil,
+                lastLoginStatus: nil,
+                usage: UsageSummary(
+                    fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+                    weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+                    credits: "-"
+                ),
+                source: "-",
+                usageError: nil
+            ),
+        ]
+
+        viewModel.refreshLive()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.switchCalls.contains("beta")
+        }
+
+        XCTAssertEqual(service.switchCalls.last, "beta")
+    }
+
     func testSendTestAutoSwitchNotificationUsesCurrentAndNextAccount() {
         let defaults = ephemeralDefaults()
         var preferences = AppPreferencesStore(defaults: defaults)
@@ -290,6 +381,25 @@ final class AccountsMenuViewModelTests: XCTestCase {
                 ),
             ]
         )
+    }
+
+    func testSetAccountSwitchingStrategyTriggersImmediateLiveRefreshForAutomaticModes() async {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.setAccountSwitchingStrategy(.failover)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.fetchLimitsRefreshLiveCalls.contains(true)
+        }
+
+        XCTAssertTrue(service.fetchLimitsRefreshLiveCalls.contains(true))
     }
 
     func testExpiryAwareStrategyAutomaticallySwitchesToSoonerExpiringHeadroom() async {
@@ -419,6 +529,10 @@ final class AccountsMenuViewModelTests: XCTestCase {
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+            limits: service.stubbedLimits
+        )
 
         viewModel.openLoginInTerminal(for: "alpha")
 
@@ -432,11 +546,107 @@ final class AccountsMenuViewModelTests: XCTestCase {
         NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
 
         await waitUntil(timeoutSeconds: 1.0) {
-            service.importCalls.contains("alpha") && service.statusCalls.contains("alpha")
+            service.importFromHomeCalls.contains(where: { $0.name == "alpha" })
+                && service.statusForLoginHomeCalls.contains("alpha")
         }
 
-        XCTAssertTrue(service.importCalls.contains("alpha"))
-        XCTAssertTrue(service.statusCalls.contains("alpha"))
+        XCTAssertTrue(service.importFromHomeCalls.contains(where: { $0.name == "alpha" }))
+        XCTAssertTrue(service.statusForLoginHomeCalls.contains("alpha"))
+        XCTAssertTrue(service.switchCalls.contains("alpha"))
+    }
+
+    func testStartLoginFlowKeepsRetryableSessionWhenTerminalLoginFails() async {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
+        service.loginHomeStatusExitCode = 1
+        service.loginHomeStatusOutput = "authorization failed"
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.openLoginInTerminal(for: "alpha")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.openLoginCalls.contains("alpha")
+        }
+
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            (viewModel.accountActionError ?? "").contains("authorization failed")
+        }
+
+        XCTAssertEqual(viewModel.pendingInteractiveLoginSession?.phase, .needsRetry)
+        XCTAssertTrue(service.importFromHomeCalls.isEmpty)
+    }
+
+    func testStartNewAccountLoginStoresAuthWithoutAutoSwitching() async {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.startLoginFlow(accountName: "fresh", createIfNeeded: true)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.importFromHomeCalls.contains(where: { $0.name == "fresh" })
+        }
+
+        XCTAssertTrue(service.switchCalls.isEmpty)
+    }
+
+    func testSwitchToAccountCompletesBeforeBackgroundRefreshFinishes() async throws {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: nil, ageSec: nil),
+                LimitsResult(account: "beta", source: "live-api", snapshot: nil, ageSec: nil),
+            ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+            limits: service.stubbedLimits
+        )
+        service.fetchLimitsDelayNanoseconds = 400_000_000
+
+        viewModel.switchToAccount(named: "beta")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.switchCalls.contains("beta")
+        }
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertNil(viewModel.switchingAccountName)
+        XCTAssertEqual(viewModel.currentAccount?.name, "beta")
     }
 
     func testOnboardingStateTransitionsMatrix() async {
@@ -536,6 +746,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     struct LoginCall {
         let account: String
         let createIfNeeded: Bool
+        let loginHome: String?
     }
 
     struct RemoveCall {
@@ -560,6 +771,10 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var openLoginError: Error?
     var openNewLoginError: Error?
     var loginInAppError: Error?
+    var fetchLimitsDelayNanoseconds: UInt64 = 0
+    var loginHomeStatusError: Error?
+    var loginHomeStatusExitCode = 0
+    var loginHomeStatusOutput = "ok"
     var probeRuntimeResult = CodexAccountService.RuntimeProbe(isAvailable: true, summary: "ok")
 
     private(set) var switchCalls: [String] = []
@@ -567,9 +782,12 @@ private final class MockCodexAccountService: CodexAccountServicing {
     private(set) var renameCalls: [(from: String, to: String)] = []
     private(set) var importCalls: [String] = []
     private(set) var statusCalls: [String] = []
+    private(set) var importFromHomeCalls: [(home: String, name: String)] = []
+    private(set) var statusForLoginHomeCalls: [String] = []
     private(set) var openLoginCalls: [String] = []
     private(set) var openNewLoginCalls: [String] = []
     private(set) var loginInAppCalls: [LoginCall] = []
+    private(set) var fetchLimitsRefreshLiveCalls: [Bool] = []
 
     func fetchAccounts() async throws -> AccountsListPayload {
         if let fetchAccountsError {
@@ -579,9 +797,13 @@ private final class MockCodexAccountService: CodexAccountServicing {
         return AccountsListPayload(accounts: stubbedAccounts, currentAccount: current)
     }
 
-    func fetchLimits(refreshLive _: Bool) async throws -> LimitsPayload {
+    func fetchLimits(refreshLive: Bool) async throws -> LimitsPayload {
         if let fetchLimitsError {
             throw fetchLimitsError
+        }
+        fetchLimitsRefreshLiveCalls.append(refreshLive)
+        if fetchLimitsDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: fetchLimitsDelayNanoseconds)
         }
         return stubbedLimits
     }
@@ -626,6 +848,14 @@ private final class MockCodexAccountService: CodexAccountServicing {
         return ImportAccountPayload(account: name)
     }
 
+    func importAuth(fromHome homePath: String, into name: String) async throws -> ImportAccountPayload {
+        if let importError {
+            throw importError
+        }
+        importFromHomeCalls.append((home: homePath, name: name))
+        return ImportAccountPayload(account: name)
+    }
+
     func fetchStatus(name: String) async throws -> AccountStatusPayload {
         if let fetchStatusError {
             throw fetchStatusError
@@ -641,22 +871,37 @@ private final class MockCodexAccountService: CodexAccountServicing {
         )
     }
 
-    func openLoginInTerminal(account name: String) throws {
+    func fetchStatusForLoginHome(_ homePath: String, accountName: String) async throws -> AccountStatusPayload {
+        if let loginHomeStatusError {
+            throw loginHomeStatusError
+        }
+        statusForLoginHomeCalls.append(accountName)
+        return AccountStatusPayload(
+            account: accountName,
+            exitCode: loginHomeStatusExitCode,
+            stdout: "",
+            stderr: "",
+            output: loginHomeStatusOutput,
+            checkedAt: homePath
+        )
+    }
+
+    func openLoginInTerminal(account name: String, loginHome _: String?) throws {
         if let openLoginError {
             throw openLoginError
         }
         openLoginCalls.append(name)
     }
 
-    func openNewAccountLoginInTerminal(newAccountName name: String) throws {
+    func openNewAccountLoginInTerminal(newAccountName name: String, loginHome _: String?) throws {
         if let openNewLoginError {
             throw openNewLoginError
         }
         openNewLoginCalls.append(name)
     }
 
-    func loginInApp(account name: String, createIfNeeded: Bool) async throws -> String {
-        loginInAppCalls.append(LoginCall(account: name, createIfNeeded: createIfNeeded))
+    func loginInApp(account name: String, createIfNeeded: Bool, loginHome: String?) async throws -> String {
+        loginInAppCalls.append(LoginCall(account: name, createIfNeeded: createIfNeeded, loginHome: loginHome))
         if let loginInAppError {
             throw loginInAppError
         }

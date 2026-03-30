@@ -242,7 +242,12 @@ final class AccountsMenuViewModel: ObservableObject {
             return
         }
 
-        triggerRefresh(refreshLive: false)
+        Task { @MainActor in
+            await performRefresh(refreshLive: false)
+            if shouldPreferLiveRefreshForAutoSwitching {
+                await performRefresh(refreshLive: true)
+            }
+        }
         startRefreshLoop()
     }
 
@@ -253,7 +258,7 @@ final class AccountsMenuViewModel: ObservableObject {
                 if Task.isCancelled {
                     break
                 }
-                await performRefresh(refreshLive: false)
+                await performRefresh(refreshLive: shouldPreferLiveRefreshForAutoSwitching)
             }
         }
     }
@@ -325,6 +330,9 @@ final class AccountsMenuViewModel: ObservableObject {
         }
         accountSwitchingStrategy = strategy
         preferences.accountSwitchingStrategy = strategy
+        if strategy != .manual {
+            refreshLive()
+        }
     }
 
     func setAutoSwitchNotificationsEnabled(_ isEnabled: Bool) {
@@ -336,6 +344,10 @@ final class AccountsMenuViewModel: ObservableObject {
         if isEnabled {
             autoSwitchNotifier.requestAuthorizationIfNeeded()
         }
+    }
+
+    var shouldPreferLiveRefreshForAutoSwitching: Bool {
+        accountSwitchingStrategy != .manual
     }
 
     func setLimitsCacheTTLSeconds(_ seconds: Int) {

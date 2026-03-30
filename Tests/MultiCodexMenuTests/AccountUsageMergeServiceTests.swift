@@ -2,7 +2,7 @@ import XCTest
 @testable import MultiCodexMenu
 
 final class AccountUsageMergeServiceTests: XCTestCase {
-    func testMergeAccountsPreservesPreviousUsageOnPerAccountRefreshFailure() {
+    func testMergeAccountsPreservesPreviousUsageAndErrorOnPerAccountRefreshFailure() {
         let previous = AccountUsage(
             name: "alpha",
             isCurrent: true,
@@ -37,7 +37,7 @@ final class AccountUsageMergeServiceTests: XCTestCase {
         XCTAssertEqual(merged.count, 1)
         XCTAssertEqual(merged[0].usage.fiveHour.percentText, "35%")
         XCTAssertEqual(merged[0].source, "cached 30s")
-        XCTAssertNil(merged[0].usageError)
+        XCTAssertEqual(merged[0].usageError, "rate limit endpoint unavailable")
     }
 
     func testMergeAccountsSortsCurrentFirstThenByName() {

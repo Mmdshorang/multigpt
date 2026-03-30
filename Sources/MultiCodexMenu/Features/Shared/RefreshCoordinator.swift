@@ -100,6 +100,19 @@ extension AccountsMenuViewModel {
         runSwitchAction(named: recommendation.accountName) {
             try await self.accountService.switchAccount(name: recommendation.accountName)
             self.lastRefreshError = nil
+            self.accounts = self.accounts.map { account in
+                AccountUsage(
+                    name: account.name,
+                    isCurrent: account.name == recommendation.accountName,
+                    hasAuth: account.hasAuth,
+                    lastUsedAt: account.lastUsedAt,
+                    lastLoginStatus: account.lastLoginStatus,
+                    usage: account.usage,
+                    source: account.source,
+                    usageError: account.usageError
+                )
+            }
+            self.syncSelectedSettingsAccount()
             let message: String
             if let previousAccountName = recommendation.previousAccountName {
                 message = "Auto-switched \(previousAccountName) -> \(recommendation.accountName). \(recommendation.reason)."
@@ -119,7 +132,9 @@ extension AccountsMenuViewModel {
                     )
                 )
             }
-            await self.performRefresh(refreshLive: true, allowAutoSwitch: false)
+            Task { @MainActor in
+                await self.performRefresh(refreshLive: false, allowAutoSwitch: false)
+            }
         }
     }
 
