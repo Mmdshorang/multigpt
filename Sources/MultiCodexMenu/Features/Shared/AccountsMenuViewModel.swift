@@ -39,7 +39,7 @@ final class AccountsMenuViewModel: ObservableObject {
 
     var refreshLoopTask: Task<Void, Never>?
     var didBecomeActiveObserver: NSObjectProtocol?
-    var pendingInteractiveLoginAccount: String?
+    var pendingInteractiveLoginSession: PendingInteractiveLoginSession?
     var feedbackAutoClearTask: Task<Void, Never>?
     lazy var autoSwitchNotifier: any AutoSwitchNotificationSending = autoSwitchNotifierFactory()
 

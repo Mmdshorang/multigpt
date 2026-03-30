@@ -196,3 +196,32 @@ struct PendingAccountRemovalRequest: Identifiable {
         "\(accountName)|\(deleteData)"
     }
 }
+
+enum InteractiveLoginSessionPhase: Equatable {
+    case waitingForExternalCompletion
+    case needsRetry
+}
+
+struct PendingInteractiveLoginSession {
+    let accountName: String
+    let loginSandboxHome: String
+    let shouldApplyAccountAuthOnSuccess: Bool
+    let successFallback: String
+    let createIfNeeded: Bool
+    let phase: InteractiveLoginSessionPhase
+
+    var id: String {
+        "\(accountName)|\(loginSandboxHome)"
+    }
+
+    func withPhase(_ phase: InteractiveLoginSessionPhase) -> Self {
+        PendingInteractiveLoginSession(
+            accountName: accountName,
+            loginSandboxHome: loginSandboxHome,
+            shouldApplyAccountAuthOnSuccess: shouldApplyAccountAuthOnSuccess,
+            successFallback: successFallback,
+            createIfNeeded: createIfNeeded,
+            phase: phase
+        )
+    }
+}

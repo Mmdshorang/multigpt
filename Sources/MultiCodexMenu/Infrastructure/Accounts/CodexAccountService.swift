@@ -184,30 +184,35 @@ final class CodexAccountService {
         try importDefaultAuthNow(into: name)
     }
 
+    func importAuth(fromHome homePath: String, into name: String) async throws -> ImportAccountPayload {
+        try importAuthNow(fromHome: homePath, into: name)
+    }
+
     func fetchStatus(name: String) async throws -> AccountStatusPayload {
         try fetchStatusNow(name: name)
     }
 
-    func openLoginInTerminal(account name: String) throws {
-        _ = try switchAccountNow(name: name)
-        let command = try makeTerminalCodexLoginCommand(accountName: name, firstTime: false)
+    func fetchStatusForLoginHome(_ homePath: String, accountName: String) async throws -> AccountStatusPayload {
+        try fetchStatusForLoginHomeNow(homePath, accountName: accountName)
+    }
+
+    func openLoginInTerminal(account name: String, loginHome: String? = nil) throws {
+        let command = try makeTerminalCodexLoginCommand(accountName: name, firstTime: false, loginHome: loginHome)
         try launchTerminal(script: command)
     }
 
-    func openNewAccountLoginInTerminal(newAccountName name: String) throws {
-        _ = try addAccountIfNeededNow(name: name)
-        _ = try switchAccountNow(name: name)
-        let command = try makeTerminalCodexLoginCommand(accountName: name, firstTime: true)
+    func openNewAccountLoginInTerminal(newAccountName name: String, loginHome: String? = nil) throws {
+        _ = try addAccountIfNeededForLoginNow(name: name)
+        let command = try makeTerminalCodexLoginCommand(accountName: name, firstTime: true, loginHome: loginHome)
         try launchTerminal(script: command)
     }
 
-    func loginInApp(account name: String, createIfNeeded: Bool) async throws -> String {
+    func loginInApp(account name: String, createIfNeeded: Bool, loginHome: String? = nil) async throws -> String {
         if createIfNeeded {
-            _ = try addAccountIfNeededNow(name: name)
+            _ = try addAccountIfNeededForLoginNow(name: name)
         }
-        _ = try switchAccountNow(name: name)
 
-        let result = try await runCodexCaptureAsync(arguments: ["login"])
+        let result = try await runCodexCaptureAsync(arguments: ["login"], loginHome: loginHome)
         let combined = (result.stdout + result.stderr).trimmingCharacters(in: .whitespacesAndNewlines)
         guard result.exitCode == 0 else {
             throw CodexAccountServiceError(message: combined.isEmpty ? "Login failed." : combined)

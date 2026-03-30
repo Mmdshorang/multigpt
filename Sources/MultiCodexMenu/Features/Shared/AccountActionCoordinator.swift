@@ -26,7 +26,9 @@ extension AccountsMenuViewModel {
     }
 
     func startLoginFlow(accountName: String, createIfNeeded: Bool) {
-        guard accountActionInFlightName == nil, pendingInteractiveLoginAccount == nil else {
+        guard accountActionInFlightName == nil,
+              pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
+        else {
             return
         }
 
@@ -43,22 +45,14 @@ extension AccountsMenuViewModel {
             }
 
             do {
-                _ = try await accountService.loginInApp(account: accountName, createIfNeeded: createIfNeeded)
-                _ = try await accountService.importDefaultAuth(into: accountName)
-                let status = try await accountService.fetchStatus(name: accountName)
-
-                switch statusOutcome(
-                    for: accountName,
-                    status: status,
-                    successFallback: "Login synced to \(accountName)."
-                ) {
-                case let .success(message):
-                    setAccountFeedback(message: message, error: nil)
-                case let .failure(message):
-                    setAccountFeedback(message: nil, error: message)
-                }
-
-                await performRefresh(refreshLive: true)
+                let session = try makeInteractiveLoginSession(accountName: accountName, createIfNeeded: createIfNeeded)
+                pendingInteractiveLoginSession = nil
+                _ = try await accountService.loginInApp(
+                    account: accountName,
+                    createIfNeeded: createIfNeeded,
+                    loginHome: session.loginSandboxHome
+                )
+                await completeInteractiveLogin(session: session, preserveFailedSession: false)
             } catch {
                 if shouldFallbackToTerminal(error) {
                     launchTerminalLoginFallback(accountName: accountName, createIfNeeded: createIfNeeded, rootError: error)
@@ -79,12 +73,16 @@ extension AccountsMenuViewModel {
 
     func launchTerminalLoginFallback(accountName: String, createIfNeeded: Bool, rootError: Error) {
         do {
+            let session = try makeInteractiveLoginSession(accountName: accountName, createIfNeeded: createIfNeeded)
             if createIfNeeded {
-                try accountService.openNewAccountLoginInTerminal(newAccountName: accountName)
+                try accountService.openNewAccountLoginInTerminal(
+                    newAccountName: accountName,
+                    loginHome: session.loginSandboxHome
+                )
             } else {
-                try accountService.openLoginInTerminal(account: accountName)
+                try accountService.openLoginInTerminal(account: accountName, loginHome: session.loginSandboxHome)
             }
-            pendingInteractiveLoginAccount = accountName
+            pendingInteractiveLoginSession = session
             setAccountFeedback(
                 message: "Using Terminal fallback for \(accountName). Complete login and return to MultiCodex.",
                 error: nil
@@ -94,6 +92,106 @@ extension AccountsMenuViewModel {
                 message: nil,
                 error: "\(rootError.localizedDescription) (Fallback failed: \(error.localizedDescription))"
             )
+        }
+    }
+
+    func makeInteractiveLoginSession(accountName: String, createIfNeeded: Bool) throws -> PendingInteractiveLoginSession {
+        let sandboxHome = try prepareFreshTemporaryAuthSandbox()
+        let wasCurrentAccount = currentAccount?.name == accountName
+        let successFallback: String
+        if wasCurrentAccount {
+            successFallback = "Login synced to \(accountName)."
+        } else if createIfNeeded {
+            successFallback = "Saved login to \(accountName). Switch when you want to use it."
+        } else {
+            successFallback = "Updated stored login for \(accountName)."
+        }
+
+        return PendingInteractiveLoginSession(
+            accountName: accountName,
+            loginSandboxHome: sandboxHome,
+            shouldApplyAccountAuthOnSuccess: wasCurrentAccount,
+            successFallback: successFallback,
+            createIfNeeded: createIfNeeded,
+            phase: .waitingForExternalCompletion
+        )
+    }
+
+    func resumePendingInteractiveLogin(_ session: PendingInteractiveLoginSession) {
+        guard accountActionInFlightName == nil else {
+            return
+        }
+
+        Task {
+            accountActionInFlightName = session.accountName
+            focusedAccountName = session.accountName
+            defer { accountActionInFlightName = nil }
+
+            await completeInteractiveLogin(session: session, preserveFailedSession: true)
+        }
+    }
+
+    func completeInteractiveLogin(session: PendingInteractiveLoginSession, preserveFailedSession: Bool) async {
+        do {
+            let status = try await accountService.fetchStatusForLoginHome(
+                session.loginSandboxHome,
+                accountName: session.accountName
+            )
+
+            guard status.exitCode == 0 else {
+                if preserveFailedSession {
+                    pendingInteractiveLoginSession = session.withPhase(.needsRetry)
+                } else {
+                    pendingInteractiveLoginSession = nil
+                }
+
+                switch statusOutcome(
+                    for: session.accountName,
+                    status: status,
+                    successFallback: session.successFallback
+                ) {
+                case let .success(message):
+                    setAccountFeedback(message: message, error: nil)
+                case let .failure(message):
+                    setAccountFeedback(
+                        message: nil,
+                        error: preserveFailedSession
+                            ? "\(message) Return to Terminal/browser and retry the login flow."
+                            : message
+                    )
+                }
+                return
+            }
+
+            _ = try await accountService.importAuth(fromHome: session.loginSandboxHome, into: session.accountName)
+            if session.shouldApplyAccountAuthOnSuccess {
+                try await accountService.switchAccount(name: session.accountName)
+            }
+
+            pendingInteractiveLoginSession = nil
+            switch statusOutcome(
+                for: session.accountName,
+                status: status,
+                successFallback: session.successFallback
+            ) {
+            case let .success(message):
+                setAccountFeedback(message: message, error: nil)
+            case let .failure(message):
+                setAccountFeedback(message: nil, error: message)
+            }
+
+            await performRefresh(refreshLive: true, allowAutoSwitch: false)
+        } catch {
+            if preserveFailedSession {
+                pendingInteractiveLoginSession = session.withPhase(.needsRetry)
+                setAccountFeedback(
+                    message: nil,
+                    error: "\(error.localizedDescription) Return to Terminal/browser and retry the login flow."
+                )
+            } else {
+                pendingInteractiveLoginSession = nil
+                setAccountFeedback(message: nil, error: error.localizedDescription)
+            }
         }
     }
 

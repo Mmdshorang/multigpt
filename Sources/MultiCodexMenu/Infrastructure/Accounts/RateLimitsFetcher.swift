@@ -32,6 +32,20 @@ extension CodexAccountService {
         )
     }
 
+    func fetchStatusForLoginHomeNow(_ homePath: String, accountName: String) throws -> AccountStatusPayload {
+        let result = try runCodexCapture(arguments: ["login", "status"], loginHome: homePath)
+        let combined = (result.stdout + result.stderr).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return AccountStatusPayload(
+            account: accountName,
+            exitCode: Int(result.exitCode),
+            stdout: result.stdout,
+            stderr: result.stderr,
+            output: combined,
+            checkedAt: Self.nowISO()
+        )
+    }
+
     func fetchLimitsNow(refreshLive: Bool) throws -> LimitsPayload {
         let paths = currentPaths()
         let config = try loadConfig(paths: paths)

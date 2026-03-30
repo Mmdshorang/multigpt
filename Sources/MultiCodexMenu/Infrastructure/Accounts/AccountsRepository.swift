@@ -24,14 +24,18 @@ extension CodexAccountService {
     }
 
     func addAccountIfNeededNow(name: String) throws -> AddAccountPayload {
-        try addAccountCore(name: name, onExisting: .ignore)
+        try addAccountCore(name: name, onExisting: .ignore, selectIfFirst: true)
+    }
+
+    func addAccountIfNeededForLoginNow(name: String) throws -> AddAccountPayload {
+        try addAccountCore(name: name, onExisting: .ignore, selectIfFirst: false)
     }
 
     func addAccountNow(name: String) throws -> AddAccountPayload {
-        try addAccountCore(name: name, onExisting: .fail)
+        try addAccountCore(name: name, onExisting: .fail, selectIfFirst: true)
     }
 
-    func addAccountCore(name: String, onExisting: ExistingAccountBehavior) throws -> AddAccountPayload {
+    func addAccountCore(name: String, onExisting: ExistingAccountBehavior, selectIfFirst: Bool) throws -> AddAccountPayload {
         let account = try validatedAccountName(name)
         let paths = currentPaths()
         var config = try loadConfig(paths: paths)
@@ -47,7 +51,7 @@ extension CodexAccountService {
         _ = try ensureAccountMeta(account: account, paths: paths)
 
         config.accounts.insert(account)
-        if config.currentAccount == nil {
+        if config.currentAccount == nil, selectIfFirst {
             config.currentAccount = account
         }
         try saveConfig(config, paths: paths)
@@ -146,6 +150,31 @@ extension CodexAccountService {
         defer { lock.release() }
 
         try snapshotDefaultAuthToAccount(account: account, paths: paths)
+        _ = try updateAccountMeta(account: account, paths: paths) { meta in
+            meta.lastUsedAt = Self.nowISO()
+        }
+
+        return ImportAccountPayload(account: account)
+    }
+
+    func importAuthNow(fromHome homePath: String, into name: String) throws -> ImportAccountPayload {
+        let account = normalizeAccountName(name)
+        let paths = currentPaths()
+        let config = try loadConfig(paths: paths)
+        guard config.accounts.contains(account) else {
+            throw CodexAccountServiceError(message: "Unknown account: \(account)")
+        }
+
+        let sourceAuthPath = (homePath as NSString).appendingPathComponent(".codex/auth.json")
+        guard let authData = fileManager.contents(atPath: sourceAuthPath), !authData.isEmpty else {
+            throw CodexAccountServiceError(message: "Login did not produce a usable auth session.")
+        }
+
+        let lock = try acquireAuthLock(account: account, force: false, paths: paths)
+        defer { lock.release() }
+
+        try createDirectory(path: paths.accountDir(account), mode: 0o700)
+        try writeFileAtomic(data: authData, path: paths.accountAuthPath(account), mode: 0o600)
         _ = try updateAccountMeta(account: account, paths: paths) { meta in
             meta.lastUsedAt = Self.nowISO()
         }

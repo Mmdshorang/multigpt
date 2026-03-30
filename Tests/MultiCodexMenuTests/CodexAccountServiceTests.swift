@@ -29,6 +29,41 @@ final class CodexAccountServiceTests: XCTestCase {
         }
     }
 
+    func testAddAccountForLoginDoesNotSelectItAsCurrent() throws {
+        let service = makeSandboxedService()
+
+        _ = try service.addAccountIfNeededForLoginNow(name: "alpha")
+
+        let configPath = (service.effectiveMulticodexHomePath() as NSString).appendingPathComponent("config.json")
+        let configData = try XCTUnwrap(FileManager.default.contents(atPath: configPath))
+        let config = try AccountConfigStore.decodeConfig(from: configData)
+
+        XCTAssertNil(config.currentAccount)
+        XCTAssertEqual(config.accounts, Set(["alpha"]))
+    }
+
+    func testImportAuthFromHomeCopiesSandboxAuthWithoutTouchingDefaultAuth() async throws {
+        let service = makeSandboxedService()
+        _ = try service.addAccountIfNeededForLoginNow(name: "alpha")
+
+        let sandbox = try XCTUnwrap(service.sandboxHomeDirectory)
+        let loginHome = makeSandboxDirectory()
+        let defaultAuthPath = (sandbox as NSString).appendingPathComponent(".codex/auth.json")
+        let loginAuthPath = (loginHome as NSString).appendingPathComponent(".codex/auth.json")
+        let accountAuthPath = (service.effectiveMulticodexHomePath() as NSString)
+            .appendingPathComponent("accounts/alpha/auth.json")
+
+        try writeText("{\"tokens\":{\"access_token\":\"external\"}}\n", to: defaultAuthPath)
+        try writeText("{\"tokens\":{\"access_token\":\"sandbox\"}}\n", to: loginAuthPath)
+
+        _ = try await service.importAuth(fromHome: loginHome, into: "alpha")
+
+        let defaultAfter = try String(contentsOfFile: defaultAuthPath, encoding: .utf8)
+        let accountAfter = try String(contentsOfFile: accountAuthPath, encoding: .utf8)
+        XCTAssertTrue(defaultAfter.contains("external"))
+        XCTAssertTrue(accountAfter.contains("sandbox"))
+    }
+
     func testAccountConfigStoreRejectsLegacyVersion1Format() throws {
         let json = """
         {

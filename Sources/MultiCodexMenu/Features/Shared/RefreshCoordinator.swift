@@ -4,7 +4,7 @@ private enum RefreshCoordinator {}
 
 extension AccountsMenuViewModel {
     func performRefresh(refreshLive: Bool, allowAutoSwitch: Bool = true) async {
-        if pendingInteractiveLoginAccount != nil {
+        if pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion {
             return
         }
 
@@ -14,6 +14,7 @@ extension AccountsMenuViewModel {
 
         isRefreshing = true
         let previousAccounts = accounts
+        var fetchedAccounts: AccountsListPayload?
         var switchRecommendation: AccountSwitchRecommendation?
         defer {
             isRefreshing = false
@@ -23,11 +24,22 @@ extension AccountsMenuViewModel {
         }
 
         do {
-            let fetchedAccounts = try await accountService.fetchAccounts()
+            let accountsPayload = try await accountService.fetchAccounts()
+            fetchedAccounts = accountsPayload
+            accounts = AccountUsageMergeService.mergeAccounts(
+                accounts: accountsPayload,
+                limits: LimitsPayload(results: [], errors: []),
+                previousAccounts: previousAccounts
+            )
+            if let focused = focusedAccountName, !accounts.contains(where: { $0.name == focused }) {
+                focusedAccountName = nil
+            }
+            syncSelectedSettingsAccount()
+
             let limits = try await accountService.fetchLimits(refreshLive: refreshLive)
 
             accounts = AccountUsageMergeService.mergeAccounts(
-                accounts: fetchedAccounts,
+                accounts: accountsPayload,
                 limits: limits,
                 previousAccounts: previousAccounts
             )
@@ -51,14 +63,24 @@ extension AccountsMenuViewModel {
                 lastRefreshError = nil
                 refreshWarningMessage = nil
             } else {
-                let count = limits.errors.count
-                let suffix = count == 1 ? "account" : "accounts"
                 lastRefreshError = nil
-                refreshWarningMessage = "Showing latest data. Could not refresh \(count) \(suffix)."
+                refreshWarningMessage = formatRefreshWarning(from: limits.errors)
             }
         } catch {
             cliResolutionHint = accountService.resolutionHint
-            if previousAccounts.isEmpty {
+            if let fetchedAccounts {
+                accounts = AccountUsageMergeService.mergeAccounts(
+                    accounts: fetchedAccounts,
+                    limits: LimitsPayload(results: [], errors: []),
+                    previousAccounts: previousAccounts
+                )
+                if let focused = focusedAccountName, !accounts.contains(where: { $0.name == focused }) {
+                    focusedAccountName = nil
+                }
+                syncSelectedSettingsAccount()
+                lastRefreshError = nil
+                refreshWarningMessage = "Loaded accounts, but usage refresh failed: \(error.localizedDescription)"
+            } else if previousAccounts.isEmpty {
                 lastRefreshError = error.localizedDescription
                 refreshWarningMessage = nil
             } else {
@@ -102,27 +124,28 @@ extension AccountsMenuViewModel {
     }
 
     func handleDidBecomeActive() {
-        guard let pendingAccount = pendingInteractiveLoginAccount else {
+        guard let session = pendingInteractiveLoginSession, session.phase == .waitingForExternalCompletion else {
             refreshLive()
             return
         }
 
-        pendingInteractiveLoginAccount = nil
-        focusedAccountName = pendingAccount
-        runAccountAction(for: pendingAccount) {
-            _ = try await self.accountService.importDefaultAuth(into: pendingAccount)
-            let status = try await self.accountService.fetchStatus(name: pendingAccount)
-            return self.statusOutcome(
-                for: pendingAccount,
-                status: status,
-                successFallback: "Login synced to \(pendingAccount). You can rename it anytime."
-            )
-        }
+        resumePendingInteractiveLogin(session)
     }
 
     func refreshRuntimeProbe() {
         let probe = accountService.probeRuntime()
         isCodexRuntimeAvailable = probe.isAvailable
         runtimeProbeSummary = probe.summary
+    }
+
+    func formatRefreshWarning(from errors: [LimitsErrorEntry]) -> String {
+        let previews = errors.prefix(2).map { "\($0.account): \($0.message)" }
+        let suffix: String
+        if errors.count > previews.count {
+            suffix = " (+\(errors.count - previews.count) more)"
+        } else {
+            suffix = ""
+        }
+        return "Some accounts could not refresh. " + previews.joined(separator: " | ") + suffix
     }
 }

@@ -13,10 +13,12 @@ protocol CodexAccountServicing: AnyObject {
     func removeAccount(name: String, deleteData: Bool) async throws -> RemoveAccountPayload
     func renameAccount(from oldName: String, to newName: String) async throws -> RenameAccountPayload
     func importDefaultAuth(into name: String) async throws -> ImportAccountPayload
+    func importAuth(fromHome homePath: String, into name: String) async throws -> ImportAccountPayload
     func fetchStatus(name: String) async throws -> AccountStatusPayload
-    func openLoginInTerminal(account name: String) throws
-    func openNewAccountLoginInTerminal(newAccountName name: String) throws
-    func loginInApp(account name: String, createIfNeeded: Bool) async throws -> String
+    func fetchStatusForLoginHome(_ homePath: String, accountName: String) async throws -> AccountStatusPayload
+    func openLoginInTerminal(account name: String, loginHome: String?) throws
+    func openNewAccountLoginInTerminal(newAccountName name: String, loginHome: String?) throws
+    func loginInApp(account name: String, createIfNeeded: Bool, loginHome: String?) async throws -> String
     func effectiveMulticodexHomePath() -> String
     func probeRuntime() -> CodexAccountService.RuntimeProbe
 }

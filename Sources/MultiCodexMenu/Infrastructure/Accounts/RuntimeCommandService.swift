@@ -32,12 +32,12 @@ extension CodexAccountService {
         }
     }
 
-    func makeTerminalCodexLoginCommand(accountName: String, firstTime: Bool) throws -> String {
+    func makeTerminalCodexLoginCommand(accountName: String, firstTime: Bool, loginHome: String? = nil) throws -> String {
         let appName = shellQuote("MultiCodex")
         let account = shellQuote(accountName)
-        let codexLoginCommand = try makeCodexShellCommand(arguments: ["login"])
+        let codexLoginCommand = try makeCodexShellCommand(arguments: ["login"], loginHome: loginHome)
 
-        var lines = terminalPreambleLines()
+        var lines = terminalPreambleLines(loginHome: loginHome)
         if firstTime {
             lines.append("echo \"Starting first-time MultiCodex login...\"")
             lines.append("echo \"Account \(account) is ready and can be renamed later in Settings.\"")
@@ -81,8 +81,8 @@ extension CodexAccountService {
         resolutionHint = hint
     }
 
-    func runCodexCapture(arguments: [String]) throws -> ProcessResult {
-        let context = try resolvedRuntimeContext()
+    func runCodexCapture(arguments: [String], loginHome: String? = nil) throws -> ProcessResult {
+        let context = try resolvedRuntimeContext(loginHome: loginHome)
         return try CodexCommandRunner.runSync(
             runtime: context.runtime,
             arguments: arguments,
@@ -90,8 +90,8 @@ extension CodexAccountService {
         )
     }
 
-    func runCodexCaptureAsync(arguments: [String]) async throws -> ProcessResult {
-        let context = try resolvedRuntimeContext()
+    func runCodexCaptureAsync(arguments: [String], loginHome: String? = nil) async throws -> ProcessResult {
+        let context = try resolvedRuntimeContext(loginHome: loginHome)
         return try await CodexCommandRunner.runAsync(
             runtime: context.runtime,
             arguments: arguments,
@@ -99,16 +99,17 @@ extension CodexAccountService {
         )
     }
 
-    func makeCodexShellCommand(arguments: [String]) throws -> String {
-        let runtime = try resolveCodexRuntime()
+    func makeCodexShellCommand(arguments: [String], loginHome: String? = nil) throws -> String {
+        let environment = baseEnvironment(loginHome: loginHome)
+        let runtime = try resolveCodexRuntime(environment: environment)
         let parts = [runtime.executableURL.path] + runtime.prefixArguments + arguments
         return parts.map(shellQuote).joined(separator: " ")
     }
 
-    func baseEnvironment() -> [String: String] {
+    func baseEnvironment(loginHome: String? = nil) -> [String: String] {
         var env = processEnvironmentProvider()
         env["PATH"] = mergedExecutableSearchPath(for: env)
-        applySandboxEnvironment(to: &env)
+        applySandboxEnvironment(to: &env, loginHome: loginHome)
         return env
     }
 
@@ -120,14 +121,14 @@ extension CodexAccountService {
         ])
     }
 
-    func applySandboxEnvironment(to env: inout [String: String]) {
-        let paths = currentPaths()
+    func applySandboxEnvironment(to env: inout [String: String], loginHome: String? = nil) {
+        let paths = currentPaths(loginHome: loginHome)
         env["HOME"] = paths.homeDir
         env["MULTICODEX_HOME"] = paths.multicodexHome
     }
 
-    func terminalPreambleLines() -> [String] {
-        let paths = currentPaths()
+    func terminalPreambleLines(loginHome: String? = nil) -> [String] {
+        let paths = currentPaths(loginHome: loginHome)
         let shellPath = mergedExecutableSearchPath(for: processEnvironmentProvider())
         return [
             "export PATH=\(shellQuote(shellPath))",
@@ -136,8 +137,8 @@ extension CodexAccountService {
         ]
     }
 
-    private func resolvedRuntimeContext() throws -> (runtime: CodexRuntime, environment: [String: String]) {
-        let environment = baseEnvironment()
+    private func resolvedRuntimeContext(loginHome: String? = nil) throws -> (runtime: CodexRuntime, environment: [String: String]) {
+        let environment = baseEnvironment(loginHome: loginHome)
         let runtime = try resolveCodexRuntime(environment: environment)
         return (runtime, environment)
     }

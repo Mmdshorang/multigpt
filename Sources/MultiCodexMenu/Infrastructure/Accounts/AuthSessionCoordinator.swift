@@ -4,10 +4,11 @@ import Foundation
 // AuthSessionCoordinator + storage
 extension CodexAccountService {
 
-    func currentPaths() -> PathContext {
+    func currentPaths(loginHome: String? = nil) -> PathContext {
         let processEnvironment = ProcessInfo.processInfo.environment
         let home = firstNonEmptyPath(
             fallback: NSHomeDirectory(),
+            loginHome,
             sandboxHomeDirectory,
             processEnvironment["HOME"]
         )
