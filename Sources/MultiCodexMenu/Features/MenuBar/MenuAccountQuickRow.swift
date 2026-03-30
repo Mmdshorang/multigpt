@@ -52,6 +52,13 @@ struct MenuAccountQuickRow: View {
                     .foregroundStyle(.secondary)
                 }
 
+                if row.connectionState != .connected, let hint = row.account.connectionHint {
+                    Text(hint)
+                        .font(.caption2)
+                        .foregroundStyle(AccountPresentation.statusColor(for: row.connectionState))
+                        .lineLimit(2)
+                }
+
                 Spacer(minLength: 8)
 
                 if isSelected, row.primaryAction != .none {
@@ -98,7 +105,7 @@ struct MenuAccountQuickRow: View {
                         )
                     }
 
-                    if let hint = row.account.connectionHint {
+                    if row.connectionState == .connected, let hint = row.account.connectionHint {
                         Text(hint)
                             .font(.caption2)
                             .foregroundStyle(AccountPresentation.statusColor(for: row.connectionState))

@@ -299,6 +299,13 @@ extension SettingsContentView {
                     Text(account.connectionState.label)
                         .font(.caption2)
                         .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
+
+                    if account.connectionState != .connected, let hint = account.connectionHint {
+                        Text(hint)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                 }
 
                 Spacer(minLength: 8)
@@ -405,6 +412,25 @@ extension SettingsContentView {
                     symbol: "info.circle.fill",
                     text: hint,
                     color: AccountPresentation.statusColor(for: account.connectionState)
+                )
+            }
+
+            if let detail = account.connectionDetail {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(account.connectionState == .error ? "Latest issue" : "Login status")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
+
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(AccountPresentation.statusColor(for: account.connectionState).opacity(0.08))
                 )
             }
         }

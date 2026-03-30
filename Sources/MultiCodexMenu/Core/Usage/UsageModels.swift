@@ -120,6 +120,13 @@ struct AccountUsage: Identifiable {
         return String(value[..<end]) + "..."
     }
 
+    var lastLoginStatusDetail: String? {
+        guard let value = lastLoginStatus?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
     var lastUsedLabel: String {
         guard let raw = lastUsedAt else {
             return "never"
@@ -156,6 +163,23 @@ struct AccountUsage: Identifiable {
                 return "Error: \(usageError)"
             }
             return "Error: refresh failed."
+        }
+    }
+
+    var connectionDetail: String? {
+        switch connectionState {
+        case .connected:
+            return nil
+        case .needsLogin:
+            if let status = lastLoginStatusDetail, !status.isEmpty {
+                return status
+            }
+            return "No active auth was found for this account."
+        case .error:
+            if let usageError, !usageError.isEmpty {
+                return usageError
+            }
+            return "The latest refresh failed."
         }
     }
 }

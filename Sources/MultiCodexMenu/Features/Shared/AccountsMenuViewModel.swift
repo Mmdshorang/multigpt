@@ -405,8 +405,24 @@ final class AccountsMenuViewModel: ObservableObject {
         runSwitchAction(named: name) {
             try await self.accountService.switchAccount(name: name)
             self.lastRefreshError = nil
+            self.accounts = self.accounts.map { account in
+                AccountUsage(
+                    name: account.name,
+                    isCurrent: account.name == name,
+                    hasAuth: account.hasAuth,
+                    lastUsedAt: account.lastUsedAt,
+                    lastLoginStatus: account.lastLoginStatus,
+                    usage: account.usage,
+                    source: account.source,
+                    usageError: account.usageError
+                )
+            }
+            self.focusedAccountName = name
+            self.syncSelectedSettingsAccount()
             self.setAccountFeedback(message: "Now using \(name).", error: nil)
-            await self.performRefresh(refreshLive: true, allowAutoSwitch: false)
+            Task { @MainActor in
+                await self.performRefresh(refreshLive: false, allowAutoSwitch: false)
+            }
         }
     }
 
