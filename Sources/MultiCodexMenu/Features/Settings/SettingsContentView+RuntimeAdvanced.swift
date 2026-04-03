@@ -198,50 +198,13 @@ extension SettingsContentView {
             VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Advanced",
-                    description: "Debug and sandbox controls."
+                    description: "Low-level diagnostics and maintenance tools."
                 )
 
-#if DEBUG
-                Toggle(isOn: testConfigToggleBinding) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Use Test Config Directory")
-                            .font(.subheadline.weight(.semibold))
-                        Text("Toggle between the real config directory and an isolated temporary sandbox.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.switch)
-                .disabled(isAccountActionRunning)
-
-                if viewModel.isUsingTemporaryAuthSandbox {
-                    if let sandbox = viewModel.temporaryAuthSandboxHome, !sandbox.isEmpty {
-                        settingsInfoRow(symbol: "folder", text: "\(sandbox)/.config/multicodex")
-                    }
-
-                    HStack(spacing: 6) {
-                        ActionPillButton(title: "Reset Sandbox", symbol: "arrow.clockwise") {
-                            viewModel.resetTemporaryAuthSandbox()
-                        }
-                        .disabled(isAccountActionRunning)
-
-                        ActionPillButton(title: "Open Folder", symbol: "folder") {
-                            viewModel.openTemporaryAuthSandboxDirectory()
-                        }
-
-                        ActionPillButton(title: "Use Real Config", symbol: "xmark.circle") {
-                            viewModel.setTemporaryAuthSandboxEnabled(false)
-                        }
-                        .disabled(isAccountActionRunning)
-                    }
-                } else {
-                    settingsInfoRow(symbol: "house", text: "Currently using the real config at ~/.config/multicodex")
-                }
-#else
-                Text("Advanced test tooling is only available in debug builds.")
+                Text("Advanced debug sandbox controls were removed as part of the simplification pass. Use Troubleshooting for refresh and runtime diagnostics.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-#endif
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

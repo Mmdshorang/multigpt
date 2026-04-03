@@ -69,11 +69,6 @@ final class CodexAccountService {
 
     typealias CodexRuntime = CodexRuntimeDescriptor
 
-    struct RuntimeProbe {
-        let isAvailable: Bool
-        let summary: String
-    }
-
     enum ExistingAccountBehavior {
         case ignore
         case fail

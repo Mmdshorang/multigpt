@@ -25,7 +25,7 @@ struct SettingsContentView: View {
         .onAppear {
             codexPathDraft = viewModel.customCodexPath
             syncRenameDrafts()
-            if viewModel.selectedSettingsSection == .advanced, !viewModel.isAdvancedSettingsVisible {
+            if viewModel.selectedSettingsSection == .advanced {
                 viewModel.setAdvancedSettingsVisible(true)
             }
         }

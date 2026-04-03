@@ -2,8 +2,6 @@ import Foundation
 
 protocol CodexAccountServicing: AnyObject {
     var customCodexPath: String? { get set }
-    var sandboxHomeDirectory: String? { get set }
-    var sandboxMulticodexHomeDirectory: String? { get set }
     var limitsCacheTTLSeconds: Int { get set }
     var resolutionHint: String? { get }
 
@@ -20,7 +18,7 @@ protocol CodexAccountServicing: AnyObject {
     func openNewAccountLoginInTerminal(newAccountName name: String, loginHome: String?) throws
     func loginInApp(account name: String, createIfNeeded: Bool, loginHome: String?) async throws -> String
     func effectiveMulticodexHomePath() -> String
-    func probeRuntime() -> CodexAccountService.RuntimeProbe
+    func probeRuntime() -> RuntimeProbe
 }
 
 extension CodexAccountService: CodexAccountServicing {}

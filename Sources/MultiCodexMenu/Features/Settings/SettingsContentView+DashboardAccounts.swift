@@ -115,13 +115,7 @@ extension SettingsContentView {
                             }
                         }
                     case .done:
-                        ActionPillButton(title: "Finish", symbol: "checkmark.circle.fill", role: .primary) {
-                            viewModel.markOnboardingCompleted()
-                        }
-                    }
-
-                    ActionPillButton(title: "Reset Wizard", symbol: "arrow.counterclockwise") {
-                        viewModel.resetOnboardingProgress()
+                        EmptyView()
                     }
                 }
             }

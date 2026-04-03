@@ -474,50 +474,6 @@ final class AccountsMenuViewModelTests: XCTestCase {
         )
     }
 
-    func testTemporaryAuthSandboxToggleUpdatesEnvironmentAndPreferences() async throws {
-        let defaults = ephemeralDefaults()
-        let service = MockCodexAccountService()
-        let viewModel = AccountsMenuViewModel(
-            accountService: service,
-            fileManager: .default,
-            preferences: AppPreferencesStore(defaults: defaults),
-            startImmediately: false
-        )
-
-        viewModel.setTemporaryAuthSandboxEnabled(true)
-
-        await waitUntil(timeoutSeconds: 1.0) {
-            viewModel.isUsingTemporaryAuthSandbox && service.sandboxHomeDirectory != nil
-        }
-
-        XCTAssertTrue(viewModel.isUsingTemporaryAuthSandbox)
-        let sandboxHome = try XCTUnwrap(viewModel.temporaryAuthSandboxHome)
-        XCTAssertEqual(service.sandboxHomeDirectory, sandboxHome)
-        XCTAssertEqual(
-            service.sandboxMulticodexHomeDirectory,
-            (sandboxHome as NSString).appendingPathComponent(".config/multicodex")
-        )
-        XCTAssertTrue(
-            FileManager.default.fileExists(
-                atPath: (sandboxHome as NSString).appendingPathComponent(".config/multicodex")
-            )
-        )
-
-        let persistedEnabled = AppPreferencesStore(defaults: defaults)
-        XCTAssertTrue(persistedEnabled.temporaryAuthSandboxEnabled)
-        XCTAssertEqual(persistedEnabled.temporaryAuthSandboxHome, sandboxHome)
-
-        viewModel.setTemporaryAuthSandboxEnabled(false)
-        await waitUntil(timeoutSeconds: 1.0) {
-            !viewModel.isUsingTemporaryAuthSandbox
-        }
-
-        XCTAssertNil(service.sandboxHomeDirectory)
-        XCTAssertNil(service.sandboxMulticodexHomeDirectory)
-        let persistedDisabled = AppPreferencesStore(defaults: defaults)
-        XCTAssertFalse(persistedDisabled.temporaryAuthSandboxEnabled)
-    }
-
     func testStartLoginFlowFallsBackToTerminalAndRecoversOnAppActive() async {
         let defaults = ephemeralDefaults()
         let service = MockCodexAccountService()
@@ -654,7 +610,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
     func testOnboardingStateTransitionsMatrix() async {
         let runtimeOffService = MockCodexAccountService()
-        runtimeOffService.probeRuntimeResult = CodexAccountService.RuntimeProbe(isAvailable: false, summary: "missing runtime")
+        runtimeOffService.probeRuntimeResult = RuntimeProbe(isAvailable: false, summary: "missing runtime")
         let runtimeOff = AccountsMenuViewModel(
             accountService: runtimeOffService,
             fileManager: .default,
@@ -664,7 +620,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(runtimeOff.onboardingState.step, .runtime)
 
         let emptyService = MockCodexAccountService()
-        emptyService.probeRuntimeResult = CodexAccountService.RuntimeProbe(isAvailable: true, summary: "ok")
+        emptyService.probeRuntimeResult = RuntimeProbe(isAvailable: true, summary: "ok")
         let empty = AccountsMenuViewModel(
             accountService: emptyService,
             fileManager: .default,
@@ -758,8 +714,6 @@ private final class MockCodexAccountService: CodexAccountServicing {
     }
 
     var customCodexPath: String?
-    var sandboxHomeDirectory: String?
-    var sandboxMulticodexHomeDirectory: String?
     var limitsCacheTTLSeconds: Int = CodexAccountService.defaultLimitsCacheTTLSeconds
     var resolutionHint: String?
     var stubbedAccounts: [AccountEntry] = []
@@ -778,7 +732,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var loginHomeStatusError: Error?
     var loginHomeStatusExitCode = 0
     var loginHomeStatusOutput = "ok"
-    var probeRuntimeResult = CodexAccountService.RuntimeProbe(isAvailable: true, summary: "ok")
+    var probeRuntimeResult = RuntimeProbe(isAvailable: true, summary: "ok")
 
     private(set) var switchCalls: [String] = []
     private(set) var removeCalls: [RemoveCall] = []
@@ -915,7 +869,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
         "/tmp"
     }
 
-    func probeRuntime() -> CodexAccountService.RuntimeProbe {
+    func probeRuntime() -> RuntimeProbe {
         probeRuntimeResult
     }
 }
