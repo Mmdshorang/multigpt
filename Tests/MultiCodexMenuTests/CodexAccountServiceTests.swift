@@ -143,8 +143,8 @@ final class CodexAccountServiceTests: XCTestCase {
 
         let gammaMetaPath = (service.effectiveMulticodexHomePath() as NSString).appendingPathComponent("accounts/gamma/meta.json")
         let gammaMetaData = try XCTUnwrap(FileManager.default.contents(atPath: gammaMetaPath))
-        let gammaMeta = try JSONSerialization.jsonObject(with: gammaMetaData) as? [String: Any]
-        XCTAssertNotNil(gammaMeta?["updatedAt"] as? String)
+        let gammaMeta = try JSONDecoder().decode(CodexAccountService.AccountMeta.self, from: gammaMetaData)
+        XCTAssertNotNil(gammaMeta.updatedAt)
 
         let removedAlphaDir = (service.effectiveMulticodexHomePath() as NSString).appendingPathComponent("accounts/alpha")
         XCTAssertFalse(FileManager.default.fileExists(atPath: removedAlphaDir))

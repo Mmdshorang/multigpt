@@ -51,7 +51,10 @@ final class AppPreferencesStoreTests: XCTestCase {
 
     private func ephemeralDefaults() -> UserDefaults {
         let suite = "MultiCodexTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            XCTFail("Could not create isolated UserDefaults suite: \(suite)")
+            return .standard
+        }
         defaults.removePersistentDomain(forName: suite)
         return defaults
     }
