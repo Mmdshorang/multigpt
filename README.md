@@ -1,36 +1,34 @@
 # MultiCodex (macOS Menu Bar App)
 
-Native macOS SwiftUI menu bar app for managing multiple Codex accounts.
+Native macOS SwiftUI menu bar app for managing multiple coding agent accounts/profiles.
 
 ## What It Does
 
-- Shows 5h and weekly usage in a compact menu bar view.
-- Lets you switch accounts and re-login when an account needs auth.
-- Opens browser-based `codex login` flows through Terminal.
-- Provides account operations in Settings: use, rename, remove, import auth, and status check.
+- Shows 5h and weekly usage in a compact menu bar view for agents that expose usage.
+- Lets you switch accounts/profiles and re-login when an account needs auth.
+- Opens browser-based `codex login` flows through Terminal and supports pi profile login flows.
+- Provides account/profile operations in Settings: use, rename, remove, import auth, status check, and runtime selection.
 - Uses a fully native Swift runtime (no bundled JavaScript CLI runtime).
 
 ## Architecture
 
 The app stays in a single SwiftPM executable target and is organized into clear layers:
 
-- `Sources/MultiCodexMenu/App`
+- `Sources/MultiCodex/App`
   - App lifecycle and top-level scene wiring.
-- `Sources/MultiCodexMenu/Core/Accounts`
+- `Sources/MultiCodex/Core/Accounts`
   - Account-focused domain payloads, UI state models, merge policy, alert prioritization.
-- `Sources/MultiCodexMenu/Core/Usage`
+- `Sources/MultiCodex/Core/Usage`
   - Usage/rate-limit models and formatting helpers.
-- `Sources/MultiCodexMenu/Infrastructure/Accounts`
-  - Account config/auth persistence, preferences, and account service facade.
-- `Sources/MultiCodexMenu/Infrastructure/Runtime`
-  - Codex runtime resolution and process execution.
-- `Sources/MultiCodexMenu/Infrastructure/Usage`
-  - Usage API request builders, RPC helpers, and limits cache codecs.
-- `Sources/MultiCodexMenu/Features/MenuBar`
+- `Sources/MultiCodex/Infrastructure/Codex`
+  - Codex-specific auth/runtime/usage implementations.
+- `Sources/MultiCodex/Infrastructure/Preferences`
+  - App preference persistence.
+- `Sources/MultiCodex/Features/MenuBar`
   - Menu bar content and status UI.
-- `Sources/MultiCodexMenu/Features/Settings`
+- `Sources/MultiCodex/Features/Settings`
   - Settings screens and account management UI.
-- `Sources/MultiCodexMenu/Features/Shared`
+- `Sources/MultiCodex/Features/Shared`
   - Shared view model and reusable UI presentation components.
 
 ## Simplification Notes
@@ -48,7 +46,7 @@ This cleanup intentionally favors simpler internals over legacy compatibility br
 
 - macOS 13+
 - Xcode 15+ (or Swift 5.9+ toolchain)
-- `codex` CLI available in `PATH` (or set custom path in app Settings)
+- `codex` CLI available in `PATH` for Codex support and `pi` CLI available in `PATH` for Pi support (or set custom paths in app Settings)
 - `just` (recommended)
 
 ## Development

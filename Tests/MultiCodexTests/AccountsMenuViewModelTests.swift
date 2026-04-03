@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import MultiCodexMenu
+@testable import MultiCodex
 
 @MainActor
 final class AccountsMenuViewModelTests: XCTestCase {

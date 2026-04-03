@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct MultiCodexMenuApp: App {
+struct MultiCodexApp: App {
     @NSApplicationDelegateAdaptor(MultiCodexAppDelegate.self) private var appDelegate
     @StateObject private var viewModel = AccountsMenuViewModel()
 

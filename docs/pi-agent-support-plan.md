@@ -1,17 +1,29 @@
 # Plan: Add Support for Pi Coding Agent
 
-Status: Draft for review only. No implementation yet.
+Status: Partially implemented. The Codex-first refactor is complete and the multi-agent abstraction / Pi scaffold is underway.
+
+## Current baseline
+
+The prerequisite Codex-first refactor has now been completed:
+- Codex infrastructure has been reorganized into clearer subsystems
+- `AccountsMenuViewModel` responsibilities have been split into dedicated controllers
+- onboarding / advanced-settings / temporary sandbox complexity has been reduced
+- the codebase now has cleaner seams for future multi-agent support
+
+This means the project is now ready to move from "refactor first" into "introduce multi-agent abstractions, then add pi".
 
 ## Goal
 
 Add support for coding agents beyond Codex CLI, starting with **pi coding agent**, while preserving current Codex behavior.
 
-This phase is for:
-- understanding pi auth/runtime behavior
-- defining the architecture
-- agreeing on an implementation plan
+This phase started as architecture/design work and is now actively being implemented.
 
-This phase is **not** for writing production code yet.
+Current implementation scope:
+- generic agent abstraction
+- Codex adapter behind the generic boundary
+- Pi runtime/profile/login scaffolding
+- capability-aware UI and preferences
+- tests and compatibility migrations
 
 ---
 
@@ -104,17 +116,20 @@ Therefore:
 
 ## Current app architecture observations
 
-The current app is heavily Codex-specific.
+The app is still operationally Codex-first, but it is no longer as tightly entangled as before.
 
-Main Codex-bound areas:
-- `Sources/MultiCodexMenu/Infrastructure/Accounts/CodexAccountService.swift`
-- `Sources/MultiCodexMenu/Infrastructure/Accounts/RuntimeCommandService.swift`
-- `Sources/MultiCodexMenu/Infrastructure/Runtime/CodexRuntimeResolver.swift`
-- `Sources/MultiCodexMenu/Infrastructure/Accounts/RateLimitsFetcher.swift`
-- settings/UI copy referring directly to `codex`
-- persisted preference key `customCodexPath`
+Main Codex-bound areas now live under clearer boundaries:
+- `Sources/MultiCodex/Infrastructure/Codex/Accounts/CodexAccountService.swift`
+- `Sources/MultiCodex/Infrastructure/Codex/Runtime/RuntimeCommandService.swift`
+- `Sources/MultiCodex/Infrastructure/Codex/Runtime/CodexRuntimeResolver.swift`
+- `Sources/MultiCodex/Infrastructure/Codex/Usage/RateLimitsFetcher.swift`
+- settings/UI copy still contains some `codex`-specific wording
+- persisted preference keying still includes `customCodexPath`
 
-This means adding pi cleanly should start with an abstraction layer, not ad hoc branching inside existing Codex-only services.
+Important implication:
+- the refactor removed major structural blockers
+- but the app model is still single-agent in its domain language
+- so pi should still be added through an explicit abstraction layer, not by sprinkling `if agent == pi` branches across Codex services
 
 ---
 
@@ -312,63 +327,88 @@ We should avoid promising that pi auth is fully validated unless we find a relia
 
 ## Proposed implementation phases
 
-## Phase 0 — Finalize design
+## Phase 0 — Confirm the remaining product decisions
 
 Goal:
-- align on architecture and scope before code changes
+- lock the few decisions that affect data model and UX before coding the abstraction layer
 
-Deliverables:
-- approved plan
-- decisions on v1 switch strategy
+Status:
+- prerequisite architecture refactor is complete
+- this is now the only planning gate left before implementation
 
-Open decisions:
+Remaining decisions to confirm:
 1. Should pi switching update the global default `~/.pi/agent/auth.json`, or only work via profile-specific launching?
 2. Should v1 store only `auth.json`, or full pi profile directories?
 3. Should the UI expose both Codex and pi in the same account list, or separate by agent?
+4. Confirm again that pi usage metrics remain out of scope for v1.
 
-## Phase 1 — Introduce generic agent abstraction
+## Phase 1 — Introduce the neutral multi-agent domain layer
 
 Goal:
-- decouple app logic from Codex-specific services
+- move the app from a Codex-shaped domain model to an agent-shaped domain model without changing user-visible Codex behavior
 
 Tasks:
 - define `AgentKind`
-- define `CodingAgentServicing`
 - define `AgentCapabilities`
-- adapt orchestration/view model to capabilities rather than Codex assumptions
-- preserve existing Codex behavior behind the new interface
+- define a generic agent service protocol, likely replacing direct use of `CodexAccountServicing` at the feature boundary
+- introduce shared agent-facing models for runtime status, account/profile summaries, auth state, and supported actions
+- keep Codex as the first adapter behind the new interface
+
+Notes:
+- this should happen at the feature/domain boundary first
+- Codex internals do not need to be fully rewritten immediately if an adapter layer can preserve behavior cleanly
 
 Non-goal:
-- no pi behavior yet beyond scaffolding
+- no pi behavior yet beyond scaffolding and compile-safe abstraction points
 
-## Phase 2 — Generalize preferences and runtime settings
+## Phase 2 — Generalize preferences, naming, and settings surface
 
 Goal:
-- persist selected agent and runtime path cleanly
+- remove remaining single-agent assumptions from app preferences and visible settings
 
 Tasks:
 - add selected agent preference
-- replace single `customCodexPath` concept with either:
-  - per-agent runtime path, or
-  - generic runtime path keyed by agent
-- update settings UI copy from `codex`-specific to generic agent wording
-- maintain backward compatibility for existing Codex path preference
+- replace `customCodexPath` with either per-agent runtime path storage or a generic runtime-path map keyed by agent
+- add one-time migration from existing Codex path preference into the new structure
+- update settings labels and helper copy from `codex`-specific wording to agent-aware wording where appropriate
+- keep any Codex-specific labels only where the functionality is truly Codex-only
 
-## Phase 3 — Implement pi runtime integration
+Likely outputs:
+- generic runtime settings model
+- selected-agent persistence
+- thinner UI branching through capabilities
+
+## Phase 3 — Add a Codex adapter behind the generic interface
 
 Goal:
-- detect and launch pi reliably
+- prove the abstraction against the existing implementation before introducing pi
 
 Tasks:
-- create `PiRuntimeResolver`
-- runtime probe via `pi --version`
-- support custom path + PATH lookup
-- reuse process runner infrastructure where possible
+- wrap the current Codex service stack in a generic agent adapter
+- map Codex capabilities explicitly
+- ensure auto-switching, login, removal, usage, and status behaviors continue to work unchanged
+- keep all current tests green, updating only where they now target the generic boundary instead of Codex-only types
 
-## Phase 4 — Implement pi profile storage
+Why this phase matters:
+- it validates the abstraction with the known integration first
+- it reduces the risk that pi design pressures distort the existing working Codex flow
+
+## Phase 4 — Implement pi runtime integration
 
 Goal:
-- manage isolated pi profiles inside MultiCodex storage
+- detect and launch pi reliably through the same generic agent boundary
+
+Tasks:
+- create a `PiRuntimeResolver`
+- probe runtime via `pi --version`
+- support custom path plus PATH lookup
+- add a pi runtime descriptor / launcher layer
+- reuse process-running infrastructure where possible, but do not force pi into Codex-specific command assumptions
+
+## Phase 5 — Implement pi profile storage
+
+Goal:
+- manage isolated pi profiles inside MultiCodex storage in a way that avoids undocumented auth-schema coupling
 
 Tasks:
 - define storage layout for pi profiles
@@ -379,49 +419,68 @@ Tasks:
 Recommended stored unit:
 - full profile directory, not only extracted auth tokens
 
-## Phase 5 — Implement pi login flow
+Recommended storage shape:
+
+```text
+<multicodex-home>/agents/pi/accounts/<name>/pi-agent/
+  auth.json
+  settings.json
+  models.json
+  sessions/
+```
+
+## Phase 6 — Implement pi login and reauthentication flow
 
 Goal:
-- allow creating or reauthenticating a pi profile
+- allow creating or reconnecting a pi profile safely
 
 Tasks:
 - create/login target profile directory
 - launch pi with `PI_CODING_AGENT_DIR=<profile dir>`
 - guide user to complete `/login`
-- mark profile as connected when `auth.json` appears
+- treat `auth.json` as opaque provider-managed state
+- mark profile as connected when expected profile files appear
 
-## Phase 6 — Implement pi switching
+Notes:
+- v1 should assume interactive login
+- we should not depend on undocumented non-interactive OAuth internals
+
+## Phase 7 — Implement pi switching
 
 Goal:
-- switch active pi profile according to chosen strategy
+- switch active pi profile according to the selected product strategy
 
 If using profile-managed launch:
 - store selected pi profile
-- ensure app-launched pi sessions use that profile dir
+- ensure app-launched pi sessions use that profile directory
+- make it clear that external terminal launches of `pi` are unaffected unless launched through the app-managed environment
 
 If using auth sync:
 - copy selected profile `auth.json` into `~/.pi/agent/auth.json`
 - preserve permissions and atomicity
 - clearly message that the global pi auth was updated
+- consider whether `settings.json` and `models.json` are intentionally excluded in v1
 
-## Phase 7 — UI adaptation
+Current recommendation:
+- design for both
+- implement profile-managed launch first unless product requirements explicitly demand global pi switching
+
+## Phase 8 — UI adaptation
 
 Goal:
-- support multi-agent UX cleanly
+- support multi-agent UX cleanly with minimal unnecessary churn
 
 Tasks:
-- add agent selector in Settings or top-level UI
-- make runtime labels agent-aware
-- hide/disable unsupported usage UI for pi
-- make button labels agent-aware:
-  - Login with Codex
-  - Login with Pi
-- present capability-aware status messaging
+- add agent selector in Settings or another clear top-level location
+- make runtime labels and login actions agent-aware
+- hide or replace unsupported usage UI for pi with capability-aware messaging
+- ensure account/profile rows communicate the active agent clearly
+- preserve current Codex UX quality instead of flattening everything into the lowest common denominator
 
-## Phase 8 — Tests and migration
+## Phase 9 — Tests, migration, and rollout safety
 
 Goal:
-- protect current behavior and validate pi integration
+- protect existing Codex behavior while validating the new pi support and compatibility paths
 
 Tasks:
 - keep Codex tests passing
@@ -430,32 +489,41 @@ Tasks:
   - runtime resolution for pi
   - pi profile directory creation
   - `PI_CODING_AGENT_DIR` env setup
-  - switch behavior
+  - pi switching behavior
   - auth sync behavior if chosen
-- add migration test for old `customCodexPath`
+  - migration from legacy `customCodexPath`
+- add focused adapter-level tests around capabilities and generic orchestration
+- avoid broad UI snapshot churn unless truly needed
 
 ---
 
 ## Suggested file/module direction
 
-Possible future organization:
+Recommended future organization:
 
 ```text
-Sources/MultiCodexMenu/Infrastructure/Agents/
+Sources/MultiCodex/Core/Agents/
   AgentKind.swift
   AgentCapabilities.swift
+  AgentRuntimeModels.swift
+  AgentAccountModels.swift
   CodingAgentServicing.swift
 
-Sources/MultiCodexMenu/Infrastructure/Codex/
+Sources/MultiCodex/Infrastructure/Codex/
   ...existing codex-specific implementations...
+  CodexAgentAdapter.swift
 
-Sources/MultiCodexMenu/Infrastructure/Pi/
+Sources/MultiCodex/Infrastructure/Pi/
   PiAgentService.swift
   PiRuntimeResolver.swift
   PiProfileRepository.swift
+  PiProfileStorage.swift
 ```
 
-This is not mandatory, but the separation is recommended.
+Why this direction fits the current refactor state:
+- shared agent contracts belong in `Core`, not inside a specific integration folder
+- existing Codex code already lives under `Infrastructure/Codex/`
+- pi can be introduced as a parallel integration instead of an invasive rewrite
 
 ---
 
@@ -499,22 +567,30 @@ Mitigation:
 
 ## Recommended decisions to make before implementation
 
-Please review and decide:
+Please review and confirm:
 
 1. **Pi switch strategy**
    - A: profile-managed launching only
    - B: sync selected profile auth into default `~/.pi/agent/auth.json`
 
+   Recommendation: **A** for v1.
+
 2. **Pi storage granularity**
    - A: full isolated pi profile directory
    - B: only managed `auth.json`
+
+   Recommendation: **A** for v1.
 
 3. **UI model**
    - A: one app with selectable active agent
    - B: keep Codex and pi sections visually separate
 
+   Recommendation: **A**, while allowing capability-based differences within the shared experience.
+
 4. **v1 scope**
    - confirm that pi usage metrics are out of scope for initial release
+
+   Recommendation: **confirmed out of scope**.
 
 ---
 
@@ -522,21 +598,27 @@ Please review and decide:
 
 My recommendation is:
 
-- introduce a multi-agent abstraction first
+- now that the refactor is complete, begin the multi-agent work in two stages:
+  1. introduce the neutral agent abstraction and migrate Codex behind it
+  2. add pi as the first non-Codex adapter
 - implement pi as a **profile-based integration**
 - use `PI_CODING_AGENT_DIR` as the isolation mechanism
 - treat pi `auth.json` as opaque managed state
 - do **not** attempt usage/rate-limit support in v1
-- keep Codex fully backward compatible
+- keep Codex behavior fully backward compatible
+- prefer profile-managed launch over global auth syncing for the first release unless product requirements say otherwise
 
 ---
 
 ## Approval gate
 
-Before implementation starts, this plan should be:
+Before pi implementation starts, this plan should be:
 
 - reviewed
 - modified as needed
-- explicitly approved
+- explicitly approved on the remaining product decisions
 
-Only after approval should we move to code changes.
+The prerequisite refactor gate is complete. The next implementation step, once approved, is:
+- introduce the generic multi-agent abstraction layer
+- migrate Codex onto it
+- then implement pi behind that boundary

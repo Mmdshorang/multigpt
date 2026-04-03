@@ -1,7 +1,7 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 app_name := "MultiCodex"
-resource_bundle := "macos_MultiCodexMenu.bundle"
+resource_bundle := "macos_MultiCodex.bundle"
 build_root := "build"
 dist_dir := "build/dist"
 dmg_staging := "build/dmg-staging"

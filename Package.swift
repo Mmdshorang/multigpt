@@ -7,20 +7,20 @@ let package = Package(
         .macOS(.v13),
     ],
     products: [
-        .executable(name: "MultiCodex", targets: ["MultiCodexMenu"]),
+        .executable(name: "MultiCodex", targets: ["MultiCodex"]),
     ],
     targets: [
         .executableTarget(
-            name: "MultiCodexMenu",
-            path: "Sources/MultiCodexMenu",
+            name: "MultiCodex",
+            path: "Sources/MultiCodex",
             resources: [
                 .copy("Resources"),
             ]
         ),
         .testTarget(
-            name: "MultiCodexMenuTests",
-            dependencies: ["MultiCodexMenu"],
-            path: "Tests/MultiCodexMenuTests"
+            name: "MultiCodexTests",
+            dependencies: ["MultiCodex"],
+            path: "Tests/MultiCodexTests"
         ),
     ]
 )

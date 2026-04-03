@@ -1,5 +1,5 @@
 import XCTest
-@testable import MultiCodexMenu
+@testable import MultiCodex
 
 final class CodexAccountServiceTests: XCTestCase {
     func testNormalizedLimitsCacheTTLSecondsClampsBounds() {

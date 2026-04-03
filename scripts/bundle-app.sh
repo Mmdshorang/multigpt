@@ -3,7 +3,7 @@ set -euo pipefail
 
 configuration="${1:-debug}"
 app_name="MultiCodex"
-resource_bundle="macos_MultiCodexMenu.bundle"
+resource_bundle="macos_MultiCodex.bundle"
 app_bundle="build/dist/MultiCodex.app"
 default_bundle_id="org.swift.swiftpm.macos.MultiCodex"
 app_icon_icns="Assets/AppIcon.icns"

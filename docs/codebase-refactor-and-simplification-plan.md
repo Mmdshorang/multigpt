@@ -33,7 +33,7 @@ I reviewed the project structure, key runtime/auth/storage flows, and test distr
 The app is a single SwiftPM executable target:
 
 - `Package.swift`
-- one target: `MultiCodexMenu`
+- one target: `MultiCodex`
 
 This is fine at the package level, but inside the target there is already substantial complexity concentrated in a few files.
 
@@ -42,25 +42,25 @@ This is fine at the package level, but inside the target there is already substa
 Swift LOC totals from the repo:
 
 - total Swift LOC: **~8.2k**
-- `Sources/MultiCodexMenu/Features`: **3277 LOC**
-- `Sources/MultiCodexMenu/Infrastructure`: **2311 LOC**
-- `Sources/MultiCodexMenu/Core`: **1026 LOC**
+- `Sources/MultiCodex/Features`: **3277 LOC**
+- `Sources/MultiCodex/Infrastructure`: **2311 LOC**
+- `Sources/MultiCodex/Core`: **1026 LOC**
 - tests total: concentrated heavily in a few files
 
 ### Biggest hotspots
 
 Largest files include:
 
-- `Tests/MultiCodexMenuTests/AccountsMenuViewModelTests.swift` — **934 LOC**
-- `Sources/MultiCodexMenu/Features/Shared/AccountsMenuViewModel.swift` — **581 LOC**
-- `Sources/MultiCodexMenu/Features/Settings/SettingsContentView+DashboardAccounts.swift` — **439 LOC**
-- `Sources/MultiCodexMenu/Infrastructure/Accounts/RateLimitsUsageAPI.swift` — **435 LOC**
-- `Sources/MultiCodexMenu/Features/MenuBar/AccountsMenuContentView+Sections.swift` — **394 LOC**
-- `Sources/MultiCodexMenu/Features/Settings/SettingsContentView+RuntimeAdvanced.swift` — **344 LOC**
-- `Sources/MultiCodexMenu/Infrastructure/Accounts/AuthSessionCoordinator.swift` — **315 LOC**
-- `Sources/MultiCodexMenu/Infrastructure/Accounts/RateLimitsFetcher.swift` — **264 LOC**
-- `Sources/MultiCodexMenu/Features/Shared/AccountActionCoordinator.swift` — **257 LOC**
-- `Sources/MultiCodexMenu/Infrastructure/Accounts/CodexAccountService.swift` — **249 LOC**
+- `Tests/MultiCodexTests/AccountsMenuViewModelTests.swift` — **934 LOC**
+- `Sources/MultiCodex/Features/Shared/AccountsMenuViewModel.swift` — **581 LOC**
+- `Sources/MultiCodex/Features/Settings/SettingsContentView+DashboardAccounts.swift` — **439 LOC**
+- `Sources/MultiCodex/Infrastructure/Accounts/RateLimitsUsageAPI.swift` — **435 LOC**
+- `Sources/MultiCodex/Features/MenuBar/AccountsMenuContentView+Sections.swift` — **394 LOC**
+- `Sources/MultiCodex/Features/Settings/SettingsContentView+RuntimeAdvanced.swift` — **344 LOC**
+- `Sources/MultiCodex/Infrastructure/Accounts/AuthSessionCoordinator.swift` — **315 LOC**
+- `Sources/MultiCodex/Infrastructure/Accounts/RateLimitsFetcher.swift` — **264 LOC**
+- `Sources/MultiCodex/Features/Shared/AccountActionCoordinator.swift` — **257 LOC**
+- `Sources/MultiCodex/Infrastructure/Accounts/CodexAccountService.swift` — **249 LOC**
 
 ### Test concentration
 
@@ -661,7 +661,7 @@ Tasks:
 Possible target structure:
 
 ```text
-Sources/MultiCodexMenu/
+Sources/MultiCodex/
   App/
   Core/
   Features/
