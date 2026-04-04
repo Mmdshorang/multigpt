@@ -197,51 +197,36 @@ extension SettingsContentView {
         SettingsPanelCard {
             VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
-                    title: "Advanced",
-                    description: "Debug and sandbox controls."
+                    title: "Diagnostics",
+                    description: "Low-level runtime checks and maintenance tools."
                 )
 
-#if DEBUG
-                Toggle(isOn: testConfigToggleBinding) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Use Test Config Directory")
-                            .font(.subheadline.weight(.semibold))
-                        Text("Toggle between the real config directory and an isolated temporary sandbox.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.switch)
-                .disabled(isAccountActionRunning)
+                settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
 
-                if viewModel.isUsingTemporaryAuthSandbox {
-                    if let sandbox = viewModel.temporaryAuthSandboxHome, !sandbox.isEmpty {
-                        settingsInfoRow(symbol: "folder", text: "\(sandbox)/.config/multicodex")
-                    }
-
-                    HStack(spacing: 6) {
-                        ActionPillButton(title: "Reset Sandbox", symbol: "arrow.clockwise") {
-                            viewModel.resetTemporaryAuthSandbox()
-                        }
-                        .disabled(isAccountActionRunning)
-
-                        ActionPillButton(title: "Open Folder", symbol: "folder") {
-                            viewModel.openTemporaryAuthSandboxDirectory()
-                        }
-
-                        ActionPillButton(title: "Use Real Config", symbol: "xmark.circle") {
-                            viewModel.setTemporaryAuthSandboxEnabled(false)
-                        }
-                        .disabled(isAccountActionRunning)
-                    }
+                if let hint = viewModel.cliResolutionHint {
+                    Text(hint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    settingsInfoRow(symbol: "house", text: "Currently using the real config at ~/.config/multicodex")
+                    Text("Run a refresh to capture command resolution details.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-#else
-                Text("Advanced test tooling is only available in debug builds.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-#endif
+
+                HStack(spacing: 8) {
+                    ActionPillButton(title: "Open Runtime", symbol: "terminal") {
+                        viewModel.selectSettingsSection(.runtime)
+                    }
+
+                    ActionPillButton(title: "Refresh Live", symbol: "bolt.horizontal.fill", role: .primary) {
+                        viewModel.refreshLive()
+                    }
+
+                    ActionPillButton(title: "Open Config Directory", symbol: "folder.fill") {
+                        viewModel.openMulticodexConfigDirectory()
+                    }
+                }
             }
         }
     }

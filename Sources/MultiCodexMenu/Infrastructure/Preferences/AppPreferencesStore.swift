@@ -54,16 +54,7 @@ struct AppPreferencesStore {
         }
     }
 
-    var hasCompletedOnboarding: Bool {
-        get { defaults.bool(forKey: Keys.hasCompletedOnboarding) }
-        set { defaults.set(newValue, forKey: Keys.hasCompletedOnboarding) }
-    }
-
-    var isAdvancedSettingsVisible: Bool {
-        get { defaults.bool(forKey: Keys.isAdvancedSettingsVisible) }
-        set { defaults.set(newValue, forKey: Keys.isAdvancedSettingsVisible) }
-    }
-
+    
     var menuDensity: MenuDensity {
         get {
             let raw = defaults.string(forKey: Keys.menuDensity) ?? ""
@@ -108,31 +99,11 @@ struct AppPreferencesStore {
         }
     }
 
-    var temporaryAuthSandboxEnabled: Bool {
-        get { defaults.bool(forKey: Keys.temporaryAuthSandboxEnabled) }
-        set { defaults.set(newValue, forKey: Keys.temporaryAuthSandboxEnabled) }
-    }
-
-    var temporaryAuthSandboxHome: String? {
-        get { defaults.string(forKey: Keys.temporaryAuthSandboxHome) }
-        set {
-            if let newValue {
-                defaults.set(newValue, forKey: Keys.temporaryAuthSandboxHome)
-            } else {
-                defaults.removeObject(forKey: Keys.temporaryAuthSandboxHome)
-            }
-        }
-    }
-
     enum Keys {
         static let customCodexPath = "multicodexMenu.customCodexPath"
         static let resetDisplayMode = "multicodexMenu.resetDisplayMode"
-        static let temporaryAuthSandboxEnabled = "multicodexMenu.temporaryAuthSandboxEnabled"
-        static let temporaryAuthSandboxHome = "multicodexMenu.temporaryAuthSandboxHome"
         static let selectedSettingsSection = "multicodexMenu.selectedSettingsSection"
         static let selectedSettingsAccountName = "multicodexMenu.selectedSettingsAccountName"
-        static let hasCompletedOnboarding = "multicodexMenu.hasCompletedOnboarding"
-        static let isAdvancedSettingsVisible = "multicodexMenu.isAdvancedSettingsVisible"
         static let menuDensity = "multicodexMenu.menuDensity"
         static let usageBarStyle = "multicodexMenu.usageBarStyle"
         static let accountSwitchingStrategy = "multicodexMenu.accountSwitchingStrategy"

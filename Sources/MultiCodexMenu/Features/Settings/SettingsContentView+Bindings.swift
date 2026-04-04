@@ -83,13 +83,6 @@ extension SettingsContentView {
         )
     }
 
-    var testConfigToggleBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.isUsingTemporaryAuthSandbox },
-            set: { viewModel.setTemporaryAuthSandboxEnabled($0) }
-        )
-    }
-
     func renameBinding(for accountName: String) -> Binding<String> {
         Binding(
             get: { renameDrafts[accountName] ?? accountName },

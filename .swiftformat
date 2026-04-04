@@ -1,0 +1,13 @@
+--indent 4
+--linebreaks lf
+--self insert
+--elseposition same-line
+--guardelse same-line
+--wraparguments preserve
+--wrapparameters preserve
+--wrapcollections preserve
+--commas inline
+--trimwhitespace always
+--allman false
+--stripunusedargs closure-only
+--header ignore
