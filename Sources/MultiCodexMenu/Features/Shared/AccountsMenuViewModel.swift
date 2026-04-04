@@ -273,6 +273,11 @@ final class AccountsMenuViewModel: ObservableObject {
 
     func selectSettingsSection(_ section: SettingsSection) { settingsController.selectSettingsSection(section) }
 
+    func resetOnboardingWizard() {
+        selectSettingsAccount(named: nil)
+        selectSettingsSection(.runtime)
+    }
+
     func selectSettingsAccount(named name: String?) { settingsController.selectSettingsAccount(named: name) }
 
     func setAccountSearchQuery(_ query: String) { settingsController.setAccountSearchQuery(query) }

@@ -197,14 +197,36 @@ extension SettingsContentView {
         SettingsPanelCard {
             VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
-                    title: "Advanced",
-                    description: "Low-level diagnostics and maintenance tools."
+                    title: "Diagnostics",
+                    description: "Low-level runtime checks and maintenance tools."
                 )
 
-                Text("Advanced debug sandbox controls were removed as part of the simplification pass. Use Troubleshooting for refresh and runtime diagnostics.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
+
+                if let hint = viewModel.cliResolutionHint {
+                    Text(hint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("Run a refresh to capture command resolution details.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 8) {
+                    ActionPillButton(title: "Open Runtime", symbol: "terminal") {
+                        viewModel.selectSettingsSection(.runtime)
+                    }
+
+                    ActionPillButton(title: "Refresh Live", symbol: "bolt.horizontal.fill", role: .primary) {
+                        viewModel.refreshLive()
+                    }
+
+                    ActionPillButton(title: "Open Config Directory", symbol: "folder.fill") {
+                        viewModel.openMulticodexConfigDirectory()
+                    }
+                }
             }
         }
     }

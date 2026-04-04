@@ -54,9 +54,7 @@ extension SettingsContentView {
                 }
             }
 
-            if !viewModel.onboardingState.isComplete {
-                onboardingWizardCard
-            }
+            onboardingWizardCard
         }
     }
 
@@ -86,7 +84,9 @@ extension SettingsContentView {
             VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "First-Run Setup",
-                    description: "Finish the initial setup."
+                    description: viewModel.onboardingState.isComplete
+                        ? "Setup is complete. Reset the wizard to walk through the steps again."
+                        : "Finish the initial setup."
                 )
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -94,6 +94,13 @@ extension SettingsContentView {
                     onboardingStepRow(.login, isActive: viewModel.onboardingState.step == .login)
                     onboardingStepRow(.verify, isActive: viewModel.onboardingState.step == .verify)
                     onboardingStepRow(.done, isActive: viewModel.onboardingState.step == .done)
+                }
+
+                if viewModel.onboardingState.isComplete {
+                    Text("You can keep using MultiCodex as-is or use Reset Wizard to revisit the guided setup flow.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 HStack(spacing: 8) {
@@ -115,7 +122,9 @@ extension SettingsContentView {
                             }
                         }
                     case .done:
-                        EmptyView()
+                        ActionPillButton(title: "Reset Wizard", symbol: "arrow.counterclockwise") {
+                            viewModel.resetOnboardingWizard()
+                        }
                     }
                 }
             }
