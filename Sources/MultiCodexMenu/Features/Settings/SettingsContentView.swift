@@ -5,7 +5,6 @@ struct SettingsContentView: View {
 
     @State var codexPathDraft = ""
     @State var renameDrafts: [String: String] = [:]
-    @State var deleteConfirmationName = ""
 
     var body: some View {
         NavigationSplitView {
@@ -32,9 +31,6 @@ struct SettingsContentView: View {
         .onChange(of: viewModel.customCodexPath) { codexPathDraft = $0 }
         .onChange(of: viewModel.accounts.map(\.name)) { _ in
             syncRenameDrafts()
-        }
-        .sheet(isPresented: removalSheetBinding) {
-            removalConfirmationSheet
         }
     }
 

@@ -60,18 +60,6 @@ extension SettingsContentView {
         )
     }
 
-    var removalSheetBinding: Binding<Bool> {
-        Binding(
-            get: { viewModel.pendingAccountRemovalRequest != nil },
-            set: { isPresented in
-                if !isPresented {
-                    deleteConfirmationName = ""
-                    viewModel.cancelPendingAccountRemoval()
-                }
-            }
-        )
-    }
-
     var isAccountActionRunning: Bool {
         viewModel.accountActionInFlightName != nil || viewModel.switchingAccountName != nil
     }
