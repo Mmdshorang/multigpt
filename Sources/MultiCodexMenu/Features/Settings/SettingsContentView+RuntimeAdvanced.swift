@@ -30,22 +30,40 @@ extension SettingsContentView {
             title: "Danger Zone",
             description: "Permanent actions for this account."
         ) {
-            HStack(spacing: 8) {
-                Button("Remove Account", role: .destructive) {
-                    confirmAccountRemoval(accountName: account.name, deleteData: false)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Removing an account disconnects it from MultiCodex. Deleting data also clears stored files.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                Button("Remove & Delete Data", role: .destructive) {
-                    confirmAccountRemoval(accountName: account.name, deleteData: true)
+                    HStack(spacing: 8) {
+                        Button("Remove Account", role: .destructive) {
+                            confirmAccountRemoval(accountName: account.name, deleteData: false)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(isAccountActionRunning)
+
+                        Button("Remove & Delete Data", role: .destructive) {
+                            confirmAccountRemoval(accountName: account.name, deleteData: true)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(isAccountActionRunning)
+                    }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .padding(.top, 8)
+            } label: {
+                Label("Show destructive actions", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.red)
             }
         }
     }
 
+    /// Shows an NSAlert confirmation dialog before removing an account.
+    /// Uses runModal() for app-modal behavior — intentional for this destructive action
+    /// to ensure user explicitly acknowledges before proceeding.
     private func confirmAccountRemoval(accountName: String, deleteData: Bool) {
         let message = deleteData
             ? "This permanently removes \"\(accountName)\" and deletes all its stored local data."
@@ -250,8 +268,6 @@ extension SettingsContentView {
             }
         }
     }
-
-
 
     func feedbackRow(_ text: String, color: Color) -> some View {
         HStack(spacing: 10) {
