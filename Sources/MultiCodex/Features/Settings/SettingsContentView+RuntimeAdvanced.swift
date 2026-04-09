@@ -28,56 +28,27 @@ extension SettingsContentView {
     func accountDangerSection(_ account: AccountUsage) -> some View {
         settingsInsetPanel(
             title: "Danger Zone",
-            description: "Permanent actions for this account."
+            description: "Remove this account from MultiCodex."
         ) {
-            DisclosureGroup {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Removing an account disconnects it from MultiCodex. Deleting data also clears stored files.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    HStack(spacing: 8) {
-                        Button("Remove Account", role: .destructive) {
-                            confirmAccountRemoval(accountName: account.name, deleteData: false)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(isAccountActionRunning)
-
-                        Button("Remove & Delete Data", role: .destructive) {
-                            confirmAccountRemoval(accountName: account.name, deleteData: true)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(isAccountActionRunning)
-                    }
-                }
-                .padding(.top, 8)
-            } label: {
-                Label("Show destructive actions", systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red)
+            Button("Remove Account", role: .destructive) {
+                showRemovalConfirmation(for: account.name)
             }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(isAccountActionRunning)
         }
     }
 
-    /// Shows an NSAlert confirmation dialog before removing an account.
-    /// Uses runModal() for app-modal behavior — intentional for this destructive action
-    /// to ensure user explicitly acknowledges before proceeding.
-    private func confirmAccountRemoval(accountName: String, deleteData: Bool) {
-        let message = deleteData
-            ? "This permanently removes \"\(accountName)\" and deletes all its stored local data."
-            : "This removes \"\(accountName)\" from MultiCodex but leaves its data intact."
-
+    private func showRemovalConfirmation(for accountName: String) {
         let alert = NSAlert()
-        alert.messageText = deleteData ? "Delete Account and Data?" : "Remove Account?"
-        alert.informativeText = message
-        alert.alertStyle = deleteData ? .critical : .warning
-        alert.addButton(withTitle: deleteData ? "Delete" : "Remove")
+        alert.messageText = "Remove \"\(accountName)\"?"
+        alert.informativeText = "This disconnects the account from MultiCodex."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Remove")
         alert.addButton(withTitle: "Cancel")
 
         if alert.runModal() == .alertFirstButtonReturn {
-            viewModel.removeAccount(named: accountName, deleteData: deleteData)
+            viewModel.removeAccount(named: accountName, deleteData: false)
         }
     }
 
