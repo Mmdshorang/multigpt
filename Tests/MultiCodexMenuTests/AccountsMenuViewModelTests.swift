@@ -106,52 +106,6 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(persisted.customCodexPath, "/usr/local/bin/codex")
     }
 
-    func testExecutePendingAccountRemovalRequiresTypedNameWhenDeletingData() async {
-        let defaults = ephemeralDefaults()
-        let service = MockCodexAccountService()
-        service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-        ]
-        let viewModel = AccountsMenuViewModel(
-            accountService: service,
-            fileManager: .default,
-            preferences: AppPreferencesStore(defaults: defaults),
-            startImmediately: false
-        )
-
-        viewModel.beginAccountRemoval(named: "alpha", deleteData: true)
-        viewModel.executePendingAccountRemoval(confirming: "wrong")
-
-        XCTAssertEqual(viewModel.pendingAccountRemovalRequest?.accountName, "alpha")
-        XCTAssertEqual(viewModel.accountActionError, "Type the account name to confirm delete-data removal.")
-        XCTAssertEqual(service.removeCalls.count, 0)
-    }
-
-    func testExecutePendingAccountRemovalRunsRemovalWhenTypedNameMatches() async {
-        let defaults = ephemeralDefaults()
-        let service = MockCodexAccountService()
-        service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-        ]
-        let viewModel = AccountsMenuViewModel(
-            accountService: service,
-            fileManager: .default,
-            preferences: AppPreferencesStore(defaults: defaults),
-            startImmediately: false
-        )
-
-        viewModel.beginAccountRemoval(named: "alpha", deleteData: true)
-        viewModel.executePendingAccountRemoval(confirming: "alpha")
-
-        await waitUntil(timeoutSeconds: 1.0) {
-            !service.removeCalls.isEmpty
-        }
-
-        XCTAssertNil(viewModel.pendingAccountRemovalRequest)
-        XCTAssertEqual(service.removeCalls.first?.name, "alpha")
-        XCTAssertEqual(service.removeCalls.first?.deleteData, true)
-    }
-
     func testPerformRefreshHandlesFirstFailureThenWarningFallback() async {
         let defaults = ephemeralDefaults()
         let service = MockCodexAccountService()

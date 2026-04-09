@@ -37,17 +37,19 @@ extension SettingsContentView {
                         .foregroundStyle(.secondary)
 
                     HStack(spacing: 8) {
-                        Button("Remove account", role: .destructive) {
-                            viewModel.beginAccountRemoval(named: account.name, deleteData: false)
+                        Button("Remove Account", role: .destructive) {
+                            confirmAccountRemoval(accountName: account.name, deleteData: false)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .disabled(isAccountActionRunning)
 
-                        Button("Remove + delete data", role: .destructive) {
-                            viewModel.beginAccountRemoval(named: account.name, deleteData: true)
+                        Button("Remove & Delete Data", role: .destructive) {
+                            confirmAccountRemoval(accountName: account.name, deleteData: true)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .disabled(isAccountActionRunning)
                     }
                 }
                 .padding(.top, 8)
@@ -56,6 +58,26 @@ extension SettingsContentView {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.red)
             }
+        }
+    }
+
+    /// Shows an NSAlert confirmation dialog before removing an account.
+    /// Uses runModal() for app-modal behavior — intentional for this destructive action
+    /// to ensure user explicitly acknowledges before proceeding.
+    private func confirmAccountRemoval(accountName: String, deleteData: Bool) {
+        let message = deleteData
+            ? "This permanently removes \"\(accountName)\" and deletes all its stored local data."
+            : "This removes \"\(accountName)\" from MultiCodex but leaves its data intact."
+
+        let alert = NSAlert()
+        alert.messageText = deleteData ? "Delete Account and Data?" : "Remove Account?"
+        alert.informativeText = message
+        alert.alertStyle = deleteData ? .critical : .warning
+        alert.addButton(withTitle: deleteData ? "Delete" : "Remove")
+        alert.addButton(withTitle: "Cancel")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            viewModel.removeAccount(named: accountName, deleteData: deleteData)
         }
     }
 
@@ -245,62 +267,6 @@ extension SettingsContentView {
                 }
             }
         }
-    }
-
-    var removalConfirmationSheet: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let request = viewModel.pendingAccountRemovalRequest {
-                Text(request.deleteData ? "Remove account and delete data" : "Remove account")
-                    .font(.headline)
-
-                Text(
-                    request.deleteData
-                        ? "This permanently removes \(request.accountName) and deletes its stored local data."
-                        : "This removes \(request.accountName) from MultiCodex but leaves its data intact."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-                if request.deleteData {
-                    Text("Type \"\(request.accountName)\" to confirm.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    TextField("Account name", text: $deleteConfirmationName)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                HStack {
-                    Spacer()
-
-                    Button("Cancel") {
-                        deleteConfirmationName = ""
-                        viewModel.cancelPendingAccountRemoval()
-                    }
-
-                    Button(request.deleteData ? "Delete Data" : "Remove", role: .destructive) {
-                        viewModel.executePendingAccountRemoval(confirming: deleteConfirmationName)
-                        if viewModel.pendingAccountRemovalRequest == nil {
-                            deleteConfirmationName = ""
-                        }
-                    }
-                    .disabled(!canConfirmRemoval(request))
-                }
-            }
-        }
-        .padding(16)
-        .frame(width: 390)
-    }
-
-    func canConfirmRemoval(_ request: PendingAccountRemovalRequest) -> Bool {
-        if isAccountActionRunning {
-            return false
-        }
-        if request.deleteData {
-            return deleteConfirmationName.trimmingCharacters(in: .whitespacesAndNewlines) == request.accountName
-        }
-        return true
     }
 
     func feedbackRow(_ text: String, color: Color) -> some View {

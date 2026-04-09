@@ -27,7 +27,6 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var accountSwitchingStrategy: AccountSwitchingStrategy
     @Published var autoSwitchNotificationsEnabled: Bool
     @Published var limitsCacheTTLSeconds: Int
-    @Published var pendingAccountRemovalRequest: PendingAccountRemovalRequest?
 
     let accountService: any CodexAccountServicing
     let fileManager: FileManager
@@ -70,7 +69,6 @@ final class AccountsMenuViewModel: ObservableObject {
         limitsCacheTTLSeconds = CodexAccountService.normalizedLimitsCacheTTLSeconds(
             persistedTTL > 0 ? persistedTTL : CodexAccountService.defaultLimitsCacheTTLSeconds
         )
-        pendingAccountRemovalRequest = nil
         if !isAdvancedSettingsVisible, selectedSettingsSection == .advanced {
             selectedSettingsSection = .dashboard
         }
@@ -322,12 +320,6 @@ final class AccountsMenuViewModel: ObservableObject {
     func clearCustomCodexPath() { settingsController.clearCustomCodexPath() }
 
     func chooseCustomCodexPath() { settingsController.chooseCustomCodexPath() }
-
-    func beginAccountRemoval(named name: String, deleteData: Bool) { accountManagement.beginAccountRemoval(named: name, deleteData: deleteData) }
-
-    func cancelPendingAccountRemoval() { accountManagement.cancelPendingAccountRemoval() }
-
-    func executePendingAccountRemoval(confirming typedName: String?) { accountManagement.executePendingAccountRemoval(confirming: typedName) }
 
     func switchToAccount(named name: String) { accountManagement.switchToAccount(named: name) }
 

@@ -188,15 +188,6 @@ struct OnboardingState {
     }
 }
 
-struct PendingAccountRemovalRequest: Identifiable {
-    let accountName: String
-    let deleteData: Bool
-
-    var id: String {
-        "\(accountName)|\(deleteData)"
-    }
-}
-
 enum InteractiveLoginSessionPhase: Equatable {
     case waitingForExternalCompletion
     case needsRetry
