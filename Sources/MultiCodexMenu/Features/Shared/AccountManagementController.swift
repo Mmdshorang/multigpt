@@ -9,31 +9,6 @@ final class AccountManagementController {
         self.viewModel = viewModel
     }
 
-    func beginAccountRemoval(named name: String, deleteData: Bool) {
-        viewModel.pendingAccountRemovalRequest = PendingAccountRemovalRequest(accountName: name, deleteData: deleteData)
-    }
-
-    func cancelPendingAccountRemoval() {
-        viewModel.pendingAccountRemovalRequest = nil
-    }
-
-    func executePendingAccountRemoval(confirming typedName: String?) {
-        guard let request = viewModel.pendingAccountRemovalRequest else {
-            return
-        }
-
-        if request.deleteData {
-            let normalizedTyped = (typedName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            if normalizedTyped != request.accountName {
-                viewModel.accountActions.setAccountFeedback(message: nil, error: "Type the account name to confirm delete-data removal.")
-                return
-            }
-        }
-
-        viewModel.pendingAccountRemovalRequest = nil
-        removeAccount(named: request.accountName, deleteData: request.deleteData)
-    }
-
     func switchToAccount(named name: String) {
         viewModel.runSwitchAction(named: name) {
             try await self.viewModel.accountService.switchAccount(name: name)
@@ -76,9 +51,6 @@ final class AccountManagementController {
     }
 
     func removeAccount(named name: String, deleteData: Bool) {
-        if viewModel.pendingAccountRemovalRequest?.accountName == name {
-            viewModel.pendingAccountRemovalRequest = nil
-        }
         accountActions.runAccountAction(for: name) {
             _ = try await self.viewModel.accountService.removeAccount(name: name, deleteData: deleteData)
             if self.viewModel.selectedSettingsAccountName == name {
