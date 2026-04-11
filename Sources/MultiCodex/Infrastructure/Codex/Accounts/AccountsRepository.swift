@@ -88,9 +88,18 @@ extension CodexAccountService {
             throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
 
+        let removedCurrentAccount = config.currentAccount == account
         config.accounts.remove(account)
-        if config.currentAccount == account {
+        if removedCurrentAccount {
             config.currentAccount = config.accounts.sorted().first
+        }
+
+        if removedCurrentAccount {
+            if let nextAccount = config.currentAccount {
+                try applyAccountAuthToDefault(account: nextAccount, forceLock: false, paths: paths)
+            } else {
+                try deleteFileIfExists(paths.defaultCodexAuthPath)
+            }
         }
 
         try saveConfig(config, paths: paths)

@@ -27,28 +27,37 @@ extension SettingsContentView {
 
     func accountDangerSection(_ account: AccountUsage) -> some View {
         settingsInsetPanel(
-            title: "Danger Zone",
-            description: "Remove this account from MultiCodex."
+            title: "Remove Account",
+            description: "Remove this account from MultiCodex. You can also delete its saved local auth and metadata."
         ) {
-            Button("Remove Account", role: .destructive) {
-                showRemovalConfirmation(for: account.name)
+            Toggle("Also delete local account data", isOn: removeStoredDataBinding(for: account.name))
+                .toggleStyle(.switch)
+                .font(.caption)
+
+            settingsInfoRow(
+                symbol: "info.circle",
+                text: account.isCurrent
+                    ? "If this is the current account, MultiCodex will switch to another saved account or disconnect cleanly."
+                    : "This only affects MultiCodex on this Mac."
+            )
+
+            HStack(spacing: 8) {
+                Button(removeStoredDataBinding(for: account.name).wrappedValue ? "Remove and Delete Data" : "Remove from MultiCodex", role: .destructive) {
+                    viewModel.removeAccount(
+                        named: account.name,
+                        deleteData: removeStoredDataBinding(for: account.name).wrappedValue
+                    )
+                    removalDeleteDataChoice[account.name] = false
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isAccountActionRunning)
+
+                Text(removeStoredDataBinding(for: account.name).wrappedValue ? "Local saved auth files will be deleted too." : "Saved local data stays on disk unless you opt in.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(isAccountActionRunning)
-        }
-    }
-
-    private func showRemovalConfirmation(for accountName: String) {
-        let alert = NSAlert()
-        alert.messageText = "Remove \"\(accountName)\"?"
-        alert.informativeText = "This disconnects the account from MultiCodex."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Remove")
-        alert.addButton(withTitle: "Cancel")
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            viewModel.removeAccount(named: accountName, deleteData: false)
         }
     }
 

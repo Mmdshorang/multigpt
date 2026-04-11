@@ -150,6 +150,53 @@ final class CodexAccountServiceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: removedAlphaDir))
     }
 
+    func testRemoveCurrentAccountAppliesNextAccountAuthToDefault() async throws {
+        let service = makeSandboxedService()
+        let sandbox = try XCTUnwrap(service.sandboxHomeDirectory)
+
+        _ = try await service.addAccount(name: "alpha")
+        _ = try await service.addAccount(name: "beta")
+        try await service.switchAccount(name: "alpha")
+
+        let defaultAuthPath = (sandbox as NSString).appendingPathComponent(".codex/auth.json")
+        let betaAuthPath = (service.effectiveMulticodexHomePath() as NSString)
+            .appendingPathComponent("accounts/beta/auth.json")
+
+        try writeText("{\"tokens\":{\"access_token\":\"alpha-token\"}}\n", to: defaultAuthPath)
+        try writeText("{\"tokens\":{\"access_token\":\"beta-token\"}}\n", to: betaAuthPath)
+
+        _ = try await service.removeAccount(name: "alpha", deleteData: false)
+
+        let defaultAfter = try String(contentsOfFile: defaultAuthPath, encoding: .utf8)
+        XCTAssertTrue(defaultAfter.contains("beta-token"))
+
+        let configPath = (service.effectiveMulticodexHomePath() as NSString).appendingPathComponent("config.json")
+        let configData = try XCTUnwrap(FileManager.default.contents(atPath: configPath))
+        let config = try AccountConfigStore.decodeConfig(from: configData)
+        XCTAssertEqual(config.currentAccount, "beta")
+    }
+
+    func testRemoveLastCurrentAccountClearsDefaultAuth() async throws {
+        let service = makeSandboxedService()
+        let sandbox = try XCTUnwrap(service.sandboxHomeDirectory)
+
+        _ = try await service.addAccount(name: "alpha")
+        try await service.switchAccount(name: "alpha")
+
+        let defaultAuthPath = (sandbox as NSString).appendingPathComponent(".codex/auth.json")
+        try writeText("{\"tokens\":{\"access_token\":\"alpha-token\"}}\n", to: defaultAuthPath)
+
+        _ = try await service.removeAccount(name: "alpha", deleteData: false)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: defaultAuthPath))
+
+        let configPath = (service.effectiveMulticodexHomePath() as NSString).appendingPathComponent("config.json")
+        let configData = try XCTUnwrap(FileManager.default.contents(atPath: configPath))
+        let config = try AccountConfigStore.decodeConfig(from: configData)
+        XCTAssertNil(config.currentAccount)
+        XCTAssertTrue(config.accounts.isEmpty)
+    }
+
     func testFetchStatusRestoresDefaultAuthAfterCommandFailure() async throws {
         let service = makeSandboxedService()
         service.customCodexPath = "/not/a/real/codex/path"

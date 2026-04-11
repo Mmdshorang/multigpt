@@ -5,6 +5,7 @@ struct SettingsContentView: View {
 
     @State var codexPathDraft = ""
     @State var renameDrafts: [String: String] = [:]
+    @State var removalDeleteDataChoice: [String: Bool] = [:]
 
     var body: some View {
         NavigationSplitView {
@@ -24,6 +25,7 @@ struct SettingsContentView: View {
         .onAppear {
             codexPathDraft = viewModel.customCodexPath
             syncRenameDrafts()
+            syncRemovalChoices()
             if viewModel.selectedSettingsSection == .advanced {
                 viewModel.setAdvancedSettingsVisible(true)
             }
@@ -31,6 +33,7 @@ struct SettingsContentView: View {
         .onChange(of: viewModel.customCodexPath) { codexPathDraft = $0 }
         .onChange(of: viewModel.accounts.map(\.name)) { _ in
             syncRenameDrafts()
+            syncRemovalChoices()
         }
     }
 
