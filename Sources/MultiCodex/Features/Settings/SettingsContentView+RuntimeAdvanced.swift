@@ -1,65 +1,7 @@
 import SwiftUI
 
 extension SettingsContentView {
-    func accountUsageSection(_ account: AccountUsage) -> some View {
-        settingsInsetPanel(
-            title: "Usage",
-            description: "Current usage for this account."
-        ) {
-            HStack(spacing: 10) {
-                AccountUsageMetricCard(
-                    title: "5h",
-                    metric: account.usage.fiveHour,
-                    resetDisplayMode: viewModel.resetDisplayMode,
-                    progressValue: viewModel.progressValue(for: account.usage.fiveHour)
-                )
-                AccountUsageMetricCard(
-                    title: "weekly",
-                    metric: account.usage.weekly,
-                    resetDisplayMode: viewModel.resetDisplayMode,
-                    progressValue: viewModel.progressValue(for: account.usage.weekly)
-                )
-            }
-
-            settingsInfoRow(symbol: "clock", text: "Last used \(account.lastUsedLabel)")
-        }
-    }
-
-    func accountDangerSection(_ account: AccountUsage) -> some View {
-        settingsInsetPanel(
-            title: "Remove Account",
-            description: "Remove this account from MultiCodex. You can also delete its saved local auth and metadata."
-        ) {
-            Toggle("Also delete local account data", isOn: removeStoredDataBinding(for: account.name))
-                .toggleStyle(.switch)
-                .font(.caption)
-
-            settingsInfoRow(
-                symbol: "info.circle",
-                text: account.isCurrent
-                    ? "If this is the current account, MultiCodex will switch to another saved account or disconnect cleanly."
-                    : "This only affects MultiCodex on this Mac."
-            )
-
-            HStack(spacing: 8) {
-                Button(removeStoredDataBinding(for: account.name).wrappedValue ? "Remove and Delete Data" : "Remove from MultiCodex", role: .destructive) {
-                    viewModel.removeAccount(
-                        named: account.name,
-                        deleteData: removeStoredDataBinding(for: account.name).wrappedValue
-                    )
-                    removalDeleteDataChoice[account.name] = false
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(isAccountActionRunning)
-
-                Text(removeStoredDataBinding(for: account.name).wrappedValue ? "Local saved auth files will be deleted too." : "Saved local data stays on disk unless you opt in.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
+    // MARK: - Runtime Page
 
     var runtimePage: some View {
         SettingsPanelCard {
@@ -104,6 +46,8 @@ extension SettingsContentView {
             }
         }
     }
+
+    // MARK: - Display Page
 
     var displayPage: some View {
         SettingsPanelCard {
@@ -156,6 +100,8 @@ extension SettingsContentView {
         }
     }
 
+    // MARK: - Troubleshooting Page
+
     var troubleshootingPage: some View {
         SettingsPanelCard {
             VStack(alignment: .leading, spacing: 10) {
@@ -164,16 +110,7 @@ extension SettingsContentView {
                     description: "Diagnostics and refresh controls."
                 )
 
-                if let hint = viewModel.cliResolutionHint {
-                    Text(hint)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    Text("Run a refresh to capture command resolution details.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                cliResolutionHintRow
 
                 settingsFormRow("Cache TTL", detail: "Controls how often usage limits refresh automatically.") {
                     Stepper(value: limitsCacheTTLMinutesBinding, in: 1...120) {
@@ -195,6 +132,8 @@ extension SettingsContentView {
         }
     }
 
+    // MARK: - Advanced Page
+
     var advancedPage: some View {
         SettingsPanelCard {
             VStack(alignment: .leading, spacing: 10) {
@@ -205,16 +144,7 @@ extension SettingsContentView {
 
                 settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
 
-                if let hint = viewModel.cliResolutionHint {
-                    Text(hint)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    Text("Run a refresh to capture command resolution details.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                cliResolutionHintRow
 
                 HStack(spacing: 8) {
                     ActionPillButton(title: "Open Runtime", symbol: "terminal") {
@@ -247,29 +177,5 @@ extension SettingsContentView {
                 }
             }
         }
-    }
-
-    func feedbackRow(_ text: String, color: Color) -> some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-
-            Text(text)
-                .font(.caption)
-                .foregroundStyle(.primary)
-
-            Spacer()
-
-            Button("Dismiss") {
-                viewModel.clearAccountActionFeedback()
-            }
-            .buttonStyle(.plain)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
