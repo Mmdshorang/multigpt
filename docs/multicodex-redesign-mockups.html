@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MultiCodex — Design Mockups</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Grotesk:wght@300..700&family=IBM+Plex+Mono:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --font-display:'Space Grotesk',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --font-mono:'IBM Plex Mono',monospace;
+}
+html{font-size:14px}
+body{font-family:var(--font-body);background:#0a0a0b;color:#e4e4e7;min-height:100vh;overflow-x:hidden}
+
+.nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:2px;padding:16px 24px 12px;background:rgba(10,10,11,.85);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06)}
+.nav h1{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-.3px;margin-right:24px;color:#fff}
+.sbtn{padding:7px 14px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:0 0;color:rgba(255,255,255,.5);font-family:var(--font-body);font-size:12.5px;font-weight:500;cursor:pointer;transition:all .2s}
+.sbtn:hover{color:#fff;border-color:rgba(255,255,255,.2)}
+.sbtn.on{background:#fff;color:#000;border-color:#fff;font-weight:600}
+
+.wrap{display:flex;gap:32px;max-width:1320px;margin:40px auto;padding:0 32px;align-items:flex-start}
+.panel{flex:1;max-width:420px}
+.panel.wide{max-width:800px;flex:1.6}
+.plbl{font-family:var(--font-display);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.3);margin-bottom:12px}
+
+/* helpers */
+.flex{display:flex}.gap8{gap:8px}.gap10{gap:10px}.aic{align-items:center}.jcsb{justify-content:space-between}.f1{flex:1}.tac{text-align:center}.rel{position:relative}.oh{overflow:hidden}.fi{fill:none}
+
+/* ═══════════════════════════════════════════════════
+   1 — Native macOS Pro
+   ═══════════════════════════════════════════════════ */
+[data-theme="macos"] .popover{background:rgba(246,246,246,.92);backdrop-filter:blur(40px) saturate(180%);border-radius:14px;border:.5px solid rgba(0,0,0,.12);box-shadow:0 8px 40px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.06);padding:14px;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif}
+[data-theme="macos"] .hdr{display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;margin-bottom:10px;border-bottom:.5px solid rgba(0,0,0,.08)}
+[data-theme="macos"] .hdr h2{font-size:13px;font-weight:600}
+[data-theme="macos"] .hdr .ts{font-size:10px;color:rgba(0,0,0,.4)}
+[data-theme="macos"] .rbtn{width:24px;height:24px;border-radius:6px;border:none;background:rgba(0,0,0,.05);color:rgba(0,0,0,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:background .15s}
+[data-theme="macos"] .rbtn:hover{background:rgba(0,0,0,.1)}
+[data-theme="macos"] .mcard{background:rgba(255,255,255,.7);border:.5px solid rgba(0,0,0,.06);border-radius:10px;padding:12px;margin-bottom:8px}
+[data-theme="macos"] .mcard-t{font-size:10px;color:rgba(0,0,0,.45);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px}
+[data-theme="macos"] .mcard h3{font-size:13px;font-weight:600;margin-bottom:8px}
+[data-theme="macos"] .mrow{display:flex;gap:8px}
+[data-theme="macos"] .mbox{flex:1;background:rgba(0,0,0,.03);border-radius:8px;padding:8px 10px}
+[data-theme="macos"] .mlbl{font-size:10px;color:rgba(0,0,0,.4);margin-bottom:2px}
+[data-theme="macos"] .mval{font-size:12px;font-weight:600}
+[data-theme="macos"] .pbar{height:4px;border-radius:2px;background:rgba(0,0,0,.06);margin-top:4px;overflow:hidden}
+[data-theme="macos"] .pfill{height:100%;border-radius:2px;transition:width .4s}
+[data-theme="macos"] .g{background:#34c759}[data-theme="macos"] .o{background:#ff9500}[data-theme="macos"] .r{background:#ff3b30}
+[data-theme="macos"] .mpill{display:inline-flex;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
+[data-theme="macos"] .cur{background:rgba(0,122,255,.12);color:#007aff}
+[data-theme="macos"] .conn{background:rgba(52,199,89,.12);color:#34c759}
+[data-theme="macos"] .nlogin{background:rgba(255,149,0,.12);color:#ff9500}
+[data-theme="macos"] .arow{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .12s}
+[data-theme="macos"] .arow:hover{background:rgba(0,0,0,.03)}
+[data-theme="macos"] .arow.sel{background:rgba(0,122,255,.08)}
+[data-theme="macos"] .aname{font-size:12px;font-weight:600}
+[data-theme="macos"] .ameta{font-size:10px;color:rgba(0,0,0,.4);margin-top:1px}
+[data-theme="macos"] .foot{display:flex;justify-content:space-between;align-items:center;padding-top:10px;margin-top:10px;border-top:.5px solid rgba(0,0,0,.08)}
+[data-theme="macos"] .mbtn{padding:5px 10px;border-radius:6px;border:none;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
+[data-theme="macos"] .pri{background:#007aff;color:#fff}[data-theme="macos"] .sec{background:rgba(0,0,0,.06);color:rgba(0,0,0,.65)}
+[data-theme="macos"] .sw{background:rgba(246,246,246,.96);border-radius:14px;border:.5px solid rgba(0,0,0,.12);box-shadow:0 12px 60px rgba(0,0,0,.2);display:flex;overflow:hidden;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;height:520px}
+[data-theme="macos"] .ssb{width:180px;background:rgba(0,0,0,.03);padding:16px 0;border-right:.5px solid rgba(0,0,0,.06);flex-shrink:0}
+[data-theme="macos"] .ssb h3{font-size:13px;font-weight:700;padding:0 14px;margin-bottom:12px}
+[data-theme="macos"] .si{display:flex;align-items:center;gap:8px;padding:6px 14px;font-size:12px;color:rgba(0,0,0,.55);cursor:pointer;transition:all .12s}
+[data-theme="macos"] .si:hover{background:rgba(0,0,0,.04);color:rgba(0,0,0,.8)}
+[data-theme="macos"] .si.on{background:rgba(0,122,255,.1);color:#007aff;font-weight:600}
+[data-theme="macos"] .sd{flex:1;padding:20px;overflow-y:auto}
+[data-theme="macos"] .sd h2{font-size:16px;font-weight:700;margin-bottom:4px}
+[data-theme="macos"] .sd .desc{font-size:11px;color:rgba(0,0,0,.4);margin-bottom:16px}
+[data-theme="macos"] .fg{margin-bottom:14px}
+[data-theme="macos"] .fg label{display:block;font-size:11px;font-weight:600;color:rgba(0,0,0,.6);margin-bottom:4px}
+[data-theme="macos"] .fg input{width:100%;padding:7px 10px;border-radius:7px;border:.5px solid rgba(0,0,0,.12);background:#fff;font-size:12px;color:#1d1d1f;outline:none}
+[data-theme="macos"] .fg input:focus{border-color:#007aff;box-shadow:0 0 0 3px rgba(0,122,255,.15)}
+[data-theme="macos"] .og{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+[data-theme="macos"] .oc{background:rgba(255,255,255,.7);border:.5px solid rgba(0,0,0,.06);border-radius:8px;padding:10px}
+[data-theme="macos"] .oc .lbl{font-size:10px;color:rgba(0,0,0,.4);margin-bottom:2px}
+[data-theme="macos"] .oc .val{font-size:12px;font-weight:600}
+[data-theme="macos"] .seg{display:flex;background:rgba(0,0,0,.05);border-radius:7px;padding:2px}
+[data-theme="macos"] .seg-b{flex:1;padding:5px 10px;border:none;border-radius:5px;background:0 0;font-size:11px;font-weight:500;color:rgba(0,0,0,.5);cursor:pointer;transition:all .15s}
+[data-theme="macos"] .seg-b.on{background:#fff;color:#1d1d1f;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* ═══════════════════════════════════════════════════
+   2 — Dashboard / Data-First
+   ═══════════════════════════════════════════════════ */
+[data-theme="dashboard"] .popover{background:#0c0e14;border-radius:12px;border:1px solid rgba(255,255,255,.06);padding:16px;color:#e0e0e6;font-family:'Space Grotesk',sans-serif}
+[data-theme="dashboard"] .hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+[data-theme="dashboard"] .hdr h2{font-size:13px;font-weight:600;color:#fff}
+[data-theme="dashboard"] .hdr .ts{font-size:10px;color:rgba(255,255,255,.3)}
+[data-theme="dashboard"] .dbtn{padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:rgba(255,255,255,.5);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s}
+[data-theme="dashboard"] .dbtn:hover{background:rgba(255,255,255,.08);color:#fff}
+[data-theme="dashboard"] .bgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+[data-theme="dashboard"] .bcard{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px;position:relative;overflow:hidden}
+[data-theme="dashboard"] .bcard.wide{grid-column:span 2}
+[data-theme="dashboard"] .blbl{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.3);margin-bottom:8px}
+[data-theme="dashboard"] .bsub{font-size:10px;color:rgba(255,255,255,.35);margin-top:2px}
+[data-theme="dashboard"] .ring{width:48px;height:48px;position:relative}
+[data-theme="dashboard"] .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+[data-theme="dashboard"] .ring-bg{fill:none;stroke:rgba(255,255,255,.06);stroke-width:4}
+[data-theme="dashboard"] .ring-fl{fill:none;stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset .6s}
+[data-theme="dashboard"] .rlbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff}
+[data-theme="dashboard"] .spark{display:flex;align-items:flex-end;gap:2px;height:24px;margin-top:6px}
+[data-theme="dashboard"] .sbar{flex:1;border-radius:2px;background:rgba(99,102,241,.4);transition:height .3s}
+[data-theme="dashboard"] .sbar.hi{background:rgba(251,146,60,.5)}[data-theme="dashboard"] .sbar.crit{background:rgba(239,68,68,.5)}
+[data-theme="dashboard"] .dlist{display:flex;flex-direction:column;gap:4px}
+[data-theme="dashboard"] .drow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);transition:all .15s}
+[data-theme="dashboard"] .drow:hover{background:rgba(255,255,255,.05)}
+[data-theme="dashboard"] .drow.sel{border-color:rgba(99,102,241,.4);background:rgba(99,102,241,.08)}
+[data-theme="dashboard"] .ddot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+[data-theme="dashboard"] .ddot.gn{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.4)}
+[data-theme="dashboard"] .ddot.og{background:#fb923c;box-shadow:0 0 8px rgba(251,146,60,.4)}
+[data-theme="dashboard"] .ddot.rd{background:#ef4444;box-shadow:0 0 8px rgba(239,68,68,.4)}
+[data-theme="dashboard"] .dn{font-size:12px;font-weight:600;color:#fff}
+[data-theme="dashboard"] .dm{font-size:10px;color:rgba(255,255,255,.35)}
+[data-theme="dashboard"] .dbar{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;margin-left:auto}
+[data-theme="dashboard"] .dbf{height:100%;border-radius:2px;transition:width .4s}
+[data-theme="dashboard"] .foot{display:flex;justify-content:space-between;padding-top:10px;margin-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+[data-theme="dashboard"] .sw{background:#0c0e14;border-radius:12px;border:1px solid rgba(255,255,255,.06);display:flex;color:#e0e0e6;font-family:'Space Grotesk',sans-serif;height:520px}
+[data-theme="dashboard"] .ssb{width:180px;background:rgba(0,0,0,.2);padding:16px 0;border-right:1px solid rgba(255,255,255,.06);flex-shrink:0}
+[data-theme="dashboard"] .ssb h3{font-size:13px;font-weight:700;color:#fff;padding:0 14px;margin-bottom:14px}
+[data-theme="dashboard"] .si{padding:7px 14px;font-size:12px;color:rgba(255,255,255,.4);cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .12s}
+[data-theme="dashboard"] .si:hover{color:rgba(255,255,255,.7)}
+[data-theme="dashboard"] .si.on{color:#fff;background:rgba(99,102,241,.15);border-right:2px solid #6366f1}
+[data-theme="dashboard"] .sd{flex:1;padding:20px;overflow-y:auto}
+[data-theme="dashboard"] .sd h2{font-size:18px;font-weight:700;color:#fff;margin-bottom:4px}
+[data-theme="dashboard"] .sd .desc{font-size:11px;color:rgba(255,255,255,.35);margin-bottom:18px}
+[data-theme="dashboard"] .dsg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+[data-theme="dashboard"] .dsc{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px}
+[data-theme="dashboard"] .dsc .lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.3);margin-bottom:4px}
+[data-theme="dashboard"] .dsc .val{font-size:16px;font-weight:700;color:#fff}
+[data-theme="dashboard"] .dfr{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:8px;margin-bottom:4px}
+[data-theme="dashboard"] .dfr label{font-size:11px;color:rgba(255,255,255,.6)}
+[data-theme="dashboard"] .dfr input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:4px 8px;font-size:11px;color:#fff;font-family:inherit;outline:none;width:200px}
+[data-theme="dashboard"] .dsec{margin-bottom:18px}
+[data-theme="dashboard"] .dst{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.3);margin-bottom:8px;font-weight:600}
+
+/* ═══════════════════════════════════════════════════
+   3 — Compact Terminal-Dev
+   ═══════════════════════════════════════════════════ */
+[data-theme="terminal"] .popover{background:#111;border-radius:4px;border:1px solid #2a2a2a;padding:12px;color:#b0b0b0;font-family:'IBM Plex Mono','Geist Mono',monospace}
+[data-theme="terminal"] .hdr{display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid #2a2a2a}
+[data-theme="terminal"] .hdr h2{font-size:12px;font-weight:600;color:#e0e0e0}
+[data-theme="terminal"] .hdr .ts{font-size:10px;color:#555}
+[data-theme="terminal"] .tbtn{padding:2px 8px;border-radius:2px;border:1px solid #333;background:#1a1a1a;color:#888;font-size:10px;font-family:inherit;cursor:pointer;transition:all .1s}
+[data-theme="terminal"] .tbtn:hover{background:#222;color:#ccc}
+[data-theme="terminal"] .tsec{margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #1e1e1e}
+[data-theme="terminal"] .tlbl{font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+[data-theme="terminal"] .tline{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px}
+[data-theme="terminal"] .tline .k{color:#777}[data-theme="terminal"] .tline .v{color:#e0e0e0;font-weight:500}
+[data-theme="terminal"] .tbar{height:6px;background:#1e1e1e;border-radius:1px;margin-top:3px}
+[data-theme="terminal"] .tbf{height:100%;border-radius:1px}
+[data-theme="terminal"] .tbf.gn{background:#4ade80}[data-theme="terminal"] .tbf.og{background:#fb923c}[data-theme="terminal"] .tbf.rd{background:#ef4444}
+[data-theme="terminal"] .tdot{display:inline-block;width:5px;height:5px;border-radius:1px;margin-right:6px}
+[data-theme="terminal"] .tdot.gn{background:#4ade80}[data-theme="terminal"] .tdot.og{background:#fb923c}[data-theme="terminal"] .tdot.rd{background:#ef4444}
+[data-theme="terminal"] .tacc{padding:5px 0;cursor:pointer;border-bottom:1px solid #1a1a1a;transition:background .08s}
+[data-theme="terminal"] .tacc:hover{background:#1a1a1a}
+[data-theme="terminal"] .tacc.sel{background:#1a1a1a;border-left:2px solid #6366f1;padding-left:8px}
+[data-theme="terminal"] .tan{font-size:11px;color:#e0e0e0;font-weight:500}
+[data-theme="terminal"] .tam{font-size:10px;color:#555}
+[data-theme="terminal"] .foot{display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid #2a2a2a}
+[data-theme="terminal"] .ttag{font-size:9px;padding:1px 5px;border-radius:2px;border:1px solid #333;color:#888;background:#1a1a1a}
+[data-theme="terminal"] .ttag.act{border-color:#6366f1;color:#a5b4fc;background:rgba(99,102,241,.1)}
+[data-theme="terminal"] .ttag.wrn{border-color:#b45309;color:#fbbf24}
+[data-theme="terminal"] .sw{background:#111;border-radius:4px;border:1px solid #2a2a2a;display:flex;color:#b0b0b0;font-family:'IBM Plex Mono',monospace;height:520px}
+[data-theme="terminal"] .ssb{width:180px;background:#0d0d0d;padding:14px 0;border-right:1px solid #2a2a2a;flex-shrink:0}
+[data-theme="terminal"] .ssb h3{font-size:12px;font-weight:600;color:#e0e0e0;padding:0 12px;margin-bottom:10px}
+[data-theme="terminal"] .si{padding:5px 12px;font-size:11px;color:#555;cursor:pointer;border-left:2px solid transparent;transition:all .1s}
+[data-theme="terminal"] .si:hover{color:#888}
+[data-theme="terminal"] .si.on{color:#e0e0e0;border-left-color:#6366f1;background:#1a1a1a}
+[data-theme="terminal"] .sd{flex:1;padding:16px;overflow-y:auto}
+[data-theme="terminal"] .sd h2{font-size:14px;font-weight:600;color:#e0e0e0;margin-bottom:4px}
+[data-theme="terminal"] .sd .desc{font-size:10px;color:#555;margin-bottom:16px}
+[data-theme="terminal"] .tsr{display:flex;gap:2px;margin-bottom:14px}
+[data-theme="terminal"] .tsc{flex:1;padding:8px;background:#1a1a1a;border:1px solid #2a2a2a}
+[data-theme="terminal"] .tsc .lbl{font-size:8px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
+[data-theme="terminal"] .tsc .val{font-size:13px;color:#e0e0e0;font-weight:500}
+[data-theme="terminal"] .tfl{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1e1e1e}
+[data-theme="terminal"] .tfl label{font-size:10px;color:#555;min-width:120px}
+[data-theme="terminal"] .tfl input{flex:1;padding:4px 8px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:2px;color:#e0e0e0;font-family:inherit;font-size:11px;outline:none}
+[data-theme="terminal"] .tfl input:focus{border-color:#6366f1}
+
+
+</style>
+</head>
+<body data-theme="macos">
+
+<nav class="nav">
+  <h1>MultiCodex Redesign</h1>
+  <button class="sbtn on" data-t="macos">macOS Pro</button>
+  <button class="sbtn" data-t="dashboard">Dashboard</button>
+  <button class="sbtn" data-t="terminal">Terminal</button>
+
+</nav>
+
+<div class="wrap">
+  <div class="panel"><div class="plbl">Menu Bar Popover</div><div id="pm"></div></div>
+  <div class="panel wide"><div class="plbl">Settings Window</div><div id="sm"></div></div>
+</div>
+
+<script>
+const A=[
+  {name:'work-main',state:'connected',fh:{u:42,t:100},wk:{u:180,t:500}},
+  {name:'personal',state:'connected',fh:{u:78,t:100},wk:{u:410,t:500}},
+  {name:'team-alpha',state:'needsLogin',fh:{u:0,t:100},wk:{u:50,t:500}},
+  {name:'backup-acct',state:'connected',fh:{u:15,t:100},wk:{u:90,t:500}},
+];
+let sel='work-main';
+const p=(u,t)=>Math.round(u/t*100);
+const ck=(u,t)=>{const v=p(u,t);return v>85?'rd':v>60?'og':'gn'};
+const ckC=(u,t)=>{const v=p(u,t);return v>85?'r':v>60?'o':'g'};
+
+// ——— Popover Renderers ———
+
+function rMacP(){
+  const c=A[0],o=A.slice(1);
+  return `<div class="popover">
+  <div class="hdr"><div><h2>MultiCodex</h2><span class="ts">Updated 12s ago</span></div><button class="rbtn">↻</button></div>
+  <div class="mcard"><div class="mcard-t">Current Account</div><h3>${c.name}</h3><div class="mrow">
+    <div class="mbox"><div class="mlbl">5h Usage</div><div class="mval">${p(c.fh.u,c.fh.t)}%</div><div class="pbar"><div class="pfill ${ckC(c.fh.u,c.fh.t)}" style="width:${p(c.fh.u,c.fh.t)}%"></div></div></div>
+    <div class="mbox"><div class="mlbl">Weekly</div><div class="mval">${p(c.wk.u,c.wk.t)}%</div><div class="pbar"><div class="pfill ${ckC(c.wk.u,c.wk.t)}" style="width:${p(c.wk.u,c.wk.t)}%"></div></div></div>
+  </div></div>
+  <div class="mcard"><div class="mcard-t">Accounts</div>${o.map(a=>`<div class="arow ${a.name===sel?'sel':''}" onclick="sel='${a.name}';R()">
+    <div><div class="aname"><span class="mpill ${a.state==='connected'?'conn':'nlogin'}">${a.state==='connected'?'●':'!'}</span> ${a.name}</div><div class="ameta">5h ${p(a.fh.u,a.fh.t)}% · weekly ${p(a.wk.u,a.wk.t)}%</div></div>
+    <button class="mbtn ${a.state==='needsLogin'?'pri':'sec'}" style="font-size:10px;padding:3px 8px">${a.state==='needsLogin'?'Re-login':'Switch'}</button></div>`).join('')}</div>
+  <div class="foot"><button class="mbtn pri">Login New Account</button><button class="mbtn sec">Settings</button></div></div>`}
+
+function rDashP(){
+  const c=A[0],o=A.slice(1),fH=p(c.fh.u,c.fh.t),wP=p(c.wk.u,c.wk.t),ci=2*Math.PI*20,sd=[30,45,52,60,42,55,78,62,70,85,72,68];
+  return `<div class="popover">
+  <div class="hdr"><div><h2>MultiCodex</h2><div class="ts">Updated 12s ago</div></div><button class="dbtn">↻ Refresh</button></div>
+  <div class="bgrid">
+    <div class="bcard"><div class="blbl">5h Window</div><div class="ring"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" class="ring-bg"/><circle cx="24" cy="24" r="20" class="ring-fl" style="stroke:#6366f1;stroke-dasharray:${ci};stroke-dashoffset:${ci*(1-fH/100)}"/></svg><div class="rlbl">${fH}%</div></div><div class="spark">${sd.map(v=>`<div class="sbar ${v>80?'crit':v>60?'hi':''}" style="height:${v*.28}px"></div>`).join('')}</div></div>
+    <div class="bcard"><div class="blbl">Weekly</div><div class="ring"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" class="ring-bg"/><circle cx="24" cy="24" r="20" class="ring-fl" style="stroke:#34d399;stroke-dasharray:${ci};stroke-dashoffset:${ci*(1-wP/100)}"/></svg><div class="rlbl">${wP}%</div></div><div class="bsub">${c.wk.u} / ${c.wk.t} used</div></div>
+    <div class="bcard wide"><div class="blbl">Current Account</div><div style="display:flex;align-items:center;gap:8px"><div class="ddot gn"></div><div><div class="dn">${c.name}</div><div class="dm">Connected</div></div></div></div>
+  </div>
+  <div class="blbl" style="margin-bottom:6px">All Accounts</div><div class="dlist">${o.map(a=>{const ap=p(a.fh.u,a.fh.t),k=ck(a.fh.u,a.fh.t);return `<div class="drow ${a.name===sel?'sel':''}" onclick="sel='${a.name}';R()">
+    <div class="ddot ${a.state==='connected'?'gn':'og'}"></div><div style="flex:1"><div class="dn">${a.name}</div><div class="dm">${a.state==='needsLogin'?'Needs login':'Connected'}</div></div>
+    <div class="dbar"><div class="dbf" style="width:${ap}%;background:${{gn:'#34d399',og:'#fb923c',rd:'#ef4444'}[k]}"></div></div><span style="font-size:10px;color:rgba(255,255,255,.5);min-width:30px;text-align:right">${ap}%</span></div>`}).join('')}</div>
+  <div class="foot"><button class="dbtn" style="border-color:rgba(99,102,241,.3);color:#a5b4fc">+ New Account</button><button class="dbtn">Settings</button></div></div>`}
+
+function rTermP(){
+  const c=A[0],o=A.slice(1);
+  return `<div class="popover">
+  <div class="hdr"><h2>$ multicodex status</h2><span class="ts">12s ago</span></div>
+  <div class="tsec"><div class="tlbl">Current</div><div class="tline"><span class="k">account:</span><span class="v">${c.name}</span></div><div class="tline"><span class="k">status:</span><span class="v" style="color:#4ade80">● connected</span></div></div>
+  <div class="tsec"><div class="tlbl">Usage</div><div class="tline"><span class="k">5h:</span><span class="v">${p(c.fh.u,c.fh.t)}%</span></div><div class="tbar"><div class="tbf ${ckC(c.fh.u,c.fh.t)==='g'?'gn':ckC(c.fh.u,c.fh.t)==='o'?'og':'rd'}" style="width:${p(c.fh.u,c.fh.t)}%"></div></div><div class="tline" style="margin-top:4px"><span class="k">week:</span><span class="v">${p(c.wk.u,c.wk.t)}%</span></div><div class="tbar"><div class="tbf ${ckC(c.wk.u,c.wk.t)==='g'?'gn':ckC(c.wk.u,c.wk.t)==='o'?'og':'rd'}" style="width:${p(c.wk.u,c.wk.t)}%"></div></div></div>
+  <div class="tsec"><div class="tlbl">Accounts</div>${o.map(a=>`<div class="tacc ${a.name===sel?'sel':''}" onclick="sel='${a.name}';R()">
+    <div class="tan"><span class="tdot ${a.state==='connected'?'gn':'og'}"></span>${a.name}${a.state!=='connected'?' <span class="ttag wrn">NEEDS LOGIN</span>':''}</div><div class="tam">5h ${p(a.fh.u,a.fh.t)}% | week ${p(a.wk.u,a.wk.t)}%</div></div>`).join('')}</div>
+  <div class="foot"><button class="tbtn">+ login</button><button class="tbtn">settings</button></div></div>`}
+
+// ——— Settings Renderers ———
+
+function rMacS(){return `<div class="sw">
+  <div class="ssb"><h3>Settings</h3><div class="si on">Dashboard</div><div class="si">Accounts</div><div class="si">Runtime</div><div class="si">Display</div><div class="si">Troubleshooting</div></div>
+  <div class="sd"><h2>Dashboard</h2><p class="desc">Quick status for this install.</p>
+    <div class="og"><div class="oc"><div class="lbl">Current Account</div><div class="val">work-main</div></div><div class="oc"><div class="lbl">Needs Login</div><div class="val">1</div></div><div class="oc"><div class="lbl">Setup</div><div class="val">Complete</div></div></div>
+    <div style="background:rgba(255,255,255,.7);border:.5px solid rgba(0,0,0,.06);border-radius:10px;padding:14px;margin-bottom:14px"><div style="font-size:11px;font-weight:600;margin-bottom:8px">Switching Strategy</div><p style="font-size:10px;color:rgba(0,0,0,.4);margin-bottom:8px">Choose how MultiCodex decides when to switch accounts.</p><div class="seg"><button class="seg-b on">Manual</button><button class="seg-b">Auto (5h)</button><button class="seg-b">Auto (Weekly)</button></div></div>
+    <div class="fg"><label>Codex Runtime Path</label><input type="text" value="/usr/local/bin/codex"></div>
+    <div class="fg"><label>Auto-switch Notifications</label><div style="display:flex;align-items:center;gap:8px;margin-top:4px"><div style="width:36px;height:20px;border-radius:10px;background:#34c759;position:relative;cursor:pointer"><div style="width:16px;height:16px;border-radius:8px;background:#fff;position:absolute;top:2px;right:2px;box-shadow:0 1px 2px rgba(0,0,0,.15)"></div></div><span style="font-size:11px;color:rgba(0,0,0,.5)">Show silent notifications</span></div></div></div></div>`}
+
+function rDashS(){return `<div class="sw">
+  <div class="ssb"><h3>MultiCodex</h3><div class="si on">Dashboard</div><div class="si">Accounts</div><div class="si">Runtime</div><div class="si">Display</div><div class="si">Troubleshooting</div></div>
+  <div class="sd"><h2>Dashboard</h2><p class="desc">Quick status for this install.</p>
+    <div class="dsg"><div class="dsc"><div class="lbl">Current</div><div class="val">work-main</div></div><div class="dsc"><div class="lbl">Needs Login</div><div class="val">1</div></div><div class="dsc"><div class="lbl">Setup</div><div class="val">Done</div></div></div>
+    <div class="dsec"><div class="dst">Switching Strategy</div><div class="dfr"><label>Strategy</label><input type="text" value="Manual"></div><div class="dfr"><label>Notifications</label><input type="text" value="Enabled"></div></div>
+    <div class="dsec"><div class="dst">Runtime</div><div class="dfr"><label>Path</label><input type="text" value="/usr/local/bin/codex"></div></div></div></div>`}
+
+function rTermS(){return `<div class="sw">
+  <div class="ssb"><h3># settings</h3><div class="si on">&gt; dashboard</div><div class="si">&gt; accounts</div><div class="si">&gt; runtime</div><div class="si">&gt; display</div></div>
+  <div class="sd"><h2>// dashboard</h2><p class="desc">$ multicodex status --summary</p>
+    <div class="tsr"><div class="tsc"><div class="lbl">account</div><div class="val">work-main</div></div><div class="tsc"><div class="lbl">login</div><div class="val" style="color:#fb923c">1 needed</div></div><div class="tsc"><div class="lbl">setup</div><div class="val" style="color:#4ade80">done</div></div></div>
+    <div class="tfl"><label>strategy:</label><input type="text" value="manual"></div><div class="tfl"><label>notifications:</label><input type="text" value="enabled"></div><div class="tfl"><label>runtime_path:</label><input type="text" value="/usr/local/bin/codex"></div></div></div>`}
+
+
+
+const PR={macos:rMacP,dashboard:rDashP,terminal:rTermP};
+const SR={macos:rMacS,dashboard:rDashS,terminal:rTermS};
+function R(){const t=document.body.dataset.theme;document.getElementById('pm').innerHTML=PR[t]();document.getElementById('sm').innerHTML=SR[t]()}
+
+document.querySelectorAll('.sbtn').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.sbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');document.body.dataset.theme=b.dataset.t;R()}));
+R();
+</script>
+</body>
+</html>
