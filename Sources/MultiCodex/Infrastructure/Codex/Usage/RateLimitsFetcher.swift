@@ -55,61 +55,80 @@ extension CodexAccountService {
         var errors: [LimitsErrorEntry] = []
 
         for account in targets {
-            do {
-                let ttlSeconds = Self.normalizedLimitsCacheTTLSeconds(limitsCacheTTLSeconds)
-                if !refreshLive, let cached = try getCachedLimits(account: account, ttlMs: Double(ttlSeconds * 1000), paths: paths) {
-                    let ageSec = Int((cached.ageMs / 1000.0).rounded())
-                    results.append(
-                        LimitsResult(
-                            account: account,
-                            source: "cached",
-                            snapshot: cached.snapshot,
-                            ageSec: ageSec
-                        )
+            // 1. Check cache if not forcing live refresh
+            let ttlSeconds = Self.normalizedLimitsCacheTTLSeconds(limitsCacheTTLSeconds)
+            if !refreshLive, let cached = try getCachedLimits(account: account, ttlMs: Double(ttlSeconds * 1000), paths: paths) {
+                let ageSec = Int((cached.ageMs / 1000.0).rounded())
+                results.append(
+                    LimitsResult(
+                        account: account,
+                        source: "cached",
+                        snapshot: cached.snapshot,
+                        ageSec: ageSec
                     )
-                    continue
-                }
-
-                do {
-                    let snapshot = try fetchRateLimitsViaApiForAuthPath(paths.accountAuthPath(account))
-                    try setCachedLimits(account: account, snapshot: snapshot, provider: "api", paths: paths)
-                    results.append(
-                        LimitsResult(
-                            account: account,
-                            source: "live-api",
-                            snapshot: snapshot,
-                            ageSec: nil
-                        )
-                    )
-                    continue
-                } catch {
-                    let apiError = error
-
-                    do {
-                        let snapshot = try withAccountAuth(account: account, forceLock: false, restorePreviousAuth: true, paths: paths) {
-                            try fetchRateLimitsViaRpc()
-                        }
-
-                        try setCachedLimits(account: account, snapshot: snapshot, provider: "rpc", paths: paths)
-                        results.append(
-                            LimitsResult(
-                                account: account,
-                                source: "live-rpc",
-                                snapshot: snapshot,
-                                ageSec: nil
-                            )
-                        )
-                        continue
-                    } catch {
-                        errors.append(
-                            LimitsErrorEntry(
-                                account: account,
-                                message: "API failed (\(apiError.localizedDescription)); RPC fallback failed (\(error.localizedDescription))"
-                            )
-                        )
-                    }
-                }
+                )
+                continue
             }
+
+            // 2. Try API fetch
+            let apiResult: RateLimitSnapshot?
+            let apiError: Error?
+            do {
+                apiResult = try fetchRateLimitsViaApiForAuthPath(paths.accountAuthPath(account))
+                apiError = nil
+            } catch {
+                apiResult = nil
+                apiError = error
+            }
+
+            if let snapshot = apiResult {
+                try setCachedLimits(account: account, snapshot: snapshot, provider: "api", paths: paths)
+                results.append(
+                    LimitsResult(
+                        account: account,
+                        source: "live-api",
+                        snapshot: snapshot,
+                        ageSec: nil
+                    )
+                )
+                continue
+            }
+
+            // 3. Fallback to RPC fetch
+            let rpcResult: RateLimitSnapshot?
+            let rpcError: Error?
+            do {
+                rpcResult = try withAccountAuth(account: account, forceLock: false, restorePreviousAuth: true, paths: paths) {
+                    try fetchRateLimitsViaRpc()
+                }
+                rpcError = nil
+            } catch {
+                rpcResult = nil
+                rpcError = error
+            }
+
+            if let snapshot = rpcResult {
+                try setCachedLimits(account: account, snapshot: snapshot, provider: "rpc", paths: paths)
+                results.append(
+                    LimitsResult(
+                        account: account,
+                        source: "live-rpc",
+                        snapshot: snapshot,
+                        ageSec: nil
+                    )
+                )
+                continue
+            }
+
+            // 4. Record error if both API and RPC failed
+            let apiMessage = apiError?.localizedDescription ?? "unknown"
+            let rpcMessage = rpcError?.localizedDescription ?? "unknown"
+            errors.append(
+                LimitsErrorEntry(
+                    account: account,
+                    message: "API failed (\(apiMessage)); RPC fallback failed (\(rpcMessage))"
+                )
+            )
         }
 
         return LimitsPayload(results: results, errors: errors)

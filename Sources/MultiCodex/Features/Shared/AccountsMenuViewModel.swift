@@ -368,77 +368,91 @@ final class AccountsMenuViewModel: ObservableObject {
         }
     }
 
-    func applyCurrentAccountLocally(named name: String) {
-        accounts = accounts.map { account in
-            AccountUsage(
-                name: account.name,
-                isCurrent: account.name == name,
-                hasAuth: account.hasAuth,
-                lastUsedAt: account.lastUsedAt,
-                lastLoginStatus: account.lastLoginStatus,
-                defaultWorkspaceEmail: account.defaultWorkspaceEmail,
-                usage: account.usage,
-                source: account.source,
-                usageError: account.usageError
-            )
+    func clearFocusedAccountIfMissing() {
+        if let focusedAccountName,
+           !accounts.contains(where: { $0.name == focusedAccountName })
+        {
+            self.focusedAccountName = nil
         }
     }
 
+    // MARK: - Account List Mutation Helpers
+
+    /// Sorts accounts with current first, then by name.
+    private func sortedCurrentFirst(_ accounts: [AccountUsage]) -> [AccountUsage] {
+        accounts.sorted { lhs, rhs in
+            if lhs.isCurrent != rhs.isCurrent {
+                return lhs.isCurrent
+            }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    /// Creates a copy of an AccountUsage with specified field overrides.
+    private func copyAccount(
+        _ account: AccountUsage,
+        name: String? = nil,
+        isCurrent: Bool? = nil,
+        hasAuth: Bool? = nil,
+        lastUsedAt: String? = nil,
+        lastLoginStatus: String? = nil,
+        defaultWorkspaceEmail: String? = nil,
+        usage: UsageSummary? = nil,
+        source: String? = nil,
+        usageError: String? = nil
+    ) -> AccountUsage {
+        AccountUsage(
+            name: name ?? account.name,
+            isCurrent: isCurrent ?? account.isCurrent,
+            hasAuth: hasAuth ?? account.hasAuth,
+            lastUsedAt: lastUsedAt ?? account.lastUsedAt,
+            lastLoginStatus: lastLoginStatus ?? account.lastLoginStatus,
+            defaultWorkspaceEmail: defaultWorkspaceEmail ?? account.defaultWorkspaceEmail,
+            usage: usage ?? account.usage,
+            source: source ?? account.source,
+            usageError: usageError ?? account.usageError
+        )
+    }
+
+    /// Updates the accounts array and applies current-first sorting.
+    private func updateAccounts(_ newAccounts: [AccountUsage]) {
+        accounts = sortedCurrentFirst(newAccounts)
+    }
+
+    /// Applies local state change when the current account is switched.
+    func applyCurrentAccountLocally(named name: String) {
+        updateAccounts(accounts.map { copyAccount($0, isCurrent: $0.name == name) })
+    }
+
+    /// Renames an account locally and updates focused/selected references.
     func renameAccountLocally(from oldName: String, to newName: String) {
-        accounts = accounts
-            .map { account in
-                let effectiveName = account.name == oldName ? newName : account.name
-                return AccountUsage(
-                    name: effectiveName,
-                    isCurrent: account.isCurrent,
-                    hasAuth: account.hasAuth,
-                    lastUsedAt: account.lastUsedAt,
-                    lastLoginStatus: account.lastLoginStatus,
-                    defaultWorkspaceEmail: account.defaultWorkspaceEmail,
-                    usage: account.usage,
-                    source: account.source,
-                    usageError: account.usageError
-                )
-            }
-            .sorted { lhs, rhs in
-                if lhs.isCurrent != rhs.isCurrent {
-                    return lhs.isCurrent
-                }
-                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            }
+        updateAccounts(accounts.map { account in
+            copyAccount(account, name: account.name == oldName ? newName : account.name)
+        })
 
         if focusedAccountName == oldName {
             focusedAccountName = newName
         }
     }
 
+    /// Removes an account locally and optionally updates the current account marker.
     func removeAccountLocally(named name: String, currentAccountName: String?) {
-        accounts = accounts
-            .filter { $0.name != name }
-            .map { account in
-                AccountUsage(
-                    name: account.name,
-                    isCurrent: currentAccountName.map { account.name == $0 } ?? false,
-                    hasAuth: account.hasAuth,
-                    lastUsedAt: account.lastUsedAt,
-                    lastLoginStatus: account.lastLoginStatus,
-                    defaultWorkspaceEmail: account.defaultWorkspaceEmail,
-                    usage: account.usage,
-                    source: account.source,
-                    usageError: account.usageError
-                )
-            }
-            .sorted { lhs, rhs in
-                if lhs.isCurrent != rhs.isCurrent {
-                    return lhs.isCurrent
+        updateAccounts(
+            accounts
+                .filter { $0.name != name }
+                .map { account in
+                    copyAccount(
+                        account,
+                        isCurrent: currentAccountName.map { account.name == $0 } ?? account.isCurrent
+                    )
                 }
-                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            }
+        )
 
         clearFocusedAccountIfMissing()
         syncSelectedSettingsAccount()
     }
 
+    /// Upserts an authenticated account locally, preserving existing data where not overridden.
     func upsertAuthenticatedAccountLocally(
         named name: String,
         currentAccountName: String? = nil,
@@ -448,73 +462,41 @@ final class AccountsMenuViewModel: ObservableObject {
         var didUpdateExisting = false
 
         let updated = accounts.map { account in
-            let isCurrent = currentAccountName.map { account.name == $0 } ?? account.isCurrent
             guard account.name == name else {
-                return AccountUsage(
-                    name: account.name,
-                    isCurrent: isCurrent,
-                    hasAuth: account.hasAuth,
-                    lastUsedAt: account.lastUsedAt,
-                    lastLoginStatus: account.lastLoginStatus,
-                    defaultWorkspaceEmail: account.defaultWorkspaceEmail,
-                    usage: account.usage,
-                    source: account.source,
-                    usageError: account.usageError
+                return copyAccount(
+                    account,
+                    isCurrent: currentAccountName.map { account.name == $0 } ?? account.isCurrent
                 )
             }
 
             didUpdateExisting = true
-            return AccountUsage(
-                name: account.name,
+            return copyAccount(
+                account,
                 isCurrent: currentAccountName.map { name == $0 } ?? account.isCurrent,
                 hasAuth: true,
                 lastUsedAt: nowISO,
-                lastLoginStatus: lastLoginStatus ?? account.lastLoginStatus,
-                defaultWorkspaceEmail: account.defaultWorkspaceEmail,
-                usage: account.usage,
-                source: account.source,
-                usageError: account.usageError
+                lastLoginStatus: lastLoginStatus ?? account.lastLoginStatus
             )
         }
 
         if didUpdateExisting {
-            accounts = updated.sorted { lhs, rhs in
-                if lhs.isCurrent != rhs.isCurrent {
-                    return lhs.isCurrent
-                }
-                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            }
+            updateAccounts(updated)
         } else {
-            accounts = (updated + [
-                AccountUsage(
-                    name: name,
-                    isCurrent: currentAccountName == name,
-                    hasAuth: true,
-                    lastUsedAt: nowISO,
-                    lastLoginStatus: lastLoginStatus,
-                    defaultWorkspaceEmail: nil,
-                    usage: UsageFormatter.usageSummary(from: nil),
-                    source: "-",
-                    usageError: nil
-                ),
-            ])
-            .sorted { lhs, rhs in
-                if lhs.isCurrent != rhs.isCurrent {
-                    return lhs.isCurrent
-                }
-                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            }
+            let newAccount = AccountUsage(
+                name: name,
+                isCurrent: currentAccountName == name,
+                hasAuth: true,
+                lastUsedAt: nowISO,
+                lastLoginStatus: lastLoginStatus,
+                defaultWorkspaceEmail: nil,
+                usage: UsageFormatter.usageSummary(from: nil),
+                source: "-",
+                usageError: nil
+            )
+            updateAccounts(updated + [newAccount])
         }
 
         syncSelectedSettingsAccount()
-    }
-
-    func clearFocusedAccountIfMissing() {
-        if let focusedAccountName,
-           !accounts.contains(where: { $0.name == focusedAccountName })
-        {
-            self.focusedAccountName = nil
-        }
     }
 
     func sendTestAutoSwitchNotification() { accountManagement.sendTestAutoSwitchNotification() }
