@@ -5,7 +5,7 @@ import XCTest
 @MainActor
 final class AccountsMenuViewModelTests: XCTestCase {
     func testSetLimitsCacheTTLUpdatesServiceAndPreferences() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let preferences = AppPreferencesStore(defaults: defaults)
         let service = MockCodexAccountService()
         let viewModel = AccountsMenuViewModel(
@@ -25,7 +25,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testSwitchingStrategyDefaultsToManualAndPersistsChanges() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
@@ -51,7 +51,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testSelectSettingsSectionPersistsSelection() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
@@ -69,7 +69,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testResetOnboardingWizardReturnsToRuntimeAndClearsSelectedAccount() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         defaults.set("beta", forKey: AppPreferencesStore.Keys.selectedSettingsAccountName)
         let service = MockCodexAccountService()
         let viewModel = AccountsMenuViewModel(
@@ -90,7 +90,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testUpdateCustomCodexPathUpdatesServiceAndStore() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
@@ -107,7 +107,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testMenuAccountRowsExcludeCurrentAccount() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
@@ -134,7 +134,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testPerformRefreshHandlesFirstFailureThenWarningFallback() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.fetchAccountsError = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "accounts unavailable"])
         let viewModel = AccountsMenuViewModel(
@@ -182,7 +182,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testPerformRefreshPublishesAccountsBeforeSlowLimitsComplete() async throws {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -212,7 +212,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testManualStrategyDoesNotAutoSwitch() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: "expired"),
@@ -243,7 +243,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testFailoverStrategyAutomaticallySwitchesWhenCurrentNeedsLogin() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         var preferences = AppPreferencesStore(defaults: defaults)
         preferences.accountSwitchingStrategy = .failover
 
@@ -281,7 +281,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testFailoverStrategyAutomaticallySwitchesWhenCurrentRefreshErrorsButUsageIsPreserved() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         var preferences = AppPreferencesStore(defaults: defaults)
         preferences.accountSwitchingStrategy = .failover
 
@@ -346,7 +346,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testSendTestAutoSwitchNotificationUsesCurrentAndNextAccount() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         var preferences = AppPreferencesStore(defaults: defaults)
         preferences.autoSwitchNotificationsEnabled = true
 
@@ -393,7 +393,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testSetAccountSwitchingStrategyTriggersImmediateLiveRefreshForAutomaticModes() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
@@ -412,7 +412,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testExpiryAwareStrategyAutomaticallySwitchesToSoonerExpiringHeadroom() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         var preferences = AppPreferencesStore(defaults: defaults)
         preferences.accountSwitchingStrategy = .expiryAware
         preferences.autoSwitchNotificationsEnabled = true
@@ -481,7 +481,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testStartLoginFlowFallsBackToTerminalAndRecoversOnAppActive() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -521,7 +521,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testStartLoginFlowKeepsRetryableSessionWhenTerminalLoginFails() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -554,7 +554,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testStartNewAccountLoginStoresAuthWithoutAutoSwitching() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -577,7 +577,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testStartNewAccountLoginAutoRenamesToDefaultWorkspaceEmail() async {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -601,7 +601,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testSwitchToAccountCompletesBeforeBackgroundRefreshFinishes() async throws {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -643,7 +643,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testRenameAccountUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -692,7 +692,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testRemoveAccountUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -734,7 +734,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testImportAuthUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: nil),
@@ -774,7 +774,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testCheckStatusUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -814,7 +814,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     }
 
     func testStartNewAccountLoginUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
@@ -859,7 +859,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let runtimeOff = AccountsMenuViewModel(
             accountService: runtimeOffService,
             fileManager: .default,
-            preferences: AppPreferencesStore(defaults: ephemeralDefaults()),
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
             startImmediately: false
         )
         XCTAssertEqual(runtimeOff.onboardingState.step, .runtime)
@@ -869,7 +869,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let empty = AccountsMenuViewModel(
             accountService: emptyService,
             fileManager: .default,
-            preferences: AppPreferencesStore(defaults: ephemeralDefaults()),
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
             startImmediately: false
         )
         XCTAssertEqual(empty.onboardingState.step, .login)
@@ -881,7 +881,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let needsLogin = AccountsMenuViewModel(
             accountService: needsLoginService,
             fileManager: .default,
-            preferences: AppPreferencesStore(defaults: ephemeralDefaults()),
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
             startImmediately: false
         )
         needsLogin.refresh()
@@ -897,7 +897,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let complete = AccountsMenuViewModel(
             accountService: completeService,
             fileManager: .default,
-            preferences: AppPreferencesStore(defaults: ephemeralDefaults()),
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
             startImmediately: false
         )
         complete.refresh()
@@ -907,15 +907,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(complete.onboardingState.step, .done)
     }
 
-    private func ephemeralDefaults() -> UserDefaults {
-        let suite = "MultiCodexTests.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suite) else {
-            XCTFail("Could not create isolated UserDefaults suite: \(suite)")
-            return .standard
-        }
-        defaults.removePersistentDomain(forName: suite)
-        return defaults
-    }
+    // Note: Uses makeEphemeralDefaults() from TestFixtures.swift
 
     private func waitUntil(timeoutSeconds: TimeInterval, condition: @escaping () -> Bool) async {
         let deadline = Date().addingTimeInterval(timeoutSeconds)

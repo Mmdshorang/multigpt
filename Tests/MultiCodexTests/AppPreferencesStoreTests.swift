@@ -3,21 +3,21 @@ import XCTest
 
 final class AppPreferencesStoreTests: XCTestCase {
     func testCustomCodexPathDefaultsToEmptyWhenUnset() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
 
         let store = AppPreferencesStore(defaults: defaults)
         XCTAssertEqual(store.customCodexPath, "")
     }
 
     func testSelectedSettingsAccountDefaultsToNilWhenUnset() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
 
         let store = AppPreferencesStore(defaults: defaults)
         XCTAssertNil(store.selectedSettingsAccountName)
     }
 
     func testSettingCustomCodexPathPersistsCanonicalKey() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
 
         var store = AppPreferencesStore(defaults: defaults)
         store.customCodexPath = "/usr/local/bin/codex"
@@ -26,7 +26,7 @@ final class AppPreferencesStoreTests: XCTestCase {
     }
 
     func testDefaultsForDisplaySettings() {
-        let defaults = ephemeralDefaults()
+        let defaults = makeEphemeralDefaults()
         var store = AppPreferencesStore(defaults: defaults)
 
         XCTAssertEqual(store.resetDisplayMode, .relative)
@@ -49,13 +49,4 @@ final class AppPreferencesStoreTests: XCTestCase {
         XCTAssertTrue(persisted.autoSwitchNotificationsEnabled)
     }
 
-    private func ephemeralDefaults() -> UserDefaults {
-        let suite = "MultiCodexTests.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suite) else {
-            XCTFail("Could not create isolated UserDefaults suite: \(suite)")
-            return .standard
-        }
-        defaults.removePersistentDomain(forName: suite)
-        return defaults
-    }
 }
