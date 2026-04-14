@@ -290,7 +290,7 @@ extension CodexAccountService {
     func validatedAccountName(_ name: String) throws -> String {
         let account = normalizeAccountName(name)
         guard isValidAccountName(account) else {
-            throw CodexAccountServiceError(message: "Invalid account name. Use letters, numbers, underscore, or dash.")
+            throw CodexAccountServiceError(message: "Invalid account name. Use letters, numbers, underscore, dash, dot, or @.")
         }
         return account
     }
@@ -301,7 +301,7 @@ extension CodexAccountService {
 
     func isValidAccountName(_ name: String) -> Bool {
         guard !name.isEmpty else { return false }
-        return name.range(of: "^[a-zA-Z0-9_-]+$", options: .regularExpression) != nil
+        return name.range(of: "^[a-zA-Z0-9][a-zA-Z0-9_.@-]*$", options: .regularExpression) != nil
     }
 
     func shellQuote(_ value: String) -> String {

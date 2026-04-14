@@ -64,6 +64,29 @@ final class CodexAccountServiceTests: XCTestCase {
         XCTAssertTrue(accountAfter.contains("sandbox"))
     }
 
+    func testFetchAccountsInfersDefaultWorkspaceEmailFromAuthToken() async throws {
+        let service = makeSandboxedService()
+        _ = try await service.addAccount(name: "alpha")
+
+        let authPath = (service.effectiveMulticodexHomePath() as NSString)
+            .appendingPathComponent("accounts/alpha/auth.json")
+        let idToken = makeIDToken(email: "dev@example.com", defaultWorkspace: "Personal")
+        try writeText(
+            """
+            {
+              "tokens": {
+                "access_token": "token",
+                "id_token": "\(idToken)"
+              }
+            }
+            """,
+            to: authPath
+        )
+
+        let payload = try await service.fetchAccounts()
+        XCTAssertEqual(payload.accounts.first?.defaultWorkspaceEmail, "personal-dev@example.com")
+    }
+
     func testAccountConfigStoreRejectsLegacyVersion1Format() throws {
         let json = """
         {
@@ -338,5 +361,36 @@ final class CodexAccountServiceTests: XCTestCase {
         let dir = (path as NSString).deletingLastPathComponent
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         try Data(value.utf8).write(to: URL(fileURLWithPath: path))
+    }
+
+    private func makeIDToken(email: String, defaultWorkspace: String) -> String {
+        let header: [String: Any] = [
+            "alg": "none",
+            "typ": "JWT",
+        ]
+        let payload: [String: Any] = [
+            "email": email,
+            "https://api.openai.com/auth": [
+                "organizations": [
+                    [
+                        "title": defaultWorkspace,
+                        "is_default": true,
+                    ],
+                ],
+            ],
+        ]
+
+        let headerSegment = base64URLEncodedJSON(header)
+        let payloadSegment = base64URLEncodedJSON(payload)
+        return "\(headerSegment).\(payloadSegment).signature"
+    }
+
+    private func base64URLEncodedJSON(_ object: Any) -> String {
+        let data = (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{}".utf8)
+        return data
+            .base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 }

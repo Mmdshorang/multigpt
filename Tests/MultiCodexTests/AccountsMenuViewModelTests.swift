@@ -106,6 +106,33 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(persisted.customCodexPath, "/usr/local/bin/codex")
     }
 
+    func testMenuAccountRowsExcludeCurrentAccount() {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(
+                accounts: [
+                    AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+                    AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+                    AccountEntry(name: "gamma", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+                ],
+                currentAccount: "alpha"
+            ),
+            limits: LimitsPayload(results: [], errors: [])
+        )
+
+        let rows = viewModel.menuAccountRows(limit: 5)
+
+        XCTAssertEqual(rows.map(\.name), ["beta", "gamma"])
+    }
+
     func testPerformRefreshHandlesFirstFailureThenWarningFallback() async {
         let defaults = ephemeralDefaults()
         let service = MockCodexAccountService()
@@ -549,6 +576,30 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertTrue(service.switchCalls.isEmpty)
     }
 
+    func testStartNewAccountLoginAutoRenamesToDefaultWorkspaceEmail() async {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedDefaultWorkspaceEmailByAccount["fresh"] = "personal-fresh@example.com"
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.startLoginFlow(accountName: "fresh", createIfNeeded: true)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.renameCalls.contains(where: { $0.from == "fresh" && $0.to == "personal-fresh@example.com" })
+        }
+
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "personal-fresh@example.com" && $0.hasAuth }))
+    }
+
     func testSwitchToAccountCompletesBeforeBackgroundRefreshFinishes() async throws {
         let defaults = ephemeralDefaults()
         let service = MockCodexAccountService()
@@ -930,6 +981,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var loginHomeStatusExitCode = 0
     var loginHomeStatusOutput = "ok"
     var probeRuntimeResult = RuntimeProbe(isAvailable: true, summary: "ok")
+    var stubbedDefaultWorkspaceEmailByAccount: [String: String] = [:]
 
     private(set) var switchCalls: [String] = []
     private(set) var removeCalls: [RemoveCall] = []
@@ -948,7 +1000,17 @@ private final class MockCodexAccountService: CodexAccountServicing {
             throw fetchAccountsError
         }
         let current = stubbedAccounts.first(where: { $0.isCurrent })?.name
-        return AccountsListPayload(accounts: stubbedAccounts, currentAccount: current)
+        let withIdentity = stubbedAccounts.map { account in
+            AccountEntry(
+                name: account.name,
+                isCurrent: account.isCurrent,
+                hasAuth: account.hasAuth,
+                lastUsedAt: account.lastUsedAt,
+                lastLoginStatus: account.lastLoginStatus,
+                defaultWorkspaceEmail: stubbedDefaultWorkspaceEmailByAccount[account.name]
+            )
+        }
+        return AccountsListPayload(accounts: withIdentity, currentAccount: current)
     }
 
     func fetchLimits(refreshLive: Bool) async throws -> LimitsPayload {
@@ -1009,6 +1071,9 @@ private final class MockCodexAccountService: CodexAccountServicing {
             throw renameError
         }
         renameCalls.append((from: oldName, to: newName))
+        if let defaultWorkspaceEmail = stubbedDefaultWorkspaceEmailByAccount.removeValue(forKey: oldName) {
+            stubbedDefaultWorkspaceEmailByAccount[newName] = defaultWorkspaceEmail
+        }
         stubbedAccounts = stubbedAccounts.map { account in
             let effectiveName = account.name == oldName ? newName : account.name
             return AccountEntry(

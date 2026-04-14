@@ -16,7 +16,10 @@ extension CodexAccountService {
                 isCurrent: name == config.currentAccount,
                 hasAuth: hasAuth,
                 lastUsedAt: meta?.lastUsedAt,
-                lastLoginStatus: meta?.lastLoginStatus
+                lastLoginStatus: meta?.lastLoginStatus,
+                defaultWorkspaceEmail: DebugFeatureFlags.inferWorkspaceEmailFromAuth
+                    ? inferDefaultWorkspaceEmail(fromAuthPath: paths.accountAuthPath(name))
+                    : nil
             )
         }
 

@@ -26,6 +26,7 @@ enum AccountUsageMergeService {
                 hasAuth: account.hasAuth,
                 lastUsedAt: account.lastUsedAt,
                 lastLoginStatus: account.lastLoginStatus,
+                defaultWorkspaceEmail: account.defaultWorkspaceEmail,
                 usage: usage,
                 source: source,
                 usageError: effectiveUsageError

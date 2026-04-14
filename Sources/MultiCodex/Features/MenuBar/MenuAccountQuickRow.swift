@@ -36,10 +36,12 @@ struct MenuAccountQuickRow: View {
                         if row.isCurrent {
                             AccountStatusPill(text: "Current", color: .accentColor)
                         }
-                        AccountStatusPill(
-                            text: row.connectionState.label,
-                            color: AccountPresentation.statusColor(for: row.connectionState)
-                        )
+                        if !DebugFeatureFlags.hideConnectedBadge || row.connectionState != .connected {
+                            AccountStatusPill(
+                                text: row.connectionState.label,
+                                color: AccountPresentation.statusColor(for: row.connectionState)
+                            )
+                        }
                     }
 
                     HStack(spacing: 8) {
@@ -50,6 +52,13 @@ struct MenuAccountQuickRow: View {
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+
+                    if let workspaceEmailHint = row.workspaceEmailHint {
+                        Text(workspaceEmailHint)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
 
                 if row.connectionState != .connected, let hint = row.account.connectionHint {

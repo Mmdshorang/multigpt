@@ -77,32 +77,54 @@ struct AccountsMenuContentView: View {
         .forDensity(viewModel.menuDensity)
     }
 
+    var isSafeMenuFallbackEnabled: Bool {
+        DebugFeatureFlags.useSafeMenuFallback
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             Color(nsColor: .windowBackgroundColor)
                 .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: layout.sectionSpacing) {
-                header
-
-                if let alert = viewModel.prioritizedMenuAlert {
-                    alertBanner(alert)
-                }
-
-                if viewModel.prioritizedMenuAlert == nil, let warning = viewModel.refreshWarningMessage {
-                    SubtleWarningRow(text: warning)
-                }
-
-                if viewModel.accounts.isEmpty {
-                    emptyStateCard
-                } else {
-                    if let current = viewModel.currentAccount {
-                        currentAccountCard(current)
+                if isSafeMenuFallbackEnabled {
+                    safeHeader
+                    if let alert = viewModel.prioritizedMenuAlert {
+                        safeAlertBanner(alert)
+                    } else if let warning = viewModel.refreshWarningMessage {
+                        Text(warning)
+                            .font(.caption)
                     }
-                    quickAccountsCard
-                }
+                    if viewModel.accounts.isEmpty {
+                        safeEmptyState
+                    } else {
+                        safeAccountsCard
+                    }
+                    safeFooter
+                } else {
+                    header
 
-                footer
+                    if let alert = viewModel.prioritizedMenuAlert {
+                        alertBanner(alert)
+                    }
+
+                    if viewModel.prioritizedMenuAlert == nil, let warning = viewModel.refreshWarningMessage {
+                        SubtleWarningRow(text: warning)
+                    }
+
+                    if viewModel.accounts.isEmpty {
+                        emptyStateCard
+                    } else {
+                        if let current = viewModel.currentAccount {
+                            currentAccountCard(current)
+                        }
+                        if !viewModel.menuListAccounts.isEmpty {
+                            quickAccountsCard
+                        }
+                    }
+
+                    footer
+                }
             }
             .padding(layout.containerPadding)
 

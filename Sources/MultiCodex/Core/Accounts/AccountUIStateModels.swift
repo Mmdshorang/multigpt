@@ -145,6 +145,17 @@ struct AccountRowState: Identifiable {
     var connectionState: AccountConnectionState { account.connectionState }
     var fiveHourPercent: String { account.usage.fiveHour.percentText }
     var weeklyPercent: String { account.usage.weekly.percentText }
+    var defaultWorkspaceEmail: String? { account.defaultWorkspaceEmail }
+    var workspaceEmailHint: String? {
+        guard DebugFeatureFlags.showWorkspaceEmailHint,
+              let defaultWorkspaceEmail,
+              !defaultWorkspaceEmail.isEmpty,
+              defaultWorkspaceEmail.localizedCaseInsensitiveCompare(name) != .orderedSame
+        else {
+            return nil
+        }
+        return defaultWorkspaceEmail
+    }
     var resetText: String {
         account.usage.fiveHour.resetText(mode: resetDisplayMode)
     }

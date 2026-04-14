@@ -90,9 +90,32 @@ struct AccountUsage: Identifiable {
     let hasAuth: Bool
     let lastUsedAt: String?
     let lastLoginStatus: String?
+    let defaultWorkspaceEmail: String?
     let usage: UsageSummary
     let source: String
     let usageError: String?
+
+    init(
+        name: String,
+        isCurrent: Bool,
+        hasAuth: Bool,
+        lastUsedAt: String?,
+        lastLoginStatus: String?,
+        defaultWorkspaceEmail: String? = nil,
+        usage: UsageSummary,
+        source: String,
+        usageError: String?
+    ) {
+        self.name = name
+        self.isCurrent = isCurrent
+        self.hasAuth = hasAuth
+        self.lastUsedAt = lastUsedAt
+        self.lastLoginStatus = lastLoginStatus
+        self.defaultWorkspaceEmail = defaultWorkspaceEmail
+        self.usage = usage
+        self.source = source
+        self.usageError = usageError
+    }
 
     var id: String { name }
 

@@ -161,6 +161,16 @@ final class AccountsMenuViewModel: ObservableObject {
         }
     }
 
+    var menuListAccounts: [AccountUsage] {
+        guard DebugFeatureFlags.excludeCurrentAccountFromMenuList else {
+            return accounts
+        }
+        guard let currentName = currentAccount?.name else {
+            return accounts
+        }
+        return accounts.filter { $0.name != currentName }
+    }
+
     var selectedSettingsAccount: AccountUsage? {
         guard let selectedSettingsAccountName else {
             return nil
@@ -220,7 +230,7 @@ final class AccountsMenuViewModel: ObservableObject {
 
     func menuAccountRows(limit: Int? = nil) -> [AccountRowState] {
         let maxCount = limit ?? preferredMenuAccountCount
-        return Array(accounts.prefix(maxCount)).map { account in
+        return Array(menuListAccounts.prefix(maxCount)).map { account in
             AccountRowState(account: account, resetDisplayMode: resetDisplayMode)
         }
     }
@@ -369,6 +379,7 @@ final class AccountsMenuViewModel: ObservableObject {
                 hasAuth: account.hasAuth,
                 lastUsedAt: account.lastUsedAt,
                 lastLoginStatus: account.lastLoginStatus,
+                defaultWorkspaceEmail: account.defaultWorkspaceEmail,
                 usage: account.usage,
                 source: account.source,
                 usageError: account.usageError
@@ -386,6 +397,7 @@ final class AccountsMenuViewModel: ObservableObject {
                     hasAuth: account.hasAuth,
                     lastUsedAt: account.lastUsedAt,
                     lastLoginStatus: account.lastLoginStatus,
+                    defaultWorkspaceEmail: account.defaultWorkspaceEmail,
                     usage: account.usage,
                     source: account.source,
                     usageError: account.usageError
@@ -413,6 +425,7 @@ final class AccountsMenuViewModel: ObservableObject {
                     hasAuth: account.hasAuth,
                     lastUsedAt: account.lastUsedAt,
                     lastLoginStatus: account.lastLoginStatus,
+                    defaultWorkspaceEmail: account.defaultWorkspaceEmail,
                     usage: account.usage,
                     source: account.source,
                     usageError: account.usageError
@@ -446,6 +459,7 @@ final class AccountsMenuViewModel: ObservableObject {
                     hasAuth: account.hasAuth,
                     lastUsedAt: account.lastUsedAt,
                     lastLoginStatus: account.lastLoginStatus,
+                    defaultWorkspaceEmail: account.defaultWorkspaceEmail,
                     usage: account.usage,
                     source: account.source,
                     usageError: account.usageError
@@ -459,6 +473,7 @@ final class AccountsMenuViewModel: ObservableObject {
                 hasAuth: true,
                 lastUsedAt: nowISO,
                 lastLoginStatus: lastLoginStatus ?? account.lastLoginStatus,
+                defaultWorkspaceEmail: account.defaultWorkspaceEmail,
                 usage: account.usage,
                 source: account.source,
                 usageError: account.usageError
@@ -480,6 +495,7 @@ final class AccountsMenuViewModel: ObservableObject {
                     hasAuth: true,
                     lastUsedAt: nowISO,
                     lastLoginStatus: lastLoginStatus,
+                    defaultWorkspaceEmail: nil,
                     usage: UsageFormatter.usageSummary(from: nil),
                     source: "-",
                     usageError: nil

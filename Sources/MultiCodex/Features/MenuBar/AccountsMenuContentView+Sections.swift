@@ -2,6 +2,117 @@ import AppKit
 import SwiftUI
 
 extension AccountsMenuContentView {
+    var safeHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("MultiCodex")
+                    .font(.headline)
+                Spacer()
+                Button("Refresh") {
+                    viewModel.refreshLive()
+                }
+                .disabled(viewModel.isRefreshing)
+            }
+
+            Text(viewModel.lastUpdatedLabel)
+                .font(.caption)
+        }
+    }
+
+    func safeAlertBanner(_ alert: MenuAlertState) -> some View {
+        HStack {
+            Text(alert.title)
+                .font(.caption.weight(.semibold))
+            Text(alert.message)
+                .font(.caption)
+                .lineLimit(2)
+        }
+        .padding(6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+    }
+
+    var safeEmptyState: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("No accounts yet.")
+                .font(.subheadline.weight(.semibold))
+            Button("Login First Account") {
+                viewModel.startNewAccountLogin()
+            }
+            Button("Open Settings") {
+                openSettingsWindow()
+            }
+        }
+        .padding(layout.cardPadding)
+        .background(
+            RoundedRectangle(cornerRadius: layout.cardCornerRadius, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+    }
+
+    var safeAccountsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let current = viewModel.currentAccount {
+                Text("Current: \(current.name)")
+                    .font(.caption.weight(.semibold))
+            }
+
+            ForEach(visibleRows) { row in
+                HStack(spacing: 8) {
+                    Text(row.name)
+                        .font(.caption)
+                        .lineLimit(1)
+
+                    if row.isCurrent {
+                        Text("Current")
+                            .font(.caption2)
+                    }
+
+                    if row.connectionState != .connected {
+                        Text(row.connectionState.label)
+                            .font(.caption2)
+                    }
+
+                    Spacer()
+
+                    switch row.primaryAction {
+                    case .switchAccount:
+                        Button("Switch") {
+                            viewModel.switchToAccount(named: row.name)
+                        }
+                        .font(.caption)
+                    case .relogin:
+                        Button("Re-login") {
+                            viewModel.openLoginInTerminal(for: row.name)
+                        }
+                        .font(.caption)
+                    case .none:
+                        EmptyView()
+                    }
+                }
+            }
+        }
+        .padding(layout.cardPadding)
+        .background(
+            RoundedRectangle(cornerRadius: layout.cardCornerRadius, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+    }
+
+    var safeFooter: some View {
+        HStack {
+            Button("Login New") {
+                viewModel.startNewAccountLogin()
+            }
+            Spacer()
+            Button("Settings") {
+                openSettingsWindow()
+            }
+        }
+    }
+
     var header: some View {
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
@@ -55,10 +166,12 @@ extension AccountsMenuContentView {
                         .lineLimit(1)
                 }
                 Spacer()
-                AccountStatusPill(
-                    text: account.connectionState.label,
-                    color: AccountPresentation.statusColor(for: account.connectionState)
-                )
+                if !DebugFeatureFlags.hideConnectedBadge || account.connectionState != .connected {
+                    AccountStatusPill(
+                        text: account.connectionState.label,
+                        color: AccountPresentation.statusColor(for: account.connectionState)
+                    )
+                }
             }
 
             HStack(spacing: max(6, layout.sectionSpacing - 2)) {
@@ -211,7 +324,7 @@ extension AccountsMenuContentView {
     }
 
     var hiddenAccountsCount: Int {
-        max(0, viewModel.accounts.count - visibleRows.count)
+        max(0, viewModel.menuListAccounts.count - visibleRows.count)
     }
 
     var loginNewFooterRole: ActionPillRole {

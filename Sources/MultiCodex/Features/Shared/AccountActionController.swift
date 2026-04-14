@@ -154,20 +154,54 @@ final class AccountActionController {
                 try await viewModel.accountService.switchAccount(name: session.accountName)
             }
 
+            var effectiveAccountName = session.accountName
+            var renameNote: String?
+            if DebugFeatureFlags.autoRenameNewAccountAfterLogin,
+               session.createIfNeeded,
+               let preferredName = await suggestedAccountNameForNewLogin(currentName: session.accountName),
+               preferredName != session.accountName
+            {
+                do {
+                    _ = try await viewModel.accountService.renameAccount(from: session.accountName, to: preferredName)
+                    viewModel.renameAccountLocally(from: session.accountName, to: preferredName)
+                    if viewModel.selectedSettingsAccountName == session.accountName {
+                        viewModel.settingsController.selectSettingsAccount(named: preferredName)
+                    }
+                    effectiveAccountName = preferredName
+                    renameNote = "Saved as \(preferredName)."
+                } catch {
+                    renameNote = nil
+                }
+            }
+
             viewModel.pendingInteractiveLoginSession = nil
             let summary = status.output.trimmingCharacters(in: .whitespacesAndNewlines)
             viewModel.upsertAuthenticatedAccountLocally(
-                named: session.accountName,
-                currentAccountName: session.shouldApplyAccountAuthOnSuccess ? session.accountName : nil,
+                named: effectiveAccountName,
+                currentAccountName: session.shouldApplyAccountAuthOnSuccess ? effectiveAccountName : nil,
                 lastLoginStatus: summary.isEmpty ? nil : summary
             )
+
+            let successFallback: String
+            if session.shouldApplyAccountAuthOnSuccess {
+                successFallback = "Login synced to \(effectiveAccountName)."
+            } else if session.createIfNeeded {
+                successFallback = "Saved login to \(effectiveAccountName). Switch when you want to use it."
+            } else {
+                successFallback = "Updated stored login for \(effectiveAccountName)."
+            }
+
             switch statusOutcome(
-                for: session.accountName,
+                for: effectiveAccountName,
                 status: status,
-                successFallback: session.successFallback
+                successFallback: successFallback
             ) {
             case let .success(message):
-                setAccountFeedback(message: message, error: nil)
+                if let renameNote {
+                    setAccountFeedback(message: "\(message) \(renameNote)", error: nil)
+                } else {
+                    setAccountFeedback(message: message, error: nil)
+                }
             case let .failure(message):
                 setAccountFeedback(message: nil, error: message)
             }
@@ -187,6 +221,35 @@ final class AccountActionController {
                 setAccountFeedback(message: nil, error: error.localizedDescription)
             }
         }
+    }
+
+    private func suggestedAccountNameForNewLogin(currentName: String) async -> String? {
+        guard let accountsPayload = try? await viewModel.accountService.fetchAccounts(),
+              let accountEntry = accountsPayload.accounts.first(where: { $0.name == currentName }),
+              let preferredName = accountEntry.defaultWorkspaceEmail?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !preferredName.isEmpty
+        else {
+            return nil
+        }
+
+        let existingNames = Set(accountsPayload.accounts.map(\.name))
+        return uniqueName(base: preferredName, currentName: currentName, existingNames: existingNames)
+    }
+
+    private func uniqueName(base: String, currentName: String, existingNames: Set<String>) -> String {
+        if base == currentName || !existingNames.contains(base) {
+            return base
+        }
+
+        for index in 2...99 {
+            let candidate = "\(base)-\(index)"
+            if !existingNames.contains(candidate) {
+                return candidate
+            }
+        }
+
+        return "\(base)-\(Int(Date().timeIntervalSince1970))"
     }
 
     func runAccountAction(

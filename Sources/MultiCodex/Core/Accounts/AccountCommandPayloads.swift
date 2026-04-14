@@ -11,8 +11,25 @@ struct AccountEntry: Codable, Identifiable {
     let hasAuth: Bool
     let lastUsedAt: String?
     let lastLoginStatus: String?
+    let defaultWorkspaceEmail: String?
 
     var id: String { name }
+
+    init(
+        name: String,
+        isCurrent: Bool,
+        hasAuth: Bool,
+        lastUsedAt: String?,
+        lastLoginStatus: String?,
+        defaultWorkspaceEmail: String? = nil
+    ) {
+        self.name = name
+        self.isCurrent = isCurrent
+        self.hasAuth = hasAuth
+        self.lastUsedAt = lastUsedAt
+        self.lastLoginStatus = lastLoginStatus
+        self.defaultWorkspaceEmail = defaultWorkspaceEmail
+    }
 }
 
 struct LimitsPayload: Codable {
