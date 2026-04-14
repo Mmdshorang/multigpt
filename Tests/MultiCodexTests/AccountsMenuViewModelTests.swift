@@ -178,6 +178,10 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha"])
         XCTAssertTrue(viewModel.isRefreshing)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !viewModel.isRefreshing
+        }
     }
 
     func testManualStrategyDoesNotAutoSwitch() async {
@@ -581,6 +585,221 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertNil(viewModel.switchingAccountName)
         XCTAssertEqual(viewModel.currentAccount?.name, "beta")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !viewModel.isRefreshing
+        }
+    }
+
+    func testRenameAccountUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 10, weeklyUsed: 20), ageSec: nil),
+                LimitsResult(account: "beta", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 30, weeklyUsed: 40), ageSec: nil),
+            ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+            limits: service.stubbedLimits
+        )
+        viewModel.focusedAccountName = "beta"
+        service.fetchLimitsDelayNanoseconds = 400_000_000
+
+        viewModel.renameAccount(from: "beta", to: "gamma")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.renameCalls.contains(where: { $0.from == "beta" && $0.to == "gamma" })
+        }
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "gamma"])
+        XCTAssertEqual(viewModel.focusedAccountName, "gamma")
+        XCTAssertEqual(
+            viewModel.accounts.first(where: { $0.name == "gamma" })?.usage.fiveHour.percentText,
+            "30%"
+        )
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !viewModel.isRefreshing && viewModel.accountActionInFlightName == nil
+        }
+
+        viewModel.clearAccountActionFeedback()
+    }
+
+    func testRemoveAccountUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 10, weeklyUsed: 20), ageSec: nil),
+                LimitsResult(account: "beta", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 30, weeklyUsed: 40), ageSec: nil),
+            ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+            limits: service.stubbedLimits
+        )
+        service.fetchLimitsDelayNanoseconds = 400_000_000
+
+        viewModel.removeAccount(named: "beta", deleteData: false)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.removeCalls.contains(where: { $0.name == "beta" })
+        }
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha"])
+        XCTAssertNil(viewModel.accountActionInFlightName)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !viewModel.isRefreshing
+        }
+    }
+
+    func testImportAuthUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 10, weeklyUsed: 20), ageSec: nil),
+            ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+            limits: service.stubbedLimits
+        )
+        service.fetchLimitsDelayNanoseconds = 400_000_000
+
+        viewModel.importCurrentAuth(into: "alpha")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.importCalls.contains("alpha")
+        }
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(viewModel.accounts.first?.hasAuth, true)
+        XCTAssertNil(viewModel.accountActionInFlightName)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !viewModel.isRefreshing
+        }
+    }
+
+    func testCheckStatusUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 10, weeklyUsed: 20), ageSec: nil),
+            ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+            limits: service.stubbedLimits
+        )
+        service.fetchLimitsDelayNanoseconds = 400_000_000
+
+        viewModel.checkLoginStatus(for: "alpha")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.statusCalls.contains("alpha")
+        }
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(viewModel.accounts.first?.lastLoginStatus, "ok")
+        XCTAssertNil(viewModel.accountActionInFlightName)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !viewModel.isRefreshing
+        }
+    }
+
+    func testStartNewAccountLoginUpdatesLocalStateBeforeBackgroundRefreshFinishes() async throws {
+        let defaults = ephemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 10, weeklyUsed: 20), ageSec: nil),
+            ],
+            errors: []
+        )
+        service.fetchLimitsDelayNanoseconds = 400_000_000
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+            limits: service.stubbedLimits
+        )
+
+        viewModel.startLoginFlow(accountName: "fresh", createIfNeeded: true)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.importFromHomeCalls.contains(where: { $0.name == "fresh" })
+        }
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "fresh" && $0.hasAuth }))
+        XCTAssertNil(viewModel.accountActionInFlightName)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !viewModel.isRefreshing
+        }
     }
 
     func testOnboardingStateTransitionsMatrix() async {
@@ -764,7 +983,25 @@ private final class MockCodexAccountService: CodexAccountServicing {
             throw removeError
         }
         removeCalls.append(RemoveCall(name: name, deleteData: deleteData))
-        return RemoveAccountPayload(removedAccount: name, currentAccount: nil)
+        let removedWasCurrent = stubbedAccounts.contains(where: { $0.name == name && $0.isCurrent })
+        stubbedAccounts.removeAll { $0.name == name }
+        if removedWasCurrent {
+            let nextCurrent = stubbedAccounts.first?.name
+            stubbedAccounts = stubbedAccounts.map { account in
+                AccountEntry(
+                    name: account.name,
+                    isCurrent: account.name == nextCurrent,
+                    hasAuth: account.hasAuth,
+                    lastUsedAt: account.lastUsedAt,
+                    lastLoginStatus: account.lastLoginStatus
+                )
+            }
+            return RemoveAccountPayload(removedAccount: name, currentAccount: nextCurrent)
+        }
+        return RemoveAccountPayload(
+            removedAccount: name,
+            currentAccount: stubbedAccounts.first(where: \.isCurrent)?.name
+        )
     }
 
     func renameAccount(from oldName: String, to newName: String) async throws -> RenameAccountPayload {
@@ -772,6 +1009,16 @@ private final class MockCodexAccountService: CodexAccountServicing {
             throw renameError
         }
         renameCalls.append((from: oldName, to: newName))
+        stubbedAccounts = stubbedAccounts.map { account in
+            let effectiveName = account.name == oldName ? newName : account.name
+            return AccountEntry(
+                name: effectiveName,
+                isCurrent: account.isCurrent,
+                hasAuth: account.hasAuth,
+                lastUsedAt: account.lastUsedAt,
+                lastLoginStatus: account.lastLoginStatus
+            )
+        }
         return RenameAccountPayload(from: oldName, to: newName, currentAccount: nil)
     }
 
@@ -780,6 +1027,16 @@ private final class MockCodexAccountService: CodexAccountServicing {
             throw importError
         }
         importCalls.append(name)
+        stubbedAccounts = stubbedAccounts.map { account in
+            guard account.name == name else { return account }
+            return AccountEntry(
+                name: account.name,
+                isCurrent: account.isCurrent,
+                hasAuth: true,
+                lastUsedAt: account.lastUsedAt,
+                lastLoginStatus: account.lastLoginStatus
+            )
+        }
         return ImportAccountPayload(account: name)
     }
 
@@ -788,6 +1045,22 @@ private final class MockCodexAccountService: CodexAccountServicing {
             throw importError
         }
         importFromHomeCalls.append((home: homePath, name: name))
+        if stubbedAccounts.contains(where: { $0.name == name }) {
+            stubbedAccounts = stubbedAccounts.map { account in
+                guard account.name == name else { return account }
+                return AccountEntry(
+                    name: account.name,
+                    isCurrent: account.isCurrent,
+                    hasAuth: true,
+                    lastUsedAt: account.lastUsedAt,
+                    lastLoginStatus: account.lastLoginStatus
+                )
+            }
+        } else {
+            stubbedAccounts.append(
+                AccountEntry(name: name, isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil)
+            )
+        }
         return ImportAccountPayload(account: name)
     }
 
@@ -796,6 +1069,16 @@ private final class MockCodexAccountService: CodexAccountServicing {
             throw fetchStatusError
         }
         statusCalls.append(name)
+        stubbedAccounts = stubbedAccounts.map { account in
+            guard account.name == name else { return account }
+            return AccountEntry(
+                name: account.name,
+                isCurrent: account.isCurrent,
+                hasAuth: true,
+                lastUsedAt: account.lastUsedAt,
+                lastLoginStatus: "ok"
+            )
+        }
         return AccountStatusPayload(
             account: name,
             exitCode: 0,
