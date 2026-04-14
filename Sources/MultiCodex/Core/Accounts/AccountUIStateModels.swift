@@ -147,8 +147,7 @@ struct AccountRowState: Identifiable {
     var weeklyPercent: String { account.usage.weekly.percentText }
     var defaultWorkspaceEmail: String? { account.defaultWorkspaceEmail }
     var workspaceEmailHint: String? {
-        guard DebugFeatureFlags.showWorkspaceEmailHint,
-              let defaultWorkspaceEmail,
+        guard let defaultWorkspaceEmail,
               !defaultWorkspaceEmail.isEmpty,
               defaultWorkspaceEmail.localizedCaseInsensitiveCompare(name) != .orderedSame
         else {

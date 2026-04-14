@@ -162,9 +162,6 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     var menuListAccounts: [AccountUsage] {
-        guard DebugFeatureFlags.excludeCurrentAccountFromMenuList else {
-            return accounts
-        }
         guard let currentName = currentAccount?.name else {
             return accounts
         }

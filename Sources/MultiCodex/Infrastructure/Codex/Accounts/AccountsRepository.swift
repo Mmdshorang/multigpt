@@ -17,9 +17,7 @@ extension CodexAccountService {
                 hasAuth: hasAuth,
                 lastUsedAt: meta?.lastUsedAt,
                 lastLoginStatus: meta?.lastLoginStatus,
-                defaultWorkspaceEmail: DebugFeatureFlags.inferWorkspaceEmailFromAuth
-                    ? inferDefaultWorkspaceEmail(fromAuthPath: paths.accountAuthPath(name))
-                    : nil
+                defaultWorkspaceEmail: inferDefaultWorkspaceEmail(fromAuthPath: paths.accountAuthPath(name))
             )
         }
 

@@ -78,7 +78,7 @@ struct AccountsMenuContentView: View {
     }
 
     var isSafeMenuFallbackEnabled: Bool {
-        DebugFeatureFlags.useSafeMenuFallback
+        false
     }
 
     var body: some View {

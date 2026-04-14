@@ -166,7 +166,7 @@ extension AccountsMenuContentView {
                         .lineLimit(1)
                 }
                 Spacer()
-                if !DebugFeatureFlags.hideConnectedBadge || account.connectionState != .connected {
+                if account.connectionState != .connected {
                     AccountStatusPill(
                         text: account.connectionState.label,
                         color: AccountPresentation.statusColor(for: account.connectionState)

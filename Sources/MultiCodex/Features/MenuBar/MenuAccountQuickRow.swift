@@ -36,7 +36,7 @@ struct MenuAccountQuickRow: View {
                         if row.isCurrent {
                             AccountStatusPill(text: "Current", color: .accentColor)
                         }
-                        if !DebugFeatureFlags.hideConnectedBadge || row.connectionState != .connected {
+                        if row.connectionState != .connected {
                             AccountStatusPill(
                                 text: row.connectionState.label,
                                 color: AccountPresentation.statusColor(for: row.connectionState)

@@ -156,8 +156,7 @@ final class AccountActionController {
 
             var effectiveAccountName = session.accountName
             var renameNote: String?
-            if DebugFeatureFlags.autoRenameNewAccountAfterLogin,
-               session.createIfNeeded,
+            if session.createIfNeeded,
                let preferredName = await suggestedAccountNameForNewLogin(currentName: session.accountName),
                preferredName != session.accountName
             {
