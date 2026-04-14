@@ -10,22 +10,22 @@ enum AccountPresentation {
     static func statusColor(for state: AccountConnectionState) -> Color {
         switch state {
         case .connected:
-            return .green
+            return DashboardTokens.statusGreen
         case .needsLogin:
-            return .orange
+            return DashboardTokens.statusOrange
         case .error:
-            return .red
+            return DashboardTokens.statusRed
         }
     }
 
     static func alertColor(for severity: MenuAlertState.Severity) -> Color {
         switch severity {
         case .runtimeUnavailable:
-            return .orange
+            return DashboardTokens.statusOrange
         case .refreshError:
-            return .red
+            return DashboardTokens.statusRed
         case .authRequired:
-            return .orange
+            return DashboardTokens.statusOrange
         }
     }
 
@@ -45,7 +45,7 @@ enum AccountPresentation {
             return RuntimeStatusPresentation(
                 text: summary ?? "codex runtime is available.",
                 symbol: "checkmark.circle.fill",
-                color: .green
+                color: DashboardTokens.statusGreen
             )
         }
 
@@ -53,14 +53,14 @@ enum AccountPresentation {
             return RuntimeStatusPresentation(
                 text: summary,
                 symbol: "exclamationmark.triangle.fill",
-                color: .orange
+                color: DashboardTokens.statusOrange
             )
         }
 
         return RuntimeStatusPresentation(
             text: "Checking codex runtime...",
             symbol: "clock",
-            color: .secondary
+            color: DashboardTokens.textSecondary
         )
     }
 }
@@ -70,8 +70,9 @@ struct AccountStatusPill: View {
     let color: Color
 
     var body: some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
+        Text(text.uppercased())
+            .font(.system(size: 8, weight: .bold))
+            .tracking(0.8)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(color.opacity(0.14), in: Capsule())
@@ -85,17 +86,20 @@ struct SubtleWarningRow: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.orange)
+                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                .foregroundStyle(DashboardTokens.statusOrange)
             Text(text)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textSecondary)
                 .lineLimit(2)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(
+            DashboardTokens.statusOrange.opacity(0.1),
+            in: RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+        )
     }
 }
 
@@ -108,35 +112,53 @@ struct AccountUsageMetricCard: View {
     private var tone: Color {
         switch UsageLevel.from(usedPercent: metric.usedPercent) {
         case .critical:
-            return .red
+            return DashboardTokens.statusRed
         case .warning:
-            return .orange
+            return DashboardTokens.statusOrange
         case .normal:
-            return .green
+            return DashboardTokens.statusGreen
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Text(title.uppercased())
+                    .font(DashboardTokens.Font.sectionLabel())
+                    .tracking(1.5)
+                    .foregroundStyle(DashboardTokens.textTertiary)
                 Spacer()
                 Text(metric.percentText)
-                    .font(.caption.weight(.semibold))
+                    .font(DashboardTokens.Font.cardHeading())
+                    .foregroundStyle(DashboardTokens.textPrimary)
             }
 
-            ProgressView(value: progressValue)
-                .tint(tone)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color.white.opacity(0.06))
+
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(tone)
+                        .frame(width: geo.size.width * CGFloat(min(1, progressValue)))
+                }
+            }
+            .frame(height: 3)
 
             Text(metric.resetText(mode: resetDisplayMode))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textSecondary)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(DashboardTokens.Spacing.cardPadding)
+        .background(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .fill(DashboardTokens.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
+        )
     }
 }

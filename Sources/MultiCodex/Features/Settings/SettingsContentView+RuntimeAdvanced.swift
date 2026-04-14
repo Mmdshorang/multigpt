@@ -18,14 +18,14 @@ extension SettingsContentView {
 
                 if let probe = viewModel.runtimeProbeSummary {
                     Text(probe)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Text("Leave this empty to auto-detect `codex` from known paths or from your shell PATH.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
 
                 HStack(spacing: 8) {
                     ActionPillButton(title: "Save", symbol: "checkmark", role: .primary) {

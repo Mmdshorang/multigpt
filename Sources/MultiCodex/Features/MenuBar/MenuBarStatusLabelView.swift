@@ -30,15 +30,15 @@ private struct TrayMinimalStatusIconView: View {
 
     private var indicatorColor: Color {
         if hasError {
-            return .orange
+            return DashboardTokens.statusOrange
         }
         switch UsageLevel.from(usedPercent: severityFraction * 100) {
         case .critical:
-            return .red
+            return DashboardTokens.statusRed
         case .warning:
-            return .orange
+            return DashboardTokens.statusOrange
         case .normal:
-            return .secondary
+            return DashboardTokens.textSecondary
         }
     }
 
@@ -54,7 +54,7 @@ private struct TrayMinimalStatusIconView: View {
                 .frame(width: 5, height: 5)
                 .overlay(
                     Circle()
-                        .stroke(Color(nsColor: .windowBackgroundColor), lineWidth: 1)
+                        .stroke(DashboardTokens.background, lineWidth: 1)
                 )
                 .offset(x: 1, y: 1)
         }

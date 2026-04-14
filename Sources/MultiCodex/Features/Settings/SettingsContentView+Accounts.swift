@@ -102,18 +102,18 @@ extension SettingsContentView {
     func switchingStrategyRow(_ strategy: AccountSwitchingStrategy) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: strategy == viewModel.accountSwitchingStrategy ? "checkmark.circle.fill" : "circle")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(strategy == viewModel.accountSwitchingStrategy ? Color.accentColor : Color.secondary)
+                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                .foregroundStyle(strategy == viewModel.accountSwitchingStrategy ? DashboardTokens.accent : DashboardTokens.textSecondary)
                 .frame(width: 14, alignment: .top)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(strategy.title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .font(DashboardTokens.Font.metadata().weight(.semibold))
+                    .foregroundStyle(DashboardTokens.textPrimary)
 
                 Text(strategy.descriptionText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -130,8 +130,8 @@ extension SettingsContentView {
 
             if viewModel.filteredAccounts.isEmpty {
                 Text("No accounts match your search.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
             } else {
                 ScrollView {
                     VStack(spacing: 6) {
@@ -153,18 +153,18 @@ extension SettingsContentView {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(account.name)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .font(DashboardTokens.Font.metadata().weight(.semibold))
+                        .foregroundStyle(DashboardTokens.textPrimary)
                         .lineLimit(1)
 
                     Text(account.connectionState.label)
-                        .font(.caption2)
+                        .font(DashboardTokens.Font.metadata())
                         .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
 
                     if account.connectionState != .connected, let hint = account.connectionHint {
                         Text(hint)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
                             .lineLimit(2)
                     }
                 }
@@ -172,15 +172,15 @@ extension SettingsContentView {
                 Spacer(minLength: 8)
 
                 if account.isCurrent {
-                    AccountStatusPill(text: "Current", color: .accentColor)
+                    AccountStatusPill(text: "Current", color: DashboardTokens.accent)
                 }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(isSelectedAccount(account.name) ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.03))
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                    .fill(isSelectedAccount(account.name) ? DashboardTokens.accentBackground : Color.white.opacity(0.02))
             )
         }
         .buttonStyle(.plain)
@@ -225,7 +225,7 @@ extension SettingsContentView {
                 AccountStatusPill(text: account.connectionState.label, color: AccountPresentation.statusColor(for: account.connectionState))
 
                 if account.isCurrent {
-                    AccountStatusPill(text: "Current", color: .accentColor)
+                    AccountStatusPill(text: "Current", color: DashboardTokens.accent)
                 }
 
                 Spacer()
@@ -281,18 +281,18 @@ extension SettingsContentView {
             if let detail = account.connectionDetail {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(account.connectionState == .error ? "Latest issue" : "Login status")
-                        .font(.caption.weight(.semibold))
+                        .font(DashboardTokens.Font.metadata().weight(.semibold))
                         .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
 
                     Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                 }
-                .padding(10)
+                .padding(DashboardTokens.Spacing.cardPadding)
                 .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
                         .fill(AccountPresentation.statusColor(for: account.connectionState).opacity(0.08))
                 )
             }
@@ -352,8 +352,8 @@ extension SettingsContentView {
                 .disabled(isAccountActionRunning)
 
                 Text(removeStoredDataBinding(for: account.name).wrappedValue ? "Local saved auth files will be deleted too." : "Saved local data stays on disk unless you opt in.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -24,7 +24,7 @@ struct ActionPillButton: View {
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
-        .opacity(isDisabled ? 0.55 : 1)
+        .opacity(isDisabled ? 0.4 : 1)
         .accessibilityLabel(title)
     }
 
@@ -33,7 +33,7 @@ struct ActionPillButton: View {
         switch layout {
         case .titleAndIcon:
             Label(title, systemImage: symbol)
-                .font(.caption.weight(role == .primary ? .semibold : .medium))
+                .font(DashboardTokens.Font.button().weight(role == .primary ? .semibold : .medium))
                 .labelStyle(.titleAndIcon)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
@@ -42,7 +42,7 @@ struct ActionPillButton: View {
                 .foregroundStyle(foregroundColor)
         case .iconOnly:
             Image(systemName: symbol)
-                .font(.caption.weight(role == .primary ? .semibold : .medium))
+                .font(DashboardTokens.Font.button().weight(role == .primary ? .semibold : .medium))
                 .frame(width: 16, height: 16)
                 .padding(6)
                 .background(backgroundShape)
@@ -52,24 +52,25 @@ struct ActionPillButton: View {
     }
 
     private var backgroundShape: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
+        RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
             .fill(
                 role == .primary
-                    ? AnyShapeStyle(
-                        Color.accentColor
-                    )
-                    : AnyShapeStyle(
-                        Color(nsColor: .controlBackgroundColor).opacity(0.72)
-                    )
+                    ? AnyShapeStyle(DashboardTokens.accent)
+                    : AnyShapeStyle(DashboardTokens.cardBackground)
             )
     }
 
     private var borderShape: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .stroke(role == .primary ? Color.accentColor.opacity(0.20) : Color.primary.opacity(0.08), lineWidth: 1)
+        RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+            .stroke(
+                role == .primary
+                    ? DashboardTokens.accent.opacity(0.4)
+                    : DashboardTokens.cardBorder,
+                lineWidth: 1
+            )
     }
 
     private var foregroundColor: Color {
-        role == .primary ? .white : .primary
+        role == .primary ? .white : DashboardTokens.textSecondary
     }
 }

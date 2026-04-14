@@ -19,12 +19,12 @@ struct SettingsPanelCard<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(padding)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.88))
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .fill(DashboardTokens.cardBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
         )
     }
 }

@@ -38,15 +38,17 @@ struct SettingsContentView: View {
     }
 
     var sidebarBackground: some View {
-        Color(nsColor: .underPageBackgroundColor)
+        Color(red: 0.06, green: 0.07, blue: 0.10)
         .ignoresSafeArea()
     }
 
     var sidebar: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Settings")
-                    .font(.headline)
+                Text("SETTINGS")
+                    .font(DashboardTokens.Font.sectionLabel())
+                    .tracking(1.5)
+                    .foregroundStyle(DashboardTokens.textTertiary)
 
                 HStack(spacing: 8) {
                     AccountStatusPill(text: runtimeStatus.text, color: runtimeStatus.color)
@@ -61,11 +63,13 @@ struct SettingsContentView: View {
                 }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
 
             SettingsPanelCard(padding: 10) {
                 HStack {
                     Text("Advanced")
-                        .font(.caption.weight(.semibold))
+                        .font(DashboardTokens.Font.metadata().weight(.semibold))
+                        .foregroundStyle(DashboardTokens.textSecondary)
 
                     Spacer(minLength: 8)
 
@@ -73,8 +77,8 @@ struct SettingsContentView: View {
                         viewModel.setAdvancedSettingsVisible(!viewModel.isAdvancedSettingsVisible)
                     }
                     .buttonStyle(.plain)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .font(DashboardTokens.Font.metadata().weight(.semibold))
+                    .foregroundStyle(DashboardTokens.accent)
                 }
             }
             .padding(.horizontal, 10)

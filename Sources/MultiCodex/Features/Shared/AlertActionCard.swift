@@ -3,26 +3,26 @@ import SwiftUI
 struct AlertActionCard: View {
     let alert: MenuAlertState
     var isDisabled: Bool = false
-    var horizontalPadding: CGFloat = 10
-    var verticalPadding: CGFloat = 8
-    var cornerRadius: CGFloat = 10
-    var fillOpacity: Double = 0.08
-    var borderOpacity: Double = 0.22
+    var horizontalPadding: CGFloat = DashboardTokens.Spacing.cardPadding
+    var verticalPadding: CGFloat = 10
+    var cornerRadius: CGFloat = DashboardTokens.Spacing.cardRadius
+    var fillOpacity: Double = 0.10
+    var borderOpacity: Double = 0.25
     let action: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: AccountPresentation.alertSymbol(for: alert.severity))
-                .font(.caption.weight(.semibold))
+                .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(AccountPresentation.alertColor(for: alert.severity))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(alert.title)
-                    .font(.caption.weight(.semibold))
+                    .font(DashboardTokens.Font.metadata().weight(.semibold))
                     .foregroundStyle(AccountPresentation.alertColor(for: alert.severity))
                 Text(alert.message)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
                     .lineLimit(2)
             }
 

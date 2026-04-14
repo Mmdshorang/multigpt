@@ -30,17 +30,23 @@ extension SettingsContentView {
 
     func dashboardMetric(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            DashboardSectionHeader(title: title)
 
             Text(value)
-                .font(.caption.weight(.semibold))
+                .font(DashboardTokens.Font.cardHeading())
+                .foregroundStyle(DashboardTokens.textPrimary)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .padding(DashboardTokens.Spacing.cardPadding)
+        .background(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .fill(Color.white.opacity(0.02))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .stroke(Color.white.opacity(0.04), lineWidth: 1)
+        )
     }
 
     func dashboardAlert(_ alert: MenuAlertState) -> some View {
@@ -70,8 +76,8 @@ extension SettingsContentView {
 
                 if viewModel.onboardingState.isComplete {
                     Text("You can keep using MultiCodex as-is or use Reset Wizard to revisit the guided setup flow.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -106,13 +112,13 @@ extension SettingsContentView {
     func onboardingStepRow(_ step: OnboardingStep, isActive: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: stepSymbol(step, isActive: isActive))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                .foregroundStyle(isActive ? DashboardTokens.accent : DashboardTokens.textSecondary)
                 .frame(width: 18)
 
             Text(step.title)
-                .font(.caption.weight(isActive ? .semibold : .regular))
-                .foregroundStyle(isActive ? Color.primary : Color.secondary)
+                .font(DashboardTokens.Font.metadata().weight(isActive ? .semibold : .regular))
+                .foregroundStyle(isActive ? DashboardTokens.textPrimary : DashboardTokens.textSecondary)
 
             Spacer()
         }

@@ -4,7 +4,7 @@ extension SettingsContentView {
     var settingsContentMaxWidth: CGFloat { 640 }
 
     var settingsBackground: some View {
-        Color(nsColor: .windowBackgroundColor)
+        DashboardTokens.background
             .ignoresSafeArea()
     }
 
@@ -14,11 +14,12 @@ extension SettingsContentView {
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.headline)
+                .font(DashboardTokens.Font.cardHeading())
+                .foregroundStyle(DashboardTokens.textPrimary)
 
             Text(description)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -30,22 +31,28 @@ extension SettingsContentView {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
-                Text(title)
-                    .font(.caption.weight(.semibold))
+                DashboardSectionHeader(title: title)
             }
 
             if let description {
                 Text(description)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(DashboardTokens.Spacing.cardPadding)
+        .background(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .fill(Color.white.opacity(0.02))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .stroke(Color.white.opacity(0.04), lineWidth: 1)
+        )
     }
 
     func settingsFormRow<Control: View>(
@@ -56,12 +63,13 @@ extension SettingsContentView {
         VStack(alignment: .leading, spacing: 6) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                    .font(.caption.weight(.semibold))
+                    .font(DashboardTokens.Font.metadata().weight(.semibold))
+                    .foregroundStyle(DashboardTokens.textPrimary)
 
                 if let detail {
                     Text(detail)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -71,14 +79,14 @@ extension SettingsContentView {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    func settingsInfoRow(symbol: String, text: String, color: Color = .secondary) -> some View {
+    func settingsInfoRow(symbol: String, text: String, color: Color = DashboardTokens.textSecondary) -> some View {
         HStack(spacing: 6) {
             Image(systemName: symbol)
-                .font(.caption2.weight(.semibold))
+                .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(color)
             Text(text)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textSecondary)
             Spacer(minLength: 0)
         }
     }

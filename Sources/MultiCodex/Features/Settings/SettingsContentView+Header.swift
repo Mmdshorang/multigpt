@@ -47,13 +47,13 @@ extension SettingsContentView {
         Group {
             if let hint = viewModel.cliResolutionHint {
                 Text(hint)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Run a refresh to capture command resolution details.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
             }
         }
     }
@@ -76,8 +76,8 @@ extension SettingsContentView {
                 .frame(width: 8, height: 8)
 
             Text(text)
-                .font(.caption)
-                .foregroundStyle(.primary)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textPrimary)
 
             Spacer()
 
@@ -85,11 +85,14 @@ extension SettingsContentView {
                 viewModel.clearAccountActionFeedback()
             }
             .buttonStyle(.plain)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(DashboardTokens.Font.metadata().weight(.semibold))
+            .foregroundStyle(DashboardTokens.textSecondary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(
+            color.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+        )
     }
 }
