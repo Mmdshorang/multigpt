@@ -9,6 +9,7 @@ final class AccountsRefreshController {
     }
 
     func performRefresh(refreshLive: Bool, allowAutoSwitch: Bool = true) async {
+        let viewModel = viewModel
         if viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion {
             return
         }
@@ -81,28 +82,30 @@ final class AccountsRefreshController {
     }
 
     func triggerRefresh(refreshLive: Bool) {
+        let viewModel = viewModel
         Task {
-            await performRefresh(refreshLive: refreshLive)
+            await viewModel.refreshController.performRefresh(refreshLive: refreshLive)
         }
     }
 
     func applyAutomaticSwitch(recommendation: AccountSwitchRecommendation) {
+        let viewModel = viewModel
         viewModel.runSwitchAction(named: recommendation.accountName) {
-            try await self.viewModel.accountService.switchAccount(name: recommendation.accountName)
-            self.viewModel.lastRefreshError = nil
-            self.viewModel.applyCurrentAccountLocally(named: recommendation.accountName)
+            try await viewModel.accountService.switchAccount(name: recommendation.accountName)
+            viewModel.lastRefreshError = nil
+            viewModel.applyCurrentAccountLocally(named: recommendation.accountName)
             let message: String
             if let previousAccountName = recommendation.previousAccountName {
                 message = "Auto-switched \(previousAccountName) -> \(recommendation.accountName). \(recommendation.reason)."
             } else {
                 message = "Auto-switched to \(recommendation.accountName). \(recommendation.reason)."
             }
-            self.viewModel.accountActions.setAccountFeedback(
+            viewModel.accountActions.setAccountFeedback(
                 message: message,
                 error: nil
             )
-            if self.viewModel.autoSwitchNotificationsEnabled {
-                self.viewModel.autoSwitchNotifier.send(
+            if viewModel.autoSwitchNotificationsEnabled {
+                viewModel.autoSwitchNotifier.send(
                     AutoSwitchNotificationPayload(
                         previousAccountName: recommendation.previousAccountName,
                         newAccountName: recommendation.accountName,
@@ -111,7 +114,7 @@ final class AccountsRefreshController {
                 )
             }
             Task { @MainActor in
-                await self.performRefresh(refreshLive: false, allowAutoSwitch: false)
+                await viewModel.refreshController.performRefresh(refreshLive: false, allowAutoSwitch: false)
             }
         }
     }

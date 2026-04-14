@@ -14,6 +14,7 @@ final class AccountActionController {
     }
 
     func setAccountFeedback(message: String?, error: String?) {
+        let viewModel = viewModel
         viewModel.accountActionMessage = message
         viewModel.accountActionError = error
         viewModel.feedbackAutoClearTask?.cancel()
@@ -26,11 +27,12 @@ final class AccountActionController {
             if Task.isCancelled {
                 return
             }
-            self.viewModel.accountActionMessage = nil
+            viewModel.accountActionMessage = nil
         }
     }
 
     func startLoginFlow(accountName: String, createIfNeeded: Bool) {
+        let viewModel = viewModel
         guard viewModel.accountActionInFlightName == nil,
               viewModel.pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
         else {
@@ -38,21 +40,21 @@ final class AccountActionController {
         }
 
         Task {
-            self.viewModel.accountActionInFlightName = accountName
-            self.viewModel.focusedAccountName = accountName
-            self.viewModel.feedbackAutoClearTask?.cancel()
-            self.viewModel.feedbackAutoClearTask = nil
-            self.viewModel.accountActionMessage = "Opening browser login for \(accountName)..."
-            self.viewModel.accountActionError = nil
+            viewModel.accountActionInFlightName = accountName
+            viewModel.focusedAccountName = accountName
+            viewModel.feedbackAutoClearTask?.cancel()
+            viewModel.feedbackAutoClearTask = nil
+            viewModel.accountActionMessage = "Opening browser login for \(accountName)..."
+            viewModel.accountActionError = nil
 
             defer {
-                self.viewModel.accountActionInFlightName = nil
+                viewModel.accountActionInFlightName = nil
             }
 
             do {
                 let session = try self.makeInteractiveLoginSession(accountName: accountName, createIfNeeded: createIfNeeded)
-                self.viewModel.pendingInteractiveLoginSession = nil
-                _ = try await self.viewModel.accountService.loginInApp(
+                viewModel.pendingInteractiveLoginSession = nil
+                _ = try await viewModel.accountService.loginInApp(
                     account: accountName,
                     createIfNeeded: createIfNeeded,
                     loginHome: session.loginSandboxHome
@@ -101,14 +103,15 @@ final class AccountActionController {
     }
 
     func resumePendingInteractiveLogin(_ session: PendingInteractiveLoginSession) {
+        let viewModel = viewModel
         guard viewModel.accountActionInFlightName == nil else {
             return
         }
 
         Task {
-            self.viewModel.accountActionInFlightName = session.accountName
-            self.viewModel.focusedAccountName = session.accountName
-            defer { self.viewModel.accountActionInFlightName = nil }
+            viewModel.accountActionInFlightName = session.accountName
+            viewModel.focusedAccountName = session.accountName
+            defer { viewModel.accountActionInFlightName = nil }
 
             await self.completeInteractiveLogin(session: session, preserveFailedSession: true)
         }
@@ -152,6 +155,12 @@ final class AccountActionController {
             }
 
             viewModel.pendingInteractiveLoginSession = nil
+            let summary = status.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            viewModel.upsertAuthenticatedAccountLocally(
+                named: session.accountName,
+                currentAccountName: session.shouldApplyAccountAuthOnSuccess ? session.accountName : nil,
+                lastLoginStatus: summary.isEmpty ? nil : summary
+            )
             switch statusOutcome(
                 for: session.accountName,
                 status: status,
@@ -163,7 +172,9 @@ final class AccountActionController {
                 setAccountFeedback(message: nil, error: message)
             }
 
-            await viewModel.refreshController.performRefresh(refreshLive: true, allowAutoSwitch: false)
+            Task { @MainActor in
+                await viewModel.refreshController.performRefresh(refreshLive: true, allowAutoSwitch: false)
+            }
         } catch {
             if preserveFailedSession {
                 viewModel.pendingInteractiveLoginSession = session.withPhase(.needsRetry)
@@ -182,14 +193,14 @@ final class AccountActionController {
         for accountName: String,
         operation: @escaping () async throws -> AccountActionOutcome
     ) {
+        let viewModel = viewModel
         guard viewModel.accountActionInFlightName == nil else {
             return
         }
 
         Task {
-            self.viewModel.accountActionInFlightName = accountName
-            defer { self.viewModel.accountActionInFlightName = nil }
-
+            viewModel.accountActionInFlightName = accountName
+            var shouldRefresh = false
             do {
                 switch try await operation() {
                 case let .success(message):
@@ -197,9 +208,17 @@ final class AccountActionController {
                 case let .failure(message):
                     self.setAccountFeedback(message: nil, error: message)
                 }
-                await self.viewModel.refreshController.performRefresh(refreshLive: false)
+                shouldRefresh = true
             } catch {
                 self.setAccountFeedback(message: nil, error: error.localizedDescription)
+            }
+
+            viewModel.accountActionInFlightName = nil
+
+            if shouldRefresh {
+                Task { @MainActor in
+                    await viewModel.refreshController.performRefresh(refreshLive: false)
+                }
             }
         }
     }

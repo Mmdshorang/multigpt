@@ -10,15 +10,16 @@ final class AccountManagementController {
     }
 
     func switchToAccount(named name: String) {
+        let viewModel = viewModel
         viewModel.runSwitchAction(named: name) {
-            try await self.viewModel.accountService.switchAccount(name: name)
-            self.viewModel.lastRefreshError = nil
-            self.viewModel.applyCurrentAccountLocally(named: name)
-            self.viewModel.focusedAccountName = name
-            self.viewModel.settingsController.syncSelectedSettingsAccount()
-            self.viewModel.accountActions.setAccountFeedback(message: "Now using \(name).", error: nil)
+            try await viewModel.accountService.switchAccount(name: name)
+            viewModel.lastRefreshError = nil
+            viewModel.applyCurrentAccountLocally(named: name)
+            viewModel.focusedAccountName = name
+            viewModel.settingsController.syncSelectedSettingsAccount()
+            viewModel.accountActions.setAccountFeedback(message: "Now using \(name).", error: nil)
             Task { @MainActor in
-                await self.viewModel.refreshController.performRefresh(refreshLive: false, allowAutoSwitch: false)
+                await viewModel.refreshController.performRefresh(refreshLive: false, allowAutoSwitch: false)
             }
         }
     }
@@ -28,6 +29,7 @@ final class AccountManagementController {
     }
 
     func renameAccount(from oldName: String, to rawNewName: String) {
+        let viewModel = viewModel
         let newName = rawNewName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newName.isEmpty else {
             viewModel.accountActionError = "New account name cannot be empty."
@@ -42,35 +44,45 @@ final class AccountManagementController {
         }
 
         accountActions.runAccountAction(for: oldName) {
-            _ = try await self.viewModel.accountService.renameAccount(from: oldName, to: newName)
-            if self.viewModel.selectedSettingsAccountName == oldName {
-                self.viewModel.settingsController.selectSettingsAccount(named: newName)
+            _ = try await viewModel.accountService.renameAccount(from: oldName, to: newName)
+            viewModel.renameAccountLocally(from: oldName, to: newName)
+            if viewModel.selectedSettingsAccountName == oldName {
+                viewModel.settingsController.selectSettingsAccount(named: newName)
             }
             return AccountActionOutcome.success("Renamed \(oldName) to \(newName).")
         }
     }
 
     func removeAccount(named name: String, deleteData: Bool) {
+        let viewModel = viewModel
         accountActions.runAccountAction(for: name) {
-            _ = try await self.viewModel.accountService.removeAccount(name: name, deleteData: deleteData)
-            if self.viewModel.selectedSettingsAccountName == name {
-                self.viewModel.settingsController.selectSettingsAccount(named: nil)
+            let payload = try await viewModel.accountService.removeAccount(name: name, deleteData: deleteData)
+            viewModel.removeAccountLocally(named: name, currentAccountName: payload.currentAccount)
+            if viewModel.selectedSettingsAccountName == name {
+                viewModel.settingsController.selectSettingsAccount(named: nil)
             }
             return AccountActionOutcome.success(deleteData ? "Removed \(name) and deleted stored data." : "Removed \(name).")
         }
     }
 
     func importCurrentAuth(into name: String) {
+        let viewModel = viewModel
         accountActions.runAccountAction(for: name) {
-            _ = try await self.viewModel.accountService.importDefaultAuth(into: name)
+            _ = try await viewModel.accountService.importDefaultAuth(into: name)
+            viewModel.upsertAuthenticatedAccountLocally(named: name)
             return AccountActionOutcome.success("Imported current ~/.codex/auth.json into \(name).")
         }
     }
 
     func checkLoginStatus(for name: String) {
+        let viewModel = viewModel
         accountActions.runAccountAction(for: name) {
-            let status = try await self.viewModel.accountService.fetchStatus(name: name)
+            let status = try await viewModel.accountService.fetchStatus(name: name)
             let summary = status.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            viewModel.upsertAuthenticatedAccountLocally(
+                named: name,
+                lastLoginStatus: summary.isEmpty ? nil : summary
+            )
             if status.exitCode == 0 {
                 return AccountActionOutcome.success(summary.isEmpty ? "\(name): login status is OK." : "\(name): \(summary)")
             }

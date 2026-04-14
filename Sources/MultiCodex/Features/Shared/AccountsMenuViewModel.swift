@@ -96,6 +96,7 @@ final class AccountsMenuViewModel: ObservableObject {
         if let didBecomeActiveObserver {
             NotificationCenter.default.removeObserver(didBecomeActiveObserver)
         }
+        feedbackAutoClearTask?.cancel()
         refreshLoopTask?.cancel()
     }
 
@@ -373,6 +374,126 @@ final class AccountsMenuViewModel: ObservableObject {
                 usageError: account.usageError
             )
         }
+    }
+
+    func renameAccountLocally(from oldName: String, to newName: String) {
+        accounts = accounts
+            .map { account in
+                let effectiveName = account.name == oldName ? newName : account.name
+                return AccountUsage(
+                    name: effectiveName,
+                    isCurrent: account.isCurrent,
+                    hasAuth: account.hasAuth,
+                    lastUsedAt: account.lastUsedAt,
+                    lastLoginStatus: account.lastLoginStatus,
+                    usage: account.usage,
+                    source: account.source,
+                    usageError: account.usageError
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.isCurrent != rhs.isCurrent {
+                    return lhs.isCurrent
+                }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+
+        if focusedAccountName == oldName {
+            focusedAccountName = newName
+        }
+    }
+
+    func removeAccountLocally(named name: String, currentAccountName: String?) {
+        accounts = accounts
+            .filter { $0.name != name }
+            .map { account in
+                AccountUsage(
+                    name: account.name,
+                    isCurrent: currentAccountName.map { account.name == $0 } ?? false,
+                    hasAuth: account.hasAuth,
+                    lastUsedAt: account.lastUsedAt,
+                    lastLoginStatus: account.lastLoginStatus,
+                    usage: account.usage,
+                    source: account.source,
+                    usageError: account.usageError
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.isCurrent != rhs.isCurrent {
+                    return lhs.isCurrent
+                }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+
+        clearFocusedAccountIfMissing()
+        syncSelectedSettingsAccount()
+    }
+
+    func upsertAuthenticatedAccountLocally(
+        named name: String,
+        currentAccountName: String? = nil,
+        lastLoginStatus: String? = nil
+    ) {
+        let nowISO = CodexAccountService.nowFormatter.string(from: Date())
+        var didUpdateExisting = false
+
+        let updated = accounts.map { account in
+            let isCurrent = currentAccountName.map { account.name == $0 } ?? account.isCurrent
+            guard account.name == name else {
+                return AccountUsage(
+                    name: account.name,
+                    isCurrent: isCurrent,
+                    hasAuth: account.hasAuth,
+                    lastUsedAt: account.lastUsedAt,
+                    lastLoginStatus: account.lastLoginStatus,
+                    usage: account.usage,
+                    source: account.source,
+                    usageError: account.usageError
+                )
+            }
+
+            didUpdateExisting = true
+            return AccountUsage(
+                name: account.name,
+                isCurrent: currentAccountName.map { name == $0 } ?? account.isCurrent,
+                hasAuth: true,
+                lastUsedAt: nowISO,
+                lastLoginStatus: lastLoginStatus ?? account.lastLoginStatus,
+                usage: account.usage,
+                source: account.source,
+                usageError: account.usageError
+            )
+        }
+
+        if didUpdateExisting {
+            accounts = updated.sorted { lhs, rhs in
+                if lhs.isCurrent != rhs.isCurrent {
+                    return lhs.isCurrent
+                }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+        } else {
+            accounts = (updated + [
+                AccountUsage(
+                    name: name,
+                    isCurrent: currentAccountName == name,
+                    hasAuth: true,
+                    lastUsedAt: nowISO,
+                    lastLoginStatus: lastLoginStatus,
+                    usage: UsageFormatter.usageSummary(from: nil),
+                    source: "-",
+                    usageError: nil
+                ),
+            ])
+            .sorted { lhs, rhs in
+                if lhs.isCurrent != rhs.isCurrent {
+                    return lhs.isCurrent
+                }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+        }
+
+        syncSelectedSettingsAccount()
     }
 
     func clearFocusedAccountIfMissing() {
