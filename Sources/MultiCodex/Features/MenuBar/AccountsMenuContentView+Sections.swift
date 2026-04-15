@@ -144,6 +144,15 @@ extension AccountsMenuContentView {
                         .font(DashboardTokens.Font.metadata())
                         .foregroundStyle(DashboardTokens.textSecondary)
                 }
+                ActionPillButton(
+                    title: areAllAccountsExpanded ? "Collapse All" : "Expand All",
+                    symbol: areAllAccountsExpanded ? "chevron.up" : "chevron.down",
+                    role: .secondary,
+                    layout: .iconOnly
+                ) {
+                    toggleAllAccountsExpanded()
+                }
+                .help(areAllAccountsExpanded ? "Collapse all accounts" : "Expand all accounts")
             }
             .padding(.horizontal, 4)
 
@@ -440,6 +449,21 @@ extension AccountsMenuContentView {
             expandedAccountNames.remove(accountName)
         } else {
             expandedAccountNames.insert(accountName)
+        }
+    }
+
+    var areAllAccountsExpanded: Bool {
+        let visibleNames = Set(visibleRows.map(\.name))
+        guard !visibleNames.isEmpty else { return false }
+        return visibleNames.isSubset(of: expandedAccountNames)
+    }
+
+    func toggleAllAccountsExpanded() {
+        let visibleNames = Set(visibleRows.map(\.name))
+        if areAllAccountsExpanded {
+            expandedAccountNames.subtract(visibleNames)
+        } else {
+            expandedAccountNames.formUnion(visibleNames)
         }
     }
 }

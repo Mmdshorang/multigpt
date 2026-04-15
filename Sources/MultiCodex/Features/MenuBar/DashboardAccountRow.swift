@@ -39,25 +39,10 @@ struct DashboardAccountRow: View {
         }
     }
 
-    private var statusDotColor: Color {
-        switch row.connectionState {
-        case .connected:
-            return DashboardTokens.statusGreen
-        case .needsLogin:
-            return DashboardTokens.statusOrange
-        case .error:
-            return DashboardTokens.statusRed
-        }
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                if isSelected, row.primaryAction != .none {
-                    actionButton
-                } else {
-                    statusDot
-                }
+                selectButton
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -93,9 +78,10 @@ struct DashboardAccountRow: View {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(DashboardTokens.textTertiary)
-                        .frame(width: 16, height: 16)
+                        .frame(width: 24, height: 24)
                 }
                 .buttonStyle(.plain)
+                .contentShape(Rectangle())
             }
 
             if isExpanded {
@@ -115,42 +101,47 @@ struct DashboardAccountRow: View {
                 .stroke(isSelected ? DashboardTokens.accent.opacity(0.3) : Color.clear, lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onTapGesture(perform: onSelect)
+        .background(
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onSelect)
+                .onTapGesture(count: 2, perform: {
+                    if row.primaryAction != .none {
+                        onPrimaryAction()
+                    }
+                })
+        )
     }
 
-    private var statusDot: some View {
-        Circle()
-            .fill(statusDotColor)
-            .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
-            .overlay(
-                Circle()
-                    .stroke(statusDotColor.opacity(0.3), lineWidth: 2)
-                    .scaleEffect(1.5)
-            )
-    }
-
-    private var actionButton: some View {
-        Group {
+    private var selectButton: some View {
+        ZStack {
             if isPrimaryActionInProgress {
                 ProgressView()
                     .controlSize(.small)
                     .tint(DashboardTokens.accent)
-                    .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
-            } else {
+            } else if isSelected, row.primaryAction != .none {
                 Button(action: onPrimaryAction) {
                     Image(systemName: row.primaryAction.symbol)
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(DashboardTokens.accent)
-                        .frame(width: 20, height: 20)
-                        .background(DashboardTokens.accentBackground)
-                        .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .disabled(isBusy)
                 .opacity(isBusy ? 0.5 : 1)
                 .help(row.primaryAction.title)
+            } else {
+                Button(action: onSelect) {
+                    Circle()
+                        .stroke(DashboardTokens.textTertiary, lineWidth: 1.5)
+                        .background(
+                            Circle()
+                                .fill(isSelected ? DashboardTokens.accent : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
             }
         }
+        .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
     }
 
     private var inlineMicroBar: some View {
