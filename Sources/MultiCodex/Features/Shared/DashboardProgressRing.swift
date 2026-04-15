@@ -13,31 +13,30 @@ struct DashboardProgressRing: View {
     }
 
     var body: some View {
-        VStack(spacing: 4) {
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.06), lineWidth: lineWidth)
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.08), lineWidth: lineWidth)
 
-                Circle()
-                    .trim(from: 0, to: clampedProgress)
-                    .stroke(
-                        color,
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
+            Circle()
+                .trim(from: 0, to: clampedProgress)
+                .stroke(
+                    color,
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
 
-                VStack(spacing: 1) {
-                    Text(valueText)
-                        .font(DashboardTokens.Font.ringLabel())
-                        .foregroundStyle(DashboardTokens.textPrimary)
-                    Text(label)
-                        .font(.system(size: 7, weight: .medium))
-                        .foregroundStyle(DashboardTokens.textSecondary)
-                        .textCase(.uppercase)
-                }
+            VStack(spacing: 1) {
+                Text(valueText)
+                    .font(DashboardTokens.Font.ringLabel())
+                    .foregroundStyle(DashboardTokens.textPrimary)
+                Text(label)
+                    .font(.system(size: 7, weight: .medium))
+                    .foregroundStyle(DashboardTokens.textSecondary)
+                    .textCase(.uppercase)
             }
-            .frame(width: size, height: size)
-            .animation(.easeInOut(duration: 0.4), value: clampedProgress)
         }
+        .frame(width: size, height: size)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .animation(.easeInOut(duration: 0.4), value: clampedProgress)
     }
 }
