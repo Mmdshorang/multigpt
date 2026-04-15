@@ -53,7 +53,11 @@ struct DashboardAccountRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                statusDot
+                if isSelected, row.primaryAction != .none {
+                    actionButton
+                } else {
+                    statusDot
+                }
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -84,16 +88,6 @@ struct DashboardAccountRow: View {
                 Spacer(minLength: 8)
 
                 inlineMicroBar
-
-                if isSelected, row.primaryAction != .none {
-                    if isPrimaryActionInProgress {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(DashboardTokens.textSecondary)
-                    } else {
-                        dashboardActionButton
-                    }
-                }
 
                 Button(action: onToggleExpanded) {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
@@ -135,6 +129,30 @@ struct DashboardAccountRow: View {
             )
     }
 
+    private var actionButton: some View {
+        Group {
+            if isPrimaryActionInProgress {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(DashboardTokens.accent)
+                    .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
+            } else {
+                Button(action: onPrimaryAction) {
+                    Image(systemName: row.primaryAction.symbol)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(DashboardTokens.accent)
+                        .frame(width: 20, height: 20)
+                        .background(DashboardTokens.accentBackground)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isBusy)
+                .opacity(isBusy ? 0.5 : 1)
+                .help(row.primaryAction.title)
+            }
+        }
+    }
+
     private var inlineMicroBar: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
@@ -147,21 +165,6 @@ struct DashboardAccountRow: View {
             }
         }
         .frame(width: 48, height: 4)
-    }
-
-    private var dashboardActionButton: some View {
-        Button(action: onPrimaryAction) {
-            Image(systemName: row.primaryAction.symbol)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(DashboardTokens.accent)
-                .frame(width: 20, height: 20)
-                .background(DashboardTokens.accentBackground)
-                .clipShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .disabled(isBusy)
-        .opacity(isBusy ? 0.5 : 1)
-        .help(row.primaryAction.title)
     }
 
     private var expandedContent: some View {
