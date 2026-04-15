@@ -101,16 +101,7 @@ struct DashboardAccountRow: View {
                 .stroke(isSelected ? DashboardTokens.accent.opacity(0.3) : Color.clear, lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .background(
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onSelect)
-                .onTapGesture(count: 2, perform: {
-                    if row.primaryAction != .none {
-                        onPrimaryAction()
-                    }
-                })
-        )
+        .onTapGesture(perform: onSelect)
     }
 
     private var selectButton: some View {
@@ -130,15 +121,13 @@ struct DashboardAccountRow: View {
                 .opacity(isBusy ? 0.5 : 1)
                 .help(row.primaryAction.title)
             } else {
-                Button(action: onSelect) {
-                    Circle()
-                        .stroke(DashboardTokens.textTertiary, lineWidth: 1.5)
-                        .background(
-                            Circle()
-                                .fill(isSelected ? DashboardTokens.accent : Color.clear)
-                        )
-                }
-                .buttonStyle(.plain)
+                Circle()
+                    .stroke(DashboardTokens.textTertiary, lineWidth: 1.5)
+                    .background(
+                        Circle()
+                            .fill(isSelected ? DashboardTokens.accent : Color.clear)
+                    )
+                    .contentShape(Circle())
             }
         }
         .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
