@@ -113,7 +113,7 @@ struct DashboardAccountRow: View {
             } else if isSelected, row.primaryAction != .none {
                 Button(action: onPrimaryAction) {
                     Image(systemName: row.primaryAction.symbol)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(DashboardTokens.accent)
                 }
                 .buttonStyle(.plain)
@@ -123,6 +123,7 @@ struct DashboardAccountRow: View {
             } else {
                 Circle()
                     .stroke(DashboardTokens.textTertiary, lineWidth: 1.5)
+                    .frame(width: 10, height: 10)
                     .background(
                         Circle()
                             .fill(isSelected ? DashboardTokens.accent : Color.clear)
@@ -130,7 +131,8 @@ struct DashboardAccountRow: View {
                     .contentShape(Circle())
             }
         }
-        .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
+        .frame(width: 20, height: 20)
+        .contentShape(Rectangle())
     }
 
     private var inlineMicroBar: some View {
