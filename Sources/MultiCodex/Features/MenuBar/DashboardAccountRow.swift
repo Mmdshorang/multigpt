@@ -223,7 +223,6 @@ struct DashboardAccountRow: View {
             if isExpanded {
                 expandedContent
                     .padding(.top, 10)
-                    .transition(.opacity)
             }
         }
         .padding(.horizontal, DashboardTokens.Spacing.rowHPadding)
