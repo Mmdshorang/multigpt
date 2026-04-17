@@ -1,46 +1,36 @@
 import Foundation
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case dashboard
+    case general
     case accounts
-    case runtime
-    case display
-    case troubleshooting
-    case advanced
+    case system
+    case about
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .dashboard:
-            return "Dashboard"
+        case .general:
+            return "General"
         case .accounts:
             return "Accounts"
-        case .runtime:
-            return "Runtime"
-        case .display:
-            return "Display"
-        case .troubleshooting:
-            return "Troubleshooting"
-        case .advanced:
-            return "Advanced"
+        case .system:
+            return "System"
+        case .about:
+            return "About"
         }
     }
 
     var symbol: String {
         switch self {
-        case .dashboard:
-            return "rectangle.grid.2x2"
+        case .general:
+            return "gear"
         case .accounts:
             return "person.2"
-        case .runtime:
-            return "terminal"
-        case .display:
-            return "paintbrush"
-        case .troubleshooting:
-            return "wrench.and.screwdriver"
-        case .advanced:
-            return "gearshape.2"
+        case .system:
+            return "cpu"
+        case .about:
+            return "info.circle"
         }
     }
 }
