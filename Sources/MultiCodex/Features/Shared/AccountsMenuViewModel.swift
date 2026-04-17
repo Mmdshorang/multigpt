@@ -21,7 +21,6 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var selectedSettingsSection: SettingsSection
     @Published var selectedSettingsAccountName: String?
     @Published var accountSearchQuery: String
-    @Published var isAdvancedSettingsVisible: Bool
     @Published var menuDensity: MenuDensity
     @Published var usageBarStyle: UsageBarStyle
     @Published var accountSwitchingStrategy: AccountSwitchingStrategy
@@ -60,7 +59,6 @@ final class AccountsMenuViewModel: ObservableObject {
         selectedSettingsSection = preferences.selectedSettingsSection
         selectedSettingsAccountName = preferences.selectedSettingsAccountName
         accountSearchQuery = ""
-        isAdvancedSettingsVisible = false
         menuDensity = preferences.menuDensity
         usageBarStyle = preferences.usageBarStyle
         accountSwitchingStrategy = preferences.accountSwitchingStrategy
@@ -69,9 +67,6 @@ final class AccountsMenuViewModel: ObservableObject {
         limitsCacheTTLSeconds = CodexAccountService.normalizedLimitsCacheTTLSeconds(
             persistedTTL > 0 ? persistedTTL : CodexAccountService.defaultLimitsCacheTTLSeconds
         )
-        if !isAdvancedSettingsVisible, selectedSettingsSection == .advanced {
-            selectedSettingsSection = .dashboard
-        }
         self.accountService.customCodexPath = customCodexPath.isEmpty ? nil : customCodexPath
         self.accountService.limitsCacheTTLSeconds = limitsCacheTTLSeconds
         if autoSwitchNotificationsEnabled {
@@ -212,17 +207,7 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     var settingsSections: [SettingsSection] {
-        var sections: [SettingsSection] = [
-            .dashboard,
-            .accounts,
-            .runtime,
-            .display,
-            .troubleshooting,
-        ]
-        if isAdvancedSettingsVisible {
-            sections.append(.advanced)
-        }
-        return sections
+        [.general, .accounts, .system, .about]
     }
 
     func menuAccountRows(limit: Int? = nil) -> [AccountRowState] {
@@ -269,7 +254,7 @@ final class AccountsMenuViewModel: ObservableObject {
     func performMenuAlertAction(_ action: MenuAlertState.Action) {
         switch action {
         case .openRuntimeSettings:
-            selectSettingsSection(.runtime)
+            selectSettingsSection(.system)
         case .refreshLive:
             refreshLive()
         case let .relogin(accountName):
@@ -281,7 +266,7 @@ final class AccountsMenuViewModel: ObservableObject {
 
     func resetOnboardingWizard() {
         selectSettingsAccount(named: nil)
-        selectSettingsSection(.runtime)
+        selectSettingsSection(.general)
     }
 
     func selectSettingsAccount(named name: String?) { settingsController.selectSettingsAccount(named: name) }
@@ -289,8 +274,6 @@ final class AccountsMenuViewModel: ObservableObject {
     func setAccountSearchQuery(_ query: String) { settingsController.setAccountSearchQuery(query) }
 
     func syncSelectedSettingsAccount() { settingsController.syncSelectedSettingsAccount() }
-
-    func setAdvancedSettingsVisible(_ isVisible: Bool) { settingsController.setAdvancedSettingsVisible(isVisible) }
 
     func setMenuDensity(_ density: MenuDensity) { settingsController.setMenuDensity(density) }
 

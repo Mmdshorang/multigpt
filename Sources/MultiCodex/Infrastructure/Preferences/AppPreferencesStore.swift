@@ -34,7 +34,7 @@ struct AppPreferencesStore {
     var selectedSettingsSection: SettingsSection {
         get {
             let raw = defaults.string(forKey: Keys.selectedSettingsSection) ?? ""
-            return SettingsSection(rawValue: raw) ?? .dashboard
+            return SettingsSection(rawValue: raw) ?? .general
         }
         set {
             defaults.set(newValue.rawValue, forKey: Keys.selectedSettingsSection)

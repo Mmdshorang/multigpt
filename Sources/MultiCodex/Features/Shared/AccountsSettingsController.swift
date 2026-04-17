@@ -10,9 +10,6 @@ final class AccountsSettingsController {
     }
 
     func selectSettingsSection(_ section: SettingsSection) {
-        if section == .advanced, !viewModel.isAdvancedSettingsVisible {
-            setAdvancedSettingsVisible(true)
-        }
         viewModel.selectedSettingsSection = section
         viewModel.preferences.selectedSettingsSection = section
     }
@@ -47,13 +44,6 @@ final class AccountsSettingsController {
         }
 
         selectSettingsAccount(named: candidates.first?.name)
-    }
-
-    func setAdvancedSettingsVisible(_ isVisible: Bool) {
-        viewModel.isAdvancedSettingsVisible = isVisible
-        if !isVisible, viewModel.selectedSettingsSection == .advanced {
-            selectSettingsSection(.dashboard)
-        }
     }
 
     func setMenuDensity(_ density: MenuDensity) {
