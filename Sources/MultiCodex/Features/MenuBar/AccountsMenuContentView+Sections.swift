@@ -44,89 +44,80 @@ extension AccountsMenuContentView {
         VStack(alignment: .leading, spacing: DashboardTokens.Spacing.cardGap) {
             if let current = viewModel.currentAccount {
                 HStack(spacing: DashboardTokens.Spacing.cardGap) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        DashboardSectionHeader(title: "5h usage")
-                        DashboardProgressRing(
-                            progress: viewModel.progressValue(for: current.usage.fiveHour),
-                            color: DashboardTokens.ringFiveHour,
-                            label: "5H",
-                            valueText: current.usage.fiveHour.percentText
-                        )
-                        Text(current.usage.fiveHour.resetText(mode: viewModel.resetDisplayMode))
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(DashboardTokens.Spacing.cardPadding)
-                    .background(
-                        RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                            .fill(DashboardTokens.cardBackground)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                            .stroke(DashboardTokens.cardBorder, lineWidth: 1)
+                    usageCard(
+                        title: "5h usage",
+                        progress: viewModel.progressValue(for: current.usage.fiveHour),
+                        color: DashboardTokens.ringFiveHour,
+                        ringLabel: "5H",
+                        valueText: current.usage.fiveHour.percentText,
+                        resetText: current.usage.fiveHour.resetText(mode: viewModel.resetDisplayMode)
                     )
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        DashboardSectionHeader(title: "weekly usage")
-                        DashboardProgressRing(
-                            progress: viewModel.progressValue(for: current.usage.weekly),
-                            color: DashboardTokens.ringWeekly,
-                            label: "WEEK",
-                            valueText: current.usage.weekly.percentText
-                        )
-                        Text(current.usage.weekly.resetText(mode: viewModel.resetDisplayMode))
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(DashboardTokens.Spacing.cardPadding)
-                    .background(
-                        RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                            .fill(DashboardTokens.cardBackground)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                            .stroke(DashboardTokens.cardBorder, lineWidth: 1)
+                    usageCard(
+                        title: "weekly usage",
+                        progress: viewModel.progressValue(for: current.usage.weekly),
+                        color: DashboardTokens.ringWeekly,
+                        ringLabel: "WEEK",
+                        valueText: current.usage.weekly.percentText,
+                        resetText: current.usage.weekly.resetText(mode: viewModel.resetDisplayMode)
                     )
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    DashboardSectionHeader(title: "current account")
-
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(AccountPresentation.statusColor(for: current.connectionState))
-                            .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
-
-                        Text(current.name)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(DashboardTokens.textPrimary)
-                            .lineLimit(1)
-
-                        if current.connectionState != .connected {
-                            AccountStatusPill(
-                                text: current.connectionState.label,
-                                color: AccountPresentation.statusColor(for: current.connectionState)
-                            )
-                        }
-
-                        Spacer()
-                    }
-                }
-                .padding(DashboardTokens.Spacing.cardPadding)
-                .background(
-                    RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                        .fill(DashboardTokens.cardBackground)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                        .stroke(DashboardTokens.cardBorder, lineWidth: 1)
-                )
+                currentAccountCard(current)
             }
         }
+    }
+
+    private func usageCard(
+        title: String,
+        progress: Double,
+        color: Color,
+        ringLabel: String,
+        valueText: String,
+        resetText: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            DashboardSectionHeader(title: title)
+            DashboardProgressRing(
+                progress: progress,
+                color: color,
+                label: ringLabel,
+                valueText: valueText
+            )
+            Text(resetText)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textSecondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .cardStyle()
+    }
+
+    private func currentAccountCard(_ account: AccountUsage) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            DashboardSectionHeader(title: "current account")
+
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(AccountPresentation.statusColor(for: account.connectionState))
+                    .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
+
+                Text(account.name)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(DashboardTokens.textPrimary)
+                    .lineLimit(1)
+
+                if account.connectionState != .connected {
+                    AccountStatusPill(
+                        text: account.connectionState.label,
+                        color: AccountPresentation.statusColor(for: account.connectionState)
+                    )
+                }
+
+                Spacer()
+            }
+        }
+        .cardStyle()
     }
 
     var accountsSection: some View {
@@ -178,25 +169,27 @@ extension AccountsMenuContentView {
                 }
             }
         }
-        .padding(DashboardTokens.Spacing.cardPadding)
-        .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(DashboardTokens.cardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
-        )
+        .cardStyle()
     }
 
     var emptyStateCard: some View {
         VStack(alignment: .leading, spacing: DashboardTokens.Spacing.sectionSpacing) {
-            VStack(alignment: .leading, spacing: 4) {
-                DashboardSectionHeader(title: "getting started")
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(DashboardTokens.accent.opacity(0.15))
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Image(systemName: viewModel.isCodexRuntimeAvailable ? "person.crop.circle.badge.plus" : "exclamationmark.triangle")
+                            .font(.system(size: 20))
+                            .foregroundStyle(DashboardTokens.accent)
+                    )
 
-                Text("Set up your first account")
-                    .font(DashboardTokens.Font.detailTitle())
-                    .foregroundStyle(DashboardTokens.textPrimary)
+                VStack(alignment: .leading, spacing: 4) {
+                    DashboardSectionHeader(title: "getting started")
+                    Text("Set up your first account")
+                        .font(DashboardTokens.Font.detailTitle())
+                        .foregroundStyle(DashboardTokens.textPrimary)
+                }
             }
 
             Text(onboardingCopy)
@@ -213,6 +206,17 @@ extension AccountsMenuContentView {
                     .foregroundStyle(viewModel.isCodexRuntimeAvailable ? DashboardTokens.textSecondary : runtimeStatus.color)
                     .lineLimit(2)
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(runtimeStatus.color.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(runtimeStatus.color.opacity(0.12), lineWidth: 1)
+            )
 
             HStack(spacing: DashboardTokens.Spacing.footerSpacing) {
                 ActionPillButton(
@@ -234,15 +238,7 @@ extension AccountsMenuContentView {
                 }
             }
         }
-        .padding(DashboardTokens.Spacing.cardPadding)
-        .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(DashboardTokens.cardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
-        )
+        .cardStyle()
     }
 
     var footer: some View {
@@ -345,20 +341,26 @@ extension AccountsMenuContentView {
     }
 
     func toastView(text: String, color: Color) -> some View {
-        Text(text)
-            .font(DashboardTokens.Font.metadata().weight(.semibold))
-            .foregroundStyle(DashboardTokens.textPrimary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                    .fill(DashboardTokens.background)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                    .stroke(color.opacity(0.34), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.3), radius: 4, y: 2)
+        HStack(spacing: 8) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+
+            Text(text)
+                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                .foregroundStyle(DashboardTokens.textPrimary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .fill(DashboardTokens.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .stroke(color.opacity(0.3), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.35), radius: 6, y: 2)
     }
 
     var isActionBusy: Bool {
