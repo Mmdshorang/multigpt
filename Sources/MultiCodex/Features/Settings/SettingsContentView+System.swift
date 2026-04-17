@@ -1,20 +1,16 @@
 import SwiftUI
 
-// MARK: - System Page
-// Merges Runtime + Troubleshooting + Advanced
-
 extension SettingsContentView {
     var systemPage: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Runtime Status Card
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 16) {
                     settingsSectionIntro(
                         title: "Runtime",
-                        description: "Codex CLI configuration"
+                        description: "Codex CLI configuration",
+                        symbol: "terminal.fill"
                     )
 
-                    // Status row
                     HStack(spacing: 8) {
                         Image(systemName: runtimeStatus.symbol)
                             .font(.system(size: 14, weight: .semibold))
@@ -24,18 +20,29 @@ extension SettingsContentView {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(runtimeStatus.color)
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(runtimeStatus.color.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(runtimeStatus.color.opacity(0.15), lineWidth: 1)
+                    )
 
-                    // Path input
                     HStack(spacing: 8) {
-                        TextField("/opt/homebrew/bin/codex", text: $codexPathDraft)
-                            .textFieldStyle(.roundedBorder)
+                        SettingsTextField(
+                            placeholder: "/opt/homebrew/bin/codex",
+                            text: $codexPathDraft
+                        )
 
                         ActionPillButton(title: "Choose", symbol: "folder") {
                             viewModel.chooseCustomCodexPath()
                         }
                     }
 
-                    // Action buttons
                     HStack(spacing: 8) {
                         ActionPillButton(title: "Save", symbol: "checkmark", role: .primary) {
                             viewModel.updateCustomCodexPath(codexPathDraft)
@@ -58,12 +65,12 @@ extension SettingsContentView {
                 }
             }
 
-            // Diagnostics Card (collapsible)
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 16) {
                     settingsSectionIntro(
                         title: "Diagnostics",
-                        description: "System information and tools"
+                        description: "System information and tools",
+                        symbol: "stethoscope"
                     )
 
                     HStack(spacing: 8) {
@@ -89,26 +96,19 @@ extension SettingsContentView {
                 }
             }
 
-            // Cache Settings Card
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 16) {
                     settingsSectionIntro(
                         title: "Cache",
-                        description: "Data refresh interval"
+                        description: "Data refresh interval",
+                        symbol: "timer"
                     )
 
-                    HStack(spacing: 12) {
-                        Text("Refresh interval")
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textPrimary)
-
-                        Spacer()
-
+                    settingsFormRow("Refresh interval", icon: "arrow.triangle.2.circlepath") {
                         Stepper(value: limitsCacheTTLMinutesBinding, in: 1...120) {
                             Text("\(viewModel.limitsCacheTTLMinutes) min")
                                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                                 .foregroundStyle(DashboardTokens.textPrimary)
-                                .frame(minWidth: 50, alignment: .trailing)
                         }
                     }
 

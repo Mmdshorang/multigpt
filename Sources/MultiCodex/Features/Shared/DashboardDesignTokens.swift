@@ -17,6 +17,20 @@ enum DashboardTokens {
     static let sparkDefault = accent.opacity(0.4)
     static let sparkHigh = statusOrange.opacity(0.5)
     static let sparkCritical = statusRed.opacity(0.5)
+    static let inputBackground = Color.white.opacity(0.04)
+    static let inputBorder = Color.white.opacity(0.08)
+    static let inputBorderFocused = accent.opacity(0.5)
+    static let toggleTrackOff = Color.white.opacity(0.12)
+    static let toggleTrackOn = accent
+    static let destructive = Color(red: 0.92, green: 0.32, blue: 0.32)
+    static let destructiveBackground = destructive.opacity(0.10)
+    static let destructiveBorder = destructive.opacity(0.25)
+    static let segmentedActiveBackground = accent.opacity(0.18)
+    static let segmentedActiveBorder = accent.opacity(0.35)
+    static let segmentedInactiveBackground = Color.white.opacity(0.03)
+    static let segmentedTrackBackground = Color.white.opacity(0.02)
+    static let sidebarSelectedBackground = accent.opacity(0.10)
+    static let sidebarHoverBackground = Color.white.opacity(0.04)
 
     enum Spacing {
         static let containerPadding: CGFloat = 16

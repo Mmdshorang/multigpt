@@ -1,18 +1,15 @@
 import SwiftUI
 
-// MARK: - Accounts Page
-// Simplified single column with expandable rows
-
 extension SettingsContentView {
     var accountsPage: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header Card
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         settingsSectionIntro(
                             title: "Accounts",
-                            description: "Manage your coding agent accounts"
+                            description: "Manage your coding agent accounts",
+                            symbol: "person.2.fill"
                         )
 
                         Spacer()
@@ -37,7 +34,6 @@ extension SettingsContentView {
                 }
             }
 
-            // Account List
             if viewModel.accounts.isEmpty {
                 SettingsPanelCard {
                     VStack(spacing: 12) {
@@ -75,17 +71,16 @@ extension SettingsContentView {
 
         return SettingsPanelCard(padding: 12) {
             VStack(alignment: .leading, spacing: 0) {
-                // Header row (always visible)
                 Button {
-                    toggleExpanded(account.name)
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        toggleExpanded(account.name)
+                    }
                 } label: {
                     HStack(spacing: 12) {
-                        // Status dot
                         Circle()
                             .fill(AccountPresentation.statusColor(for: account.connectionState))
                             .frame(width: 8, height: 8)
 
-                        // Account name
                         VStack(alignment: .leading, spacing: 2) {
                             Text(account.name)
                                 .font(.system(size: 14, weight: .semibold))
@@ -104,12 +99,10 @@ extension SettingsContentView {
 
                         Spacer()
 
-                        // Current badge
                         if account.isCurrent {
                             AccountStatusPill(text: "Active", color: DashboardTokens.accent)
                         }
 
-                        // Expand chevron
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(DashboardTokens.textTertiary)
@@ -118,14 +111,12 @@ extension SettingsContentView {
                 }
                 .buttonStyle(.plain)
 
-                // Expanded content
                 if isExpanded {
                     VStack(alignment: .leading, spacing: 16) {
                         Divider()
                             .background(Color.white.opacity(0.1))
                             .padding(.vertical, 4)
 
-                        // Actions row
                         HStack(spacing: 8) {
                             if !account.isCurrent {
                                 ActionPillButton(
@@ -155,43 +146,51 @@ extension SettingsContentView {
                             .disabled(isAccountActionRunning)
                         }
 
-                        // Rename
-                        HStack(spacing: 8) {
-                            TextField("Rename account", text: renameBinding(for: account.name))
-                                .textFieldStyle(.roundedBorder)
-
-                            ActionPillButton(title: "Rename", symbol: "pencil") {
-                                viewModel.renameAccount(from: account.name, to: renameDrafts[account.name] ?? account.name)
-                            }
-                            .disabled(cannotRename(account.name) || isAccountActionRunning)
-                        }
-
-                        // Usage
                         if account.usage.fiveHour.usedPercent != nil || account.usage.weekly.usedPercent != nil {
-                            HStack(spacing: 12) {
-                                usageMiniCard(
-                                    title: "5h",
-                                    metric: account.usage.fiveHour,
-                                    progress: viewModel.progressValue(for: account.usage.fiveHour)
-                                )
+                            settingsInsetPanel(title: "USAGE") {
+                                HStack(spacing: 8) {
+                                    AccountUsageMetricCard(
+                                        title: "5h",
+                                        metric: account.usage.fiveHour,
+                                        resetDisplayMode: viewModel.resetDisplayMode,
+                                        progressValue: viewModel.progressValue(for: account.usage.fiveHour)
+                                    )
 
-                                usageMiniCard(
-                                    title: "Weekly",
-                                    metric: account.usage.weekly,
-                                    progress: viewModel.progressValue(for: account.usage.weekly)
-                                )
+                                    AccountUsageMetricCard(
+                                        title: "Weekly",
+                                        metric: account.usage.weekly,
+                                        resetDisplayMode: viewModel.resetDisplayMode,
+                                        progressValue: viewModel.progressValue(for: account.usage.weekly)
+                                    )
+                                }
                             }
                         }
 
-                        // Danger zone
-                        VStack(alignment: .leading, spacing: 8) {
-                            Toggle("Also delete local account data", isOn: removeStoredDataBinding(for: account.name))
-                                .toggleStyle(.switch)
-                                .font(.caption)
+                        settingsInsetPanel(title: "RENAME") {
+                            HStack(spacing: 8) {
+                                SettingsTextField(
+                                    placeholder: "New name",
+                                    text: renameBinding(for: account.name)
+                                )
 
-                            Button(
-                                removeStoredDataBinding(for: account.name).wrappedValue ? "Remove and Delete Data" : "Remove from MultiCodex",
-                                role: .destructive
+                                ActionPillButton(title: "Rename", symbol: "pencil") {
+                                    viewModel.renameAccount(from: account.name, to: renameDrafts[account.name] ?? account.name)
+                                }
+                                .disabled(cannotRename(account.name) || isAccountActionRunning)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            SettingsToggle(
+                                label: "Delete local account data on removal",
+                                isOn: removeStoredDataBinding(for: account.name)
+                            )
+
+                            SettingsDestructiveButton(
+                                title: removeStoredDataBinding(for: account.name).wrappedValue
+                                    ? "Remove and Delete Data"
+                                    : "Remove from MultiCodex",
+                                isDisabled: isAccountActionRunning
                             ) {
                                 viewModel.removeAccount(
                                     named: account.name,
@@ -199,52 +198,21 @@ extension SettingsContentView {
                                 )
                                 removalDeleteDataChoice[account.name] = false
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .disabled(isAccountActionRunning)
                         }
-                        .padding(.top, 8)
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                                .fill(DashboardTokens.destructiveBackground)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                                .stroke(DashboardTokens.destructiveBorder, lineWidth: 1)
+                        )
                     }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
         }
-    }
-
-    func usageMiniCard(title: String, metric: UsageMetric, progress: Double) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(DashboardTokens.Font.metadata())
-                .foregroundStyle(DashboardTokens.textTertiary)
-
-            HStack(spacing: 6) {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.white.opacity(0.1))
-                            .frame(height: 4)
-
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(DashboardTokens.accent)
-                            .frame(width: geo.size.width * progress, height: 4)
-                    }
-                }
-                .frame(width: 40, height: 4)
-
-                Text(metric.percentText)
-                    .font(DashboardTokens.Font.metadata().weight(.semibold))
-                    .foregroundStyle(DashboardTokens.textPrimary)
-            }
-
-                        Text(metric.resetText(mode: viewModel.resetDisplayMode))
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(Color.white.opacity(0.02))
-        )
     }
 
     func toggleExpanded(_ accountName: String) {
@@ -256,7 +224,6 @@ extension SettingsContentView {
     }
 
     func syncExpandedAccounts() {
-        // Remove expanded states for accounts that no longer exist
         let names = Set(viewModel.accounts.map(\.name))
         expandedAccountNames = expandedAccountNames.intersection(names)
     }

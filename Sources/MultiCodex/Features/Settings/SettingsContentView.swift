@@ -54,18 +54,46 @@ struct SettingsContentView: View {
             }
             .padding(.horizontal, 12)
 
-            List(selection: sidebarSelectionBinding) {
+            VStack(spacing: 2) {
                 ForEach(viewModel.settingsSections) { section in
-                    Label(section.title, systemImage: section.symbol)
-                        .tag(section)
+                    sidebarRow(section)
                 }
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
+            .padding(.horizontal, 6)
 
             Spacer()
         }
         .padding(.vertical, 12)
+    }
+
+    @ViewBuilder
+    private func sidebarRow(_ section: SettingsSection) -> some View {
+        let isSelected = viewModel.selectedSettingsSection == section
+
+        Button {
+            viewModel.selectSettingsSection(section)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: section.symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(isSelected ? DashboardTokens.accent : DashboardTokens.textSecondary)
+                    .frame(width: 16)
+
+                Text(section.title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? DashboardTokens.textPrimary : DashboardTokens.textSecondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isSelected ? DashboardTokens.sidebarSelectedBackground : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder

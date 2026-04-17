@@ -1,18 +1,15 @@
 import SwiftUI
 
-// MARK: - General Page
-// Merges Dashboard overview + Display settings
-
 extension SettingsContentView {
     var generalPage: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Status Overview Card
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         settingsSectionIntro(
                             title: "Status",
-                            description: "Current system overview"
+                            description: "Current system overview",
+                            symbol: "chart.bar.fill"
                         )
 
                         Spacer()
@@ -40,25 +37,22 @@ extension SettingsContentView {
                     Divider()
                         .background(Color.white.opacity(0.1))
 
-                    HStack(spacing: 16) {
-                        statusItem(
+                    HStack(spacing: 8) {
+                        DashboardStatCard(
                             label: "Accounts",
-                            value: "\(viewModel.accounts.count)",
-                            symbol: "person.2.fill"
+                            value: "\(viewModel.accounts.count)"
                         )
 
-                        statusItem(
+                        DashboardStatCard(
                             label: "Current",
                             value: viewModel.currentAccount?.name ?? "None",
-                            symbol: "checkmark.circle.fill",
-                            valueColor: viewModel.currentAccount != nil ? DashboardTokens.statusGreen : DashboardTokens.textSecondary
+                            sublabel: viewModel.currentAccount != nil ? "Active" : nil
                         )
 
-                        statusItem(
+                        DashboardStatCard(
                             label: "Need Login",
                             value: "\(viewModel.accountsNeedingLogin.count)",
-                            symbol: "exclamationmark.triangle.fill",
-                            valueColor: viewModel.accountsNeedingLogin.isEmpty ? DashboardTokens.textSecondary : DashboardTokens.statusRed
+                            sublabel: viewModel.accountsNeedingLogin.isEmpty ? "All good" : "Action needed"
                         )
                     }
 
@@ -68,70 +62,65 @@ extension SettingsContentView {
                 }
             }
 
-            // Display Settings Card
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 16) {
                     settingsSectionIntro(
                         title: "Appearance",
-                        description: "Customize menu bar display"
+                        description: "Customize menu bar display",
+                        symbol: "paintbrush.fill"
                     )
 
-                    VStack(spacing: 12) {
-                        settingsFormRow("Menu density") {
-                            Picker("Menu density", selection: menuDensityBinding) {
-                                ForEach(MenuDensity.allCases) { density in
-                                    Text(density.title).tag(density)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
+                    VStack(spacing: 14) {
+                        settingsFormRow("Menu density", icon: "rectangle.compress.vertical") {
+                            SettingsSegmentedPicker(
+                                options: MenuDensity.allCases,
+                                titleForOption: { $0.title },
+                                selection: menuDensityBinding
+                            )
+                            .frame(maxWidth: 260)
                         }
 
-                        settingsFormRow("Reset time display") {
-                            Picker("Reset time style", selection: resetDisplayModeBinding) {
-                                ForEach(ResetDisplayMode.allCases, id: \.self) { mode in
-                                    Text(mode.title).tag(mode)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
+                        settingsFormRow("Reset time display", icon: "clock") {
+                            SettingsSegmentedPicker(
+                                options: ResetDisplayMode.allCases,
+                                titleForOption: { $0.title },
+                                selection: resetDisplayModeBinding
+                            )
+                            .frame(maxWidth: 260)
                         }
 
-                        settingsFormRow("Usage bar style") {
-                            Picker("Usage bars", selection: usageBarStyleBinding) {
-                                ForEach(UsageBarStyle.allCases) { style in
-                                    Text(style.title).tag(style)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
+                        settingsFormRow("Usage bar style", icon: "chart.bar") {
+                            SettingsSegmentedPicker(
+                                options: UsageBarStyle.allCases,
+                                titleForOption: { $0.title },
+                                selection: usageBarStyleBinding
+                            )
+                            .frame(maxWidth: 260)
                         }
                     }
                 }
             }
 
-            // Account Switching Card
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 16) {
                     settingsSectionIntro(
                         title: "Auto-Switching",
-                        description: "Automatically switch between accounts"
+                        description: "Automatically switch between accounts",
+                        symbol: "arrow.triangle.swap"
                     )
 
-                    VStack(spacing: 12) {
-                        settingsFormRow("Strategy") {
-                            Picker("Switching strategy", selection: accountSwitchingStrategyBinding) {
-                                ForEach(AccountSwitchingStrategy.allCases) { strategy in
-                                    Text(strategy.title).tag(strategy)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
+                    VStack(spacing: 14) {
+                        settingsFormRow("Strategy", detail: viewModel.accountSwitchingStrategy.descriptionText, icon: "arrow.2.circlepath") {
+                            SettingsSegmentedPicker(
+                                options: AccountSwitchingStrategy.allCases,
+                                titleForOption: { $0.title },
+                                selection: accountSwitchingStrategyBinding
+                            )
+                            .frame(maxWidth: 300)
                         }
 
                         HStack(spacing: 10) {
-                            Toggle("Show notifications", isOn: autoSwitchNotificationsBinding)
-                                .toggleStyle(.switch)
+                            SettingsToggle(label: "Show notifications", isOn: autoSwitchNotificationsBinding)
 
                             Spacer()
 
@@ -147,25 +136,5 @@ extension SettingsContentView {
                 }
             }
         }
-    }
-
-    func statusItem(label: String, value: String, symbol: String, valueColor: Color? = nil) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: symbol)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(DashboardTokens.textTertiary)
-                .frame(width: 16)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(DashboardTokens.Font.metadata())
-                    .foregroundStyle(DashboardTokens.textTertiary)
-
-                Text(value)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(valueColor ?? DashboardTokens.textPrimary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

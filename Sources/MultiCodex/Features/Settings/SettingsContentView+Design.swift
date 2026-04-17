@@ -10,18 +10,64 @@ extension SettingsContentView {
 
     func settingsSectionIntro(
         title: String,
-        description: String
+        description: String,
+        symbol: String? = nil
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(DashboardTokens.Font.cardHeading())
-                .foregroundStyle(DashboardTokens.textPrimary)
+        HStack(spacing: 8) {
+            if let symbol {
+                Image(systemName: symbol)
+                    .font(DashboardTokens.Font.cardHeading())
+                    .foregroundStyle(DashboardTokens.accent)
+                    .frame(width: 16)
+            }
 
-            Text(description)
-                .font(DashboardTokens.Font.metadata())
-                .foregroundStyle(DashboardTokens.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(DashboardTokens.Font.cardHeading())
+                    .foregroundStyle(DashboardTokens.textPrimary)
+
+                Text(description)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+
+    func settingsFormRow<Control: View>(
+        _ label: String,
+        detail: String? = nil,
+        icon: String? = nil,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 12))
+                        .foregroundStyle(DashboardTokens.textTertiary)
+                        .frame(width: 16)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(DashboardTokens.Font.metadata().weight(.semibold))
+                        .foregroundStyle(DashboardTokens.textPrimary)
+
+                    if let detail {
+                        Text(detail)
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            Spacer(minLength: 16)
+
+            control()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     func settingsInsetPanel<Content: View>(
@@ -55,30 +101,6 @@ extension SettingsContentView {
         )
     }
 
-    func settingsFormRow<Control: View>(
-        _ label: String,
-        detail: String? = nil,
-        @ViewBuilder control: () -> Control
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(DashboardTokens.Font.metadata().weight(.semibold))
-                    .foregroundStyle(DashboardTokens.textPrimary)
-
-                if let detail {
-                    Text(detail)
-                        .font(DashboardTokens.Font.metadata())
-                        .foregroundStyle(DashboardTokens.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            control()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     func settingsInfoRow(symbol: String, text: String, color: Color = DashboardTokens.textSecondary) -> some View {
         HStack(spacing: 6) {
             Image(systemName: symbol)
@@ -90,8 +112,6 @@ extension SettingsContentView {
             Spacer(minLength: 0)
         }
     }
-
-    // MARK: - Feedback Row
 
     func feedbackRow(_ text: String, color: Color) -> some View {
         HStack(spacing: 10) {
