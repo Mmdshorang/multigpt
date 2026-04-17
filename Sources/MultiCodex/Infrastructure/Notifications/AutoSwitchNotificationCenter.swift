@@ -14,6 +14,7 @@ struct AutoSwitchNotificationPayload: Equatable {
 
 protocol AutoSwitchNotificationSending: AnyObject {
     func requestAuthorizationIfNeeded()
+    func requestAuthorization()
     func send(_ payload: AutoSwitchNotificationPayload)
 }
 
@@ -32,8 +33,18 @@ final class AutoSwitchNotificationCenter: AutoSwitchNotificationSending {
             guard settings.authorizationStatus == .notDetermined else {
                 return
             }
-            _ = try? await center.requestAuthorization(options: [.alert])
+            await requestAuthorizationInternal()
         }
+    }
+
+    func requestAuthorization() {
+        Task {
+            await requestAuthorizationInternal()
+        }
+    }
+
+    private func requestAuthorizationInternal() async {
+        _ = try? await center.requestAuthorization(options: [.alert, .sound])
     }
 
     func send(_ payload: AutoSwitchNotificationPayload) {

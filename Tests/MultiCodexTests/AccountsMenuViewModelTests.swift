@@ -8,9 +8,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let preferences = AppPreferencesStore(defaults: defaults)
         let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: preferences,
             startImmediately: false
         )
@@ -44,7 +46,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.accountSwitchingStrategy, .expiryAware)
         XCTAssertTrue(viewModel.autoSwitchNotificationsEnabled)
-        XCTAssertEqual(notifier.authorizationRequests, 1)
+        // One request on init, one when enabling notifications
+        XCTAssertEqual(notifier.authorizationRequests, 2)
         let persisted = AppPreferencesStore(defaults: defaults)
         XCTAssertEqual(persisted.accountSwitchingStrategy, .expiryAware)
         XCTAssertTrue(persisted.autoSwitchNotificationsEnabled)
@@ -72,9 +75,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         defaults.set("beta", forKey: AppPreferencesStore.Keys.selectedSettingsAccountName)
         let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -92,9 +97,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
     func testUpdateCustomCodexPathUpdatesServiceAndStore() {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -109,9 +116,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
     func testMenuAccountRowsExcludeCurrentAccount() {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -137,9 +146,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.fetchAccountsError = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "accounts unavailable"])
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -193,9 +204,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         )
         service.fetchLimitsDelayNanoseconds = 400_000_000
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -226,9 +239,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             errors: []
         )
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -299,9 +314,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             ]
         )
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: preferences,
             startImmediately: false
         )
@@ -379,6 +396,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         viewModel.sendTestAutoSwitchNotification()
 
         XCTAssertEqual(viewModel.accountActionMessage, "Sent test notification alpha -> beta.")
+        // One request on view model init (authorization is always requested)
         XCTAssertEqual(notifier.authorizationRequests, 1)
         XCTAssertEqual(
             notifier.sentPayloads,
@@ -395,9 +413,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
     func testSetAccountSwitchingStrategyTriggersImmediateLiveRefreshForAutomaticModes() async {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -488,9 +508,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         ]
         service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -530,9 +552,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         service.loginHomeStatusExitCode = 1
         service.loginHomeStatusOutput = "authorization failed"
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -560,9 +584,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
         ]
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -584,9 +610,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         ]
         service.stubbedDefaultWorkspaceEmailByAccount["fresh"] = "personal-fresh@example.com"
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -615,9 +643,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             errors: []
         )
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -657,9 +687,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             errors: []
         )
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -706,9 +738,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             errors: []
         )
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -746,9 +780,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             errors: []
         )
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -786,9 +822,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             errors: []
         )
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -827,9 +865,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         )
         service.fetchLimitsDelayNanoseconds = 400_000_000
 
+        let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
             accountService: service,
             fileManager: .default,
+            autoSwitchNotifier: { notifier },
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
@@ -856,9 +896,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
     func testOnboardingStateTransitionsMatrix() async {
         let runtimeOffService = MockCodexAccountService()
         runtimeOffService.probeRuntimeResult = RuntimeProbe(isAvailable: false, summary: "missing runtime")
+        let runtimeOffNotifier = MockAutoSwitchNotifier()
         let runtimeOff = AccountsMenuViewModel(
             accountService: runtimeOffService,
             fileManager: .default,
+            autoSwitchNotifier: { runtimeOffNotifier },
             preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
             startImmediately: false
         )
@@ -866,9 +908,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         let emptyService = MockCodexAccountService()
         emptyService.probeRuntimeResult = RuntimeProbe(isAvailable: true, summary: "ok")
+        let emptyNotifier = MockAutoSwitchNotifier()
         let empty = AccountsMenuViewModel(
             accountService: emptyService,
             fileManager: .default,
+            autoSwitchNotifier: { emptyNotifier },
             preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
             startImmediately: false
         )
@@ -878,9 +922,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         needsLoginService.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: nil),
         ]
+        let needsLoginNotifier = MockAutoSwitchNotifier()
         let needsLogin = AccountsMenuViewModel(
             accountService: needsLoginService,
             fileManager: .default,
+            autoSwitchNotifier: { needsLoginNotifier },
             preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
             startImmediately: false
         )
@@ -894,9 +940,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         completeService.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
         ]
+        let completeNotifier = MockAutoSwitchNotifier()
         let complete = AccountsMenuViewModel(
             accountService: completeService,
             fileManager: .default,
+            autoSwitchNotifier: { completeNotifier },
             preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
             startImmediately: false
         )
@@ -1197,6 +1245,10 @@ private final class MockAutoSwitchNotifier: AutoSwitchNotificationSending {
     private(set) var sentPayloads: [AutoSwitchNotificationPayload] = []
 
     func requestAuthorizationIfNeeded() {
+        authorizationRequests += 1
+    }
+
+    func requestAuthorization() {
         authorizationRequests += 1
     }
 

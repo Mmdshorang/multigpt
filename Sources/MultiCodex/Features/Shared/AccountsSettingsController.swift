@@ -80,7 +80,7 @@ final class AccountsSettingsController {
         viewModel.autoSwitchNotificationsEnabled = isEnabled
         viewModel.preferences.autoSwitchNotificationsEnabled = isEnabled
         if isEnabled {
-            viewModel.autoSwitchNotifier.requestAuthorizationIfNeeded()
+            viewModel.autoSwitchNotifier.requestAuthorization()
         }
     }
 
