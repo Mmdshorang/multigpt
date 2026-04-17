@@ -220,10 +220,12 @@ struct DashboardAccountRow: View {
                 .help(isExpanded ? "Collapse account details" : "Expand account details")
             }
 
-            if isExpanded {
-                expandedContent
-                    .padding(.top, 10)
-            }
+            expandedContent
+                .padding(.top, isExpanded ? 10 : 0)
+                .frame(height: isExpanded ? nil : 0, alignment: .top)
+                .clipped()
+                .opacity(isExpanded ? 1 : 0)
+                .animation(.easeOut(duration: 0.2), value: isExpanded)
         }
         .padding(.horizontal, DashboardTokens.Spacing.rowHPadding)
         .padding(.vertical, DashboardTokens.Spacing.rowVPadding)

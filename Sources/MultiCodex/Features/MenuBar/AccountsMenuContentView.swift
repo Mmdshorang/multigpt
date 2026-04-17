@@ -60,7 +60,6 @@ struct AccountsMenuContentView: View {
         .animation(.easeInOut(duration: 0.18), value: viewModel.accounts.map(\.name))
         .animation(.easeInOut(duration: 0.18), value: viewModel.switchingAccountName)
         .animation(.easeInOut(duration: 0.18), value: viewModel.accountActionInFlightName)
-        .animation(.easeInOut(duration: 0.18), value: expandedAccountNames)
         .animation(.easeInOut(duration: 0.18), value: showAllAccounts)
     }
 }
