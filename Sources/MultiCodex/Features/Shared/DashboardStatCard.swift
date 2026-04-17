@@ -5,8 +5,8 @@ struct DashboardSectionHeader: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(DashboardTokens.Font.sectionLabel())
-            .tracking(1.5)
+            .font(.system(size: 9, weight: .medium))
+            .tracking(1.2)
             .foregroundStyle(DashboardTokens.textTertiary)
     }
 }

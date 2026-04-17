@@ -100,14 +100,9 @@ extension AccountsMenuContentView {
                         Circle()
                             .fill(AccountPresentation.statusColor(for: current.connectionState))
                             .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
-                            .overlay(
-                                Circle()
-                                    .stroke(AccountPresentation.statusColor(for: current.connectionState).opacity(0.3), lineWidth: 2)
-                                    .scaleEffect(1.5)
-                            )
 
                         Text(current.name)
-                            .font(DashboardTokens.Font.cardHeading())
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(DashboardTokens.textPrimary)
                             .lineLimit(1)
 

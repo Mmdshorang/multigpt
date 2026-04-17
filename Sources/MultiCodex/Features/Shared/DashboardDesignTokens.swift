@@ -1,17 +1,17 @@
 import SwiftUI
 
 enum DashboardTokens {
-    static let background = Color(red: 0.047, green: 0.055, blue: 0.078)
-    static let cardBackground = Color.white.opacity(0.03)
+    static let background = Color(red: 0.05, green: 0.055, blue: 0.07)
+    static let cardBackground = Color.white.opacity(0.028)
     static let cardBorder = Color.white.opacity(0.06)
     static let textPrimary = Color.white
-    static let textSecondary = Color.white.opacity(0.55)
-    static let textTertiary = Color.white.opacity(0.30)
-    static let accent = Color(red: 0.388, green: 0.400, blue: 0.945)
+    static let textSecondary = Color.white.opacity(0.58)
+    static let textTertiary = Color.white.opacity(0.32)
+    static let accent = Color(red: 0.45, green: 0.42, blue: 0.95)
     static let accentBackground = accent.opacity(0.12)
-    static let statusGreen = Color(red: 0.204, green: 0.827, blue: 0.600)
-    static let statusOrange = Color(red: 0.984, green: 0.576, blue: 0.235)
-    static let statusRed = Color(red: 0.937, green: 0.267, blue: 0.267)
+    static let statusGreen = Color(red: 0.25, green: 0.82, blue: 0.58)
+    static let statusOrange = Color(red: 0.96, green: 0.58, blue: 0.28)
+    static let statusRed = Color(red: 0.92, green: 0.32, blue: 0.32)
     static let ringFiveHour = accent
     static let ringWeekly = statusGreen
     static let sparkDefault = accent.opacity(0.4)
@@ -24,12 +24,12 @@ enum DashboardTokens {
         static let cardRadius: CGFloat = 10
         static let cardGap: CGFloat = 8
         static let sectionSpacing: CGFloat = 10
-        static let rowGap: CGFloat = 4
-        static let rowHPadding: CGFloat = 10
-        static let rowVPadding: CGFloat = 8
-        static let rowRadius: CGFloat = 8
-        static let ringSize: CGFloat = 48
-        static let dotSize: CGFloat = 8
+        static let rowGap: CGFloat = 3
+        static let rowHPadding: CGFloat = 12
+        static let rowVPadding: CGFloat = 10
+        static let rowRadius: CGFloat = 10
+        static let ringSize: CGFloat = 46
+        static let dotSize: CGFloat = 7
         static let sparkHeight: CGFloat = 24
         static let footerSpacing: CGFloat = 8
     }
@@ -44,15 +44,15 @@ enum DashboardTokens {
         }
 
         static func detailTitle() -> SwiftUI.Font {
-            .system(size: 18, weight: .bold)
+            .system(size: 17, weight: .bold)
         }
 
         static func accountName() -> SwiftUI.Font {
-            .system(size: 12, weight: .semibold)
+            .system(size: 13, weight: .semibold)
         }
 
         static func metadata() -> SwiftUI.Font {
-            .system(size: 10, weight: .regular)
+            .system(size: 11, weight: .regular)
         }
 
         static func ringLabel() -> SwiftUI.Font {

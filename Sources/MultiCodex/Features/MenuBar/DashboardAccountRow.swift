@@ -112,7 +112,7 @@ struct DashboardAccountRow: View {
         if row.primaryAction == .relogin {
             return DashboardTokens.statusOrange.opacity(isRowHovered ? 0.16 : 0.1)
         }
-        return Color.white.opacity(isRowHovered ? 0.06 : 0.02)
+        return Color.white.opacity(isRowHovered ? 0.05 : 0.025)
     }
 
     private var rowBorderColor: Color {
@@ -137,47 +137,60 @@ struct DashboardAccountRow: View {
     }
 
     private var chevronForegroundColor: Color {
-        isExpanded ? DashboardTokens.textPrimary : DashboardTokens.textSecondary
+        isExpanded ? DashboardTokens.textSecondary : DashboardTokens.textTertiary
     }
 
     private var chevronBackgroundColor: Color {
-        isExpanded ? Color.white.opacity(0.1) : Color.white.opacity(0.04)
+        isExpanded ? Color.white.opacity(0.06) : Color.clear
     }
 
     private var chevronBorderColor: Color {
-        isExpanded ? DashboardTokens.accent.opacity(0.36) : DashboardTokens.cardBorder
+        isExpanded ? DashboardTokens.accent.opacity(0.3) : Color.white.opacity(0.08)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 activationCheckboxButton
 
                 HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text(row.name)
-                                .font(DashboardTokens.Font.accountName())
+                                .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(DashboardTokens.textPrimary)
                                 .lineLimit(1)
 
                             if row.isCurrent {
-                                Text("CURRENT")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .tracking(0.8)
+                                Text("current")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .tracking(0.5)
                                     .foregroundStyle(DashboardTokens.accent)
-                                    .padding(.horizontal, 4)
+                                    .padding(.horizontal, 5)
                                     .padding(.vertical, 1)
-                                    .background(DashboardTokens.accentBackground, in: Capsule())
+                                    .background(
+                                        Capsule()
+                                            .stroke(DashboardTokens.accent.opacity(0.4), lineWidth: 1)
+                                    )
                             }
                         }
 
-                        HStack(spacing: 6) {
-                            Text("5h \(row.fiveHourPercent)")
-                            Text("wk \(row.weeklyPercent)")
+                        HStack(spacing: 8) {
+                            HStack(spacing: 2) {
+                                Text("5h")
+                                    .foregroundColor(DashboardTokens.textTertiary)
+                                Text(row.fiveHourPercent)
+                                    .foregroundColor(DashboardTokens.textSecondary)
+                            }
+                            
+                            HStack(spacing: 2) {
+                                Text("wk")
+                                    .foregroundColor(DashboardTokens.textTertiary)
+                                Text(row.weeklyPercent)
+                                    .foregroundColor(DashboardTokens.textSecondary)
+                            }
                         }
-                        .font(DashboardTokens.Font.metadata())
-                        .foregroundStyle(DashboardTokens.textSecondary)
+                        .font(.system(size: 11, weight: .regular))
                     }
 
                     Spacer(minLength: 8)
@@ -190,26 +203,26 @@ struct DashboardAccountRow: View {
 
                 Button(action: onToggleExpanded) {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(chevronForegroundColor)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 24, height: 24)
                         .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(chevronBackgroundColor)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(chevronBorderColor, lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(chevronBorderColor, lineWidth: 0.5)
                         )
                 }
                 .buttonStyle(.plain)
-                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .help(isExpanded ? "Collapse account details" : "Expand account details")
             }
 
             if isExpanded {
                 expandedContent
-                    .padding(.top, 8)
+                    .padding(.top, 10)
                     .transition(.opacity)
             }
         }
@@ -246,8 +259,8 @@ struct DashboardAccountRow: View {
                         .foregroundStyle(activationForegroundColor)
                 }
             }
-            .frame(width: 30, height: 30)
-            .scaleEffect((isActivationHovered && !isActivationDisabled) ? 1.06 : 1)
+            .frame(width: 28, height: 28)
+            .scaleEffect((isActivationHovered && !isActivationDisabled) ? 1.04 : 1)
         }
         .buttonStyle(.plain)
         .disabled(isActivationDisabled)
@@ -269,7 +282,7 @@ struct DashboardAccountRow: View {
                     .frame(width: geo.size.width * CGFloat(min(1, primaryPercent)))
             }
         }
-        .frame(width: 48, height: 4)
+        .frame(width: 44, height: 3)
     }
 
     private var expandedContent: some View {
@@ -290,15 +303,15 @@ struct DashboardAccountRow: View {
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 4) {
+            VStack(alignment: .trailing, spacing: 3) {
                 Text(row.resetText)
                     .font(DashboardTokens.Font.metadata())
-                    .foregroundStyle(DashboardTokens.textSecondary)
+                    .foregroundStyle(DashboardTokens.textTertiary)
 
                 if let email = row.workspaceEmailHint {
                     Text(email)
                         .font(DashboardTokens.Font.metadata())
-                        .foregroundStyle(DashboardTokens.textSecondary)
+                        .foregroundStyle(DashboardTokens.textTertiary)
                         .lineLimit(1)
                 }
             }

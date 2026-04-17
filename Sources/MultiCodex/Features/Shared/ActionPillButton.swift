@@ -18,6 +18,8 @@ struct ActionPillButton: View {
     var isDisabled: Bool = false
     let action: () -> Void
 
+    @State private var isHovered = false
+
     var body: some View {
         Button(action: action) {
             buttonContent
@@ -26,6 +28,8 @@ struct ActionPillButton: View {
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.4 : 1)
         .accessibilityLabel(title)
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.12), value: isHovered)
     }
 
     @ViewBuilder
@@ -55,9 +59,17 @@ struct ActionPillButton: View {
         RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
             .fill(
                 role == .primary
-                    ? AnyShapeStyle(DashboardTokens.accent)
-                    : AnyShapeStyle(DashboardTokens.cardBackground)
+                    ? AnyShapeStyle(primaryBackground)
+                    : AnyShapeStyle(secondaryBackground)
             )
+    }
+
+    private var primaryBackground: Color {
+        isHovered ? DashboardTokens.accent.opacity(0.9) : DashboardTokens.accent
+    }
+
+    private var secondaryBackground: Color {
+        isHovered ? Color.white.opacity(0.05) : DashboardTokens.cardBackground
     }
 
     private var borderShape: some View {
@@ -65,9 +77,13 @@ struct ActionPillButton: View {
             .stroke(
                 role == .primary
                     ? DashboardTokens.accent.opacity(0.4)
-                    : DashboardTokens.cardBorder,
+                    : borderColor,
                 lineWidth: 1
             )
+    }
+
+    private var borderColor: Color {
+        isHovered ? Color.white.opacity(0.12) : DashboardTokens.cardBorder
     }
 
     private var foregroundColor: Color {

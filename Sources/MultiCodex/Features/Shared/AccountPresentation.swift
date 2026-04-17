@@ -70,12 +70,15 @@ struct AccountStatusPill: View {
     let color: Color
 
     var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 8, weight: .bold))
-            .tracking(0.8)
+        Text(text.lowercased())
+            .font(.system(size: 9, weight: .medium))
+            .tracking(0.3)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(color.opacity(0.14), in: Capsule())
+            .background(
+                Capsule()
+                    .stroke(color.opacity(0.35), lineWidth: 1)
+            )
             .foregroundStyle(color)
     }
 }
