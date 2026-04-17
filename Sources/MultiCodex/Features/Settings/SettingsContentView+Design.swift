@@ -90,4 +90,33 @@ extension SettingsContentView {
             Spacer(minLength: 0)
         }
     }
+
+    // MARK: - Feedback Row
+
+    func feedbackRow(_ text: String, color: Color) -> some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+
+            Text(text)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textPrimary)
+
+            Spacer()
+
+            Button("Dismiss") {
+                viewModel.clearAccountActionFeedback()
+            }
+            .buttonStyle(.plain)
+            .font(DashboardTokens.Font.metadata().weight(.semibold))
+            .foregroundStyle(DashboardTokens.textSecondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            color.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+        )
+    }
 }

@@ -130,7 +130,7 @@ extension SettingsContentView {
     func handleAlertAction(_ alert: MenuAlertState) {
         switch alert.action {
         case .openRuntimeSettings:
-            viewModel.selectSettingsSection(.runtime)
+            viewModel.selectSettingsSection(.system)
         default:
             viewModel.performMenuAlertAction(alert.action)
         }

@@ -6,11 +6,12 @@ struct SettingsContentView: View {
     @State var codexPathDraft = ""
     @State var renameDrafts: [String: String] = [:]
     @State var removalDeleteDataChoice: [String: Bool] = [:]
+    @State var expandedAccountNames: Set<String> = []
 
     var body: some View {
         NavigationSplitView {
             sidebar
-                .frame(minWidth: 168, idealWidth: 176)
+                .frame(minWidth: 160, idealWidth: 170)
                 .background(sidebarBackground)
         } detail: {
             ZStack {
@@ -26,14 +27,13 @@ struct SettingsContentView: View {
             codexPathDraft = viewModel.customCodexPath
             syncRenameDrafts()
             syncRemovalChoices()
-            if viewModel.selectedSettingsSection == .advanced {
-                viewModel.setAdvancedSettingsVisible(true)
-            }
+            syncExpandedAccounts()
         }
         .onChange(of: viewModel.customCodexPath) { codexPathDraft = $0 }
         .onChange(of: viewModel.accounts.map(\.name)) { _ in
             syncRenameDrafts()
             syncRemovalChoices()
+            syncExpandedAccounts()
         }
     }
 
@@ -43,18 +43,16 @@ struct SettingsContentView: View {
     }
 
     var sidebar: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("SETTINGS")
                     .font(DashboardTokens.Font.sectionLabel())
                     .tracking(1.5)
                     .foregroundStyle(DashboardTokens.textTertiary)
 
-                HStack(spacing: 8) {
-                    AccountStatusPill(text: runtimeStatus.text, color: runtimeStatus.color)
-                }
+                AccountStatusPill(text: runtimeStatus.text, color: runtimeStatus.color)
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12)
 
             List(selection: sidebarSelectionBinding) {
                 ForEach(viewModel.settingsSections) { section in
@@ -65,56 +63,29 @@ struct SettingsContentView: View {
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
 
-            SettingsPanelCard(padding: 10) {
-                HStack {
-                    Text("Advanced")
-                        .font(DashboardTokens.Font.metadata().weight(.semibold))
-                        .foregroundStyle(DashboardTokens.textSecondary)
-
-                    Spacer(minLength: 8)
-
-                    Button(viewModel.isAdvancedSettingsVisible ? "Hide" : "Show") {
-                        viewModel.setAdvancedSettingsVisible(!viewModel.isAdvancedSettingsVisible)
-                    }
-                    .buttonStyle(.plain)
-                    .font(DashboardTokens.Font.metadata().weight(.semibold))
-                    .foregroundStyle(DashboardTokens.accent)
-                }
-            }
-            .padding(.horizontal, 10)
+            Spacer()
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
     }
 
     @ViewBuilder
     var detailContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 16) {
                 switch viewModel.selectedSettingsSection {
-                case .dashboard:
-                    VStack(alignment: .leading, spacing: 10) {
-                        headerCard
-                        dashboardPage
-                    }
+                case .general:
+                    generalPage
                 case .accounts:
                     accountsPage
-                case .runtime:
-                    runtimePage
-                case .display:
-                    displayPage
-                case .troubleshooting:
-                    troubleshootingPage
-                case .advanced:
-                    if viewModel.isAdvancedSettingsVisible {
-                        advancedPage
-                    } else {
-                        hiddenAdvancedPage
-                    }
+                case .system:
+                    systemPage
+                case .about:
+                    aboutPage
                 }
             }
             .frame(maxWidth: settingsContentMaxWidth, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
