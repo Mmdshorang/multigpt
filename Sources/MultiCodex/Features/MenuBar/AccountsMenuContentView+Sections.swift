@@ -224,7 +224,7 @@ extension AccountsMenuContentView {
                     if viewModel.isCodexRuntimeAvailable {
                         viewModel.startNewAccountLogin()
                     } else {
-                        viewModel.selectSettingsSection(.runtime)
+                        viewModel.selectSettingsSection(.system)
                         openSettingsWindow()
                     }
                 }
@@ -314,7 +314,7 @@ extension AccountsMenuContentView {
     func performAlertAction(_ alert: MenuAlertState) {
         switch alert.action {
         case .openRuntimeSettings:
-            viewModel.selectSettingsSection(.runtime)
+            viewModel.selectSettingsSection(.system)
             openSettingsWindow()
         default:
             viewModel.performMenuAlertAction(alert.action)
