@@ -139,10 +139,20 @@ extension AccountsMenuContentView {
             HStack {
                 DashboardSectionHeader(title: "accounts")
                 Spacer()
-                if hiddenAccountsCount > 0 {
+                if hiddenAccountsCount > 0, !showAllAccounts {
                     Text("+\(hiddenAccountsCount) more")
                         .font(DashboardTokens.Font.metadata())
                         .foregroundStyle(DashboardTokens.textSecondary)
+                }
+                if canToggleShowAll {
+                    ActionPillButton(
+                        title: showAllAccounts ? "Show Less" : "Show All",
+                        symbol: showAllAccounts ? "rectangle.compress.vertical" : "rectangle.expand.vertical",
+                        role: .secondary
+                    ) {
+                        toggleShowAllAccounts()
+                    }
+                    .help(showAllAccounts ? "Show fewer accounts in the menu" : "Show all accounts in the menu")
                 }
                 ActionPillButton(
                     title: areAllAccountsExpanded ? "Collapse All" : "Expand All",
@@ -160,15 +170,14 @@ extension AccountsMenuContentView {
                 ForEach(visibleRows) { row in
                     DashboardAccountRow(
                         row: row,
-                        isSelected: row.name == selectedAccountName,
                         isExpanded: expandedAccountNames.contains(row.name),
                         fiveHourProgressValue: viewModel.progressValue(for: row.account.usage.fiveHour),
                         weeklyProgressValue: viewModel.progressValue(for: row.account.usage.weekly),
                         isBusy: isActionBusy,
                         isSwitching: viewModel.switchingAccountName == row.name,
                         isAuthRunning: viewModel.accountActionInFlightName == row.name,
-                        onSelect: { selectedAccountName = row.name },
-                        onPrimaryAction: { performPrimaryAction(for: row) },
+                        onActivate: { performPrimaryAction(for: row) },
+                        onRowTap: { toggleExpanded(row.name) },
                         onToggleExpanded: { toggleExpanded(row.name) }
                     )
                 }
@@ -267,11 +276,24 @@ extension AccountsMenuContentView {
     }
 
     var visibleRows: [AccountRowState] {
-        viewModel.menuAccountRows(limit: viewModel.preferredMenuAccountCount)
+        if showAllAccounts {
+            return allRows
+        }
+        return Array(allRows.prefix(viewModel.preferredMenuAccountCount))
+    }
+
+    var allRows: [AccountRowState] {
+        viewModel.menuListAccounts.map { account in
+            AccountRowState(account: account, resetDisplayMode: viewModel.resetDisplayMode)
+        }
     }
 
     var hiddenAccountsCount: Int {
-        max(0, viewModel.menuListAccounts.count - visibleRows.count)
+        max(0, allRows.count - visibleRows.count)
+    }
+
+    var canToggleShowAll: Bool {
+        allRows.count > viewModel.preferredMenuAccountCount
     }
 
     var loginNewFooterRole: ActionPillRole {
@@ -307,8 +329,10 @@ extension AccountsMenuContentView {
     func performPrimaryAction(for row: AccountRowState) {
         switch row.primaryAction {
         case .switchAccount:
+            guard !isActionBusy else { return }
             viewModel.switchToAccount(named: row.name)
         case .relogin:
+            guard !isActionBusy else { return }
             viewModel.openLoginInTerminal(for: row.name)
         case .none:
             toggleExpanded(row.name)
@@ -359,22 +383,6 @@ extension AccountsMenuContentView {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    func synchronizeSelection() {
-        let names = visibleRows.map(\.name)
-
-        if let focus = viewModel.focusedAccountName, names.contains(focus) {
-            selectedAccountName = focus
-            viewModel.dismissFocusHint()
-            return
-        }
-
-        if let selectedAccountName, names.contains(selectedAccountName) {
-            return
-        }
-
-        selectedAccountName = names.first
-    }
-
     func installKeyboardMonitor() {
         guard keyboardMonitor == nil else { return }
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
@@ -402,46 +410,7 @@ extension AccountsMenuContentView {
             openSettingsWindow()
             return true
         }
-
-        switch event.keyCode {
-        case 126:
-            moveSelection(-1)
-            return true
-        case 125:
-            moveSelection(1)
-            return true
-        case 36, 76:
-            triggerPrimaryActionForSelection()
-            return true
-        default:
-            return false
-        }
-    }
-
-    func moveSelection(_ delta: Int) {
-        let names = visibleRows.map(\.name)
-        guard !names.isEmpty else { return }
-
-        guard let selectedAccountName,
-              let idx = names.firstIndex(of: selectedAccountName)
-        else {
-            self.selectedAccountName = names.first
-            return
-        }
-
-        let next = (idx + delta + names.count) % names.count
-        self.selectedAccountName = names[next]
-    }
-
-    func triggerPrimaryActionForSelection() {
-        guard
-            let selectedAccountName,
-            let row = visibleRows.first(where: { $0.name == selectedAccountName })
-        else {
-            return
-        }
-
-        performPrimaryAction(for: row)
+        return false
     }
 
     func toggleExpanded(_ accountName: String) {
@@ -465,5 +434,9 @@ extension AccountsMenuContentView {
         } else {
             expandedAccountNames.formUnion(visibleNames)
         }
+    }
+
+    func toggleShowAllAccounts() {
+        showAllAccounts.toggle()
     }
 }

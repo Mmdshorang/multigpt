@@ -4,9 +4,9 @@ import SwiftUI
 struct AccountsMenuContentView: View {
     @ObservedObject var viewModel: AccountsMenuViewModel
     @Environment(\.openWindow) var openWindow
-    @State var selectedAccountName: String?
     @State var keyboardMonitor: Any?
     @State var expandedAccountNames: Set<String> = []
+    @State var showAllAccounts = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -45,7 +45,6 @@ struct AccountsMenuContentView: View {
             }
         }
         .onAppear {
-            synchronizeSelection()
             installKeyboardMonitor()
         }
         .onDisappear {
@@ -54,14 +53,14 @@ struct AccountsMenuContentView: View {
         .onChange(of: viewModel.accounts.map(\.name)) { _ in
             let activeNames = Set(viewModel.accounts.map(\.name))
             expandedAccountNames = expandedAccountNames.intersection(activeNames)
-            synchronizeSelection()
-        }
-        .onChange(of: viewModel.focusedAccountName) { _ in
-            synchronizeSelection()
+            if !canToggleShowAll {
+                showAllAccounts = false
+            }
         }
         .animation(.easeInOut(duration: 0.18), value: viewModel.accounts.map(\.name))
         .animation(.easeInOut(duration: 0.18), value: viewModel.switchingAccountName)
         .animation(.easeInOut(duration: 0.18), value: viewModel.accountActionInFlightName)
         .animation(.easeInOut(duration: 0.18), value: expandedAccountNames)
+        .animation(.easeInOut(duration: 0.18), value: showAllAccounts)
     }
 }

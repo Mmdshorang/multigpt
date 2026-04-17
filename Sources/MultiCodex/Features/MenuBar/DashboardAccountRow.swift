@@ -2,15 +2,14 @@ import SwiftUI
 
 struct DashboardAccountRow: View {
     let row: AccountRowState
-    let isSelected: Bool
     let isExpanded: Bool
     let fiveHourProgressValue: Double
     let weeklyProgressValue: Double
     let isBusy: Bool
     let isSwitching: Bool
     let isAuthRunning: Bool
-    let onSelect: () -> Void
-    let onPrimaryAction: () -> Void
+    let onActivate: () -> Void
+    let onRowTap: () -> Void
     let onToggleExpanded: () -> Void
 
     private var isPrimaryActionInProgress: Bool {
@@ -39,40 +38,55 @@ struct DashboardAccountRow: View {
         }
     }
 
+    private var activationHelpText: String {
+        switch row.primaryAction {
+        case .switchAccount:
+            return "Activate account"
+        case .relogin:
+            return "Re-login to activate"
+        case .none:
+            return "Current account"
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                selectButton
+                HStack(spacing: 8) {
+                    activationCheckboxButton
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(row.name)
-                            .font(DashboardTokens.Font.accountName())
-                            .foregroundStyle(DashboardTokens.textPrimary)
-                            .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(row.name)
+                                .font(DashboardTokens.Font.accountName())
+                                .foregroundStyle(DashboardTokens.textPrimary)
+                                .lineLimit(1)
 
-                        if row.isCurrent {
-                            Text("CURRENT")
-                                .font(.system(size: 8, weight: .bold))
-                                .tracking(0.8)
-                                .foregroundStyle(DashboardTokens.accent)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(DashboardTokens.accentBackground, in: Capsule())
+                            if row.isCurrent {
+                                Text("CURRENT")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .tracking(0.8)
+                                    .foregroundStyle(DashboardTokens.accent)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(DashboardTokens.accentBackground, in: Capsule())
+                            }
                         }
+
+                        HStack(spacing: 6) {
+                            Text("5h \(row.fiveHourPercent)")
+                            Text("wk \(row.weeklyPercent)")
+                        }
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textSecondary)
                     }
 
-                    HStack(spacing: 6) {
-                        Text("5h \(row.fiveHourPercent)")
-                        Text("wk \(row.weeklyPercent)")
-                    }
-                    .font(DashboardTokens.Font.metadata())
-                    .foregroundStyle(DashboardTokens.textSecondary)
+                    Spacer(minLength: 8)
+
+                    inlineMicroBar
                 }
-
-                Spacer(minLength: 8)
-
-                inlineMicroBar
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onRowTap)
 
                 Button(action: onToggleExpanded) {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
@@ -92,43 +106,24 @@ struct DashboardAccountRow: View {
         }
         .padding(.horizontal, DashboardTokens.Spacing.rowHPadding)
         .padding(.vertical, DashboardTokens.Spacing.rowVPadding)
-        .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous)
-                .fill(isSelected ? DashboardTokens.accentBackground : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous)
-                .stroke(isSelected ? DashboardTokens.accent.opacity(0.3) : Color.clear, lineWidth: 1)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onSelect)
     }
 
-    private var selectButton: some View {
+    private var activationCheckboxButton: some View {
         ZStack {
             if isPrimaryActionInProgress {
                 ProgressView()
                     .controlSize(.small)
                     .tint(DashboardTokens.accent)
-            } else if isSelected, row.primaryAction != .none {
-                Button(action: onPrimaryAction) {
-                    Image(systemName: row.primaryAction.symbol)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(DashboardTokens.accent)
+            } else {
+                Button(action: onActivate) {
+                    Image(systemName: row.primaryAction == .none ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(row.primaryAction == .none ? DashboardTokens.accent : DashboardTokens.textSecondary)
                 }
                 .buttonStyle(.plain)
-                .disabled(isBusy)
-                .opacity(isBusy ? 0.5 : 1)
-                .help(row.primaryAction.title)
-            } else {
-                Circle()
-                    .stroke(DashboardTokens.textTertiary, lineWidth: 1.5)
-                    .frame(width: 10, height: 10)
-                    .background(
-                        Circle()
-                            .fill(isSelected ? DashboardTokens.accent : Color.clear)
-                    )
-                    .contentShape(Circle())
+                .disabled(isBusy && row.primaryAction != .none)
+                .opacity((isBusy && row.primaryAction != .none) ? 0.5 : 1)
+                .help(activationHelpText)
             }
         }
         .frame(width: 20, height: 20)
