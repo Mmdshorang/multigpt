@@ -161,7 +161,7 @@ extension AccountsMenuContentView {
             }
             .padding(.horizontal, 4)
 
-            VStack(spacing: DashboardTokens.Spacing.rowGap) {
+            VStack(spacing: 4) {
                 ForEach(visibleRows) { row in
                     DashboardAccountRow(
                         row: row,
