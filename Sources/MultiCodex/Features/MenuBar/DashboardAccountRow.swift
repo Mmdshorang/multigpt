@@ -11,6 +11,7 @@ struct DashboardAccountRow: View {
     let onActivate: () -> Void
     let onRowTap: () -> Void
     let onToggleExpanded: () -> Void
+    @State private var isActivationHovered = false
 
     private var isPrimaryActionInProgress: Bool {
         switch row.primaryAction {
@@ -41,20 +42,68 @@ struct DashboardAccountRow: View {
     private var activationHelpText: String {
         switch row.primaryAction {
         case .switchAccount:
-            return "Activate account"
+            return "Switch to this account"
         case .relogin:
-            return "Re-login to activate"
+            return "Re-login this account"
         case .none:
             return "Current account"
+        }
+    }
+
+    private var activationSymbol: String {
+        switch row.primaryAction {
+        case .switchAccount:
+            return "square"
+        case .relogin:
+            return "exclamationmark.square.fill"
+        case .none:
+            return "checkmark.square.fill"
+        }
+    }
+
+    private var isActivationDisabled: Bool {
+        isBusy && row.primaryAction != .none
+    }
+
+    private var activationForegroundColor: Color {
+        switch row.primaryAction {
+        case .switchAccount:
+            return isActivationHovered ? DashboardTokens.textPrimary : DashboardTokens.textSecondary
+        case .relogin:
+            return DashboardTokens.statusOrange
+        case .none:
+            return DashboardTokens.accent
+        }
+    }
+
+    private var activationBackgroundColor: Color {
+        switch row.primaryAction {
+        case .switchAccount:
+            return isActivationHovered ? Color.white.opacity(0.08) : Color.white.opacity(0.03)
+        case .relogin:
+            return DashboardTokens.statusOrange.opacity(0.14)
+        case .none:
+            return DashboardTokens.accentBackground
+        }
+    }
+
+    private var activationBorderColor: Color {
+        switch row.primaryAction {
+        case .switchAccount:
+            return isActivationHovered ? DashboardTokens.accent.opacity(0.34) : DashboardTokens.cardBorder
+        case .relogin:
+            return DashboardTokens.statusOrange.opacity(0.55)
+        case .none:
+            return DashboardTokens.accent.opacity(0.4)
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    activationCheckboxButton
+                activationCheckboxButton
 
+                HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Text(row.name)
@@ -109,25 +158,32 @@ struct DashboardAccountRow: View {
     }
 
     private var activationCheckboxButton: some View {
-        ZStack {
-            if isPrimaryActionInProgress {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(DashboardTokens.accent)
-            } else {
-                Button(action: onActivate) {
-                    Image(systemName: row.primaryAction == .none ? "checkmark.square.fill" : "square")
+        Button(action: onActivate) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(activationBackgroundColor)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(activationBorderColor, lineWidth: 1)
+
+                if isPrimaryActionInProgress {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(DashboardTokens.accent)
+                } else {
+                    Image(systemName: activationSymbol)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(row.primaryAction == .none ? DashboardTokens.accent : DashboardTokens.textSecondary)
+                        .foregroundStyle(activationForegroundColor)
                 }
-                .buttonStyle(.plain)
-                .disabled(isBusy && row.primaryAction != .none)
-                .opacity((isBusy && row.primaryAction != .none) ? 0.5 : 1)
-                .help(activationHelpText)
             }
+            .frame(width: 24, height: 24)
         }
-        .frame(width: 20, height: 20)
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
+        .disabled(isActivationDisabled)
+        .opacity(isActivationDisabled ? 0.52 : 1)
+        .help(activationHelpText)
+        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .onHover { isActivationHovered = $0 }
+        .animation(.easeInOut(duration: 0.12), value: isActivationHovered)
     }
 
     private var inlineMicroBar: some View {

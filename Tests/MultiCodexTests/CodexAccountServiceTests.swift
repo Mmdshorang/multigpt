@@ -84,7 +84,31 @@ final class CodexAccountServiceTests: XCTestCase {
         )
 
         let payload = try await service.fetchAccounts()
-        XCTAssertEqual(payload.accounts.first?.defaultWorkspaceEmail, "personal-dev@example.com")
+        XCTAssertEqual(payload.accounts.first?.defaultWorkspaceEmail, "dev@example.com")
+    }
+
+    func testFetchAccountsIgnoresAccountIDForWorkspaceEmailFormatting() async throws {
+        let service = makeSandboxedService()
+        _ = try await service.addAccount(name: "alpha")
+
+        let authPath = (service.effectiveMulticodexHomePath() as NSString)
+            .appendingPathComponent("accounts/alpha/auth.json")
+        let idToken = makeIDToken(email: "dev@example.com", defaultWorkspace: "Personal")
+        try writeText(
+            """
+            {
+              "tokens": {
+                "access_token": "token",
+                "id_token": "\(idToken)",
+                "account_id": "85b6d406-11f4-4e7f-a354-566b54bb63bc"
+              }
+            }
+            """,
+            to: authPath
+        )
+
+        let payload = try await service.fetchAccounts()
+        XCTAssertEqual(payload.accounts.first?.defaultWorkspaceEmail, "dev@example.com")
     }
 
     func testAccountConfigStoreRejectsLegacyVersion1Format() throws {

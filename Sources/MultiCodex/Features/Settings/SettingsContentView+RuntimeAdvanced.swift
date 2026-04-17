@@ -8,7 +8,7 @@ extension SettingsContentView {
             VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Runtime",
-                    description: "Choose a custom CLI path or use auto-detect."
+                    description: "Set the Codex CLI path."
                 )
 
                 settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
@@ -16,16 +16,9 @@ extension SettingsContentView {
                 TextField("/opt/homebrew/bin/codex", text: $codexPathDraft)
                     .textFieldStyle(.roundedBorder)
 
-                if let probe = viewModel.runtimeProbeSummary {
-                    Text(probe)
-                        .font(DashboardTokens.Font.metadata())
-                        .foregroundStyle(DashboardTokens.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                if let probe = viewModel.runtimeProbeSummary, !probe.isEmpty {
+                    settingsInfoRow(symbol: "info.circle", text: probe)
                 }
-
-                Text("Leave this empty to auto-detect `codex` from known paths or from your shell PATH.")
-                    .font(DashboardTokens.Font.metadata())
-                    .foregroundStyle(DashboardTokens.textSecondary)
 
                 HStack(spacing: 8) {
                     ActionPillButton(title: "Save", symbol: "checkmark", role: .primary) {
@@ -54,47 +47,37 @@ extension SettingsContentView {
             VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Display",
-                    description: "Choose how the menu feels and how usage information is shown."
+                    description: "Tune menu appearance and usage display."
                 )
 
-                settingsInsetPanel(
-                    title: "Menu Layout",
-                    description: "Controls how dense the menu feels and how reset times are presented."
-                ) {
-                    settingsFormRow("Density", detail: "Compact shows more at once. Comfortable adds breathing room.") {
-                        Picker("Menu density", selection: menuDensityBinding) {
-                            ForEach(MenuDensity.allCases) { density in
-                                Text(density.title).tag(density)
-                            }
+                settingsFormRow("Density") {
+                    Picker("Menu density", selection: menuDensityBinding) {
+                        ForEach(MenuDensity.allCases) { density in
+                            Text(density.title).tag(density)
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
                     }
-
-                    settingsFormRow("Reset time style", detail: viewModel.resetDisplayMode.descriptionText) {
-                        Picker("Reset time style", selection: resetDisplayModeBinding) {
-                            ForEach(ResetDisplayMode.allCases, id: \.self) { mode in
-                                Text(mode.title).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
 
-                settingsInsetPanel(
-                    title: "Usage Indicators",
-                    description: "Pick whether the bars emphasize remaining budget or usage consumed."
-                ) {
-                    settingsFormRow("Usage bars", detail: viewModel.usageBarStyle.descriptionText) {
-                        Picker("Usage bars", selection: usageBarStyleBinding) {
-                            ForEach(UsageBarStyle.allCases) { style in
-                                Text(style.title).tag(style)
-                            }
+                settingsFormRow("Reset time") {
+                    Picker("Reset time style", selection: resetDisplayModeBinding) {
+                        ForEach(ResetDisplayMode.allCases, id: \.self) { mode in
+                            Text(mode.title).tag(mode)
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+
+                settingsFormRow("Usage bars") {
+                    Picker("Usage bars", selection: usageBarStyleBinding) {
+                        ForEach(UsageBarStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
             }
         }
@@ -107,12 +90,12 @@ extension SettingsContentView {
             VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Troubleshooting",
-                    description: "Diagnostics and refresh controls."
+                    description: "Diagnostics and maintenance."
                 )
 
                 cliResolutionHintRow
 
-                settingsFormRow("Cache TTL", detail: "Controls how often usage limits refresh automatically.") {
+                settingsFormRow("Cache TTL") {
                     Stepper(value: limitsCacheTTLMinutesBinding, in: 1...120) {
                         Text("\(viewModel.limitsCacheTTLMinutes) min")
                             .font(.caption.weight(.semibold))
@@ -139,7 +122,7 @@ extension SettingsContentView {
             VStack(alignment: .leading, spacing: 10) {
                 settingsSectionIntro(
                     title: "Diagnostics",
-                    description: "Low-level runtime checks and maintenance tools."
+                    description: "Low-level tools."
                 )
 
                 settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)

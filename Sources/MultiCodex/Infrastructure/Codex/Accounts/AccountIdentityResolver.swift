@@ -9,14 +9,15 @@ extension CodexAccountService {
     }
 
     func inferDefaultWorkspaceEmail(fromAuthPayload authPayload: [String: Any]) -> String? {
-        guard let tokens = authPayload["tokens"] as? [String: Any],
-              let idToken = tokens["id_token"] as? String,
-              let claims = decodeJWTPayload(idToken)
+        guard let tokens = authPayload["tokens"] as? [String: Any]
         else {
             return nil
         }
 
-        guard let rawEmail = (claims["email"] as? String)?
+        let idClaims = (tokens["id_token"] as? String).flatMap(decodeJWTPayload)
+        let accessClaims = (tokens["access_token"] as? String).flatMap(decodeJWTPayload)
+
+        guard let rawEmail = resolveEmail(idClaims: idClaims, accessClaims: accessClaims)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased(),
             !rawEmail.isEmpty
@@ -24,15 +25,13 @@ extension CodexAccountService {
             return nil
         }
 
-        let workspaceRaw = defaultWorkspaceTitle(fromClaims: claims) ?? "workspace"
-        let workspace = sanitizeIdentitySegment(workspaceRaw, allowAtSymbol: false, allowDot: false)
         let email = sanitizeIdentitySegment(rawEmail, allowAtSymbol: true, allowDot: true)
 
-        guard !workspace.isEmpty, !email.isEmpty else {
+        guard !email.isEmpty else {
             return nil
         }
 
-        return "\(workspace)-\(email)"
+        return email
     }
 
     private func decodeJWTPayload(_ token: String) -> [String: Any]? {
@@ -56,36 +55,17 @@ extension CodexAccountService {
         return object
     }
 
-    private func defaultWorkspaceTitle(fromClaims claims: [String: Any]) -> String? {
-        guard let authInfo = claims["https://api.openai.com/auth"] as? [String: Any],
-              let organizations = authInfo["organizations"] as? [Any]
-        else {
-            return nil
+    private func resolveEmail(idClaims: [String: Any]?, accessClaims: [String: Any]?) -> String? {
+        if let email = idClaims?["email"] as? String, !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return email
         }
-
-        var fallbackTitle: String?
-        for organization in organizations {
-            guard let item = organization as? [String: Any] else {
-                continue
-            }
-
-            if fallbackTitle == nil,
-               let title = (item["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !title.isEmpty
-            {
-                fallbackTitle = title
-            }
-
-            if let isDefault = item["is_default"] as? Bool,
-               isDefault,
-               let title = (item["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !title.isEmpty
-            {
-                return title
-            }
+        if let profile = accessClaims?["https://api.openai.com/profile"] as? [String: Any],
+           let email = profile["email"] as? String,
+           !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            return email
         }
-
-        return fallbackTitle
+        return nil
     }
 
     private func sanitizeIdentitySegment(

@@ -129,6 +129,16 @@ struct AccountUsage: Identifiable {
         return nil
     }
 
+    var workspaceEmailHint: String? {
+        guard let defaultWorkspaceEmail,
+              !defaultWorkspaceEmail.isEmpty,
+              defaultWorkspaceEmail.localizedCaseInsensitiveCompare(name) != .orderedSame
+        else {
+            return nil
+        }
+        return defaultWorkspaceEmail
+    }
+
     var lastLoginStatusPreview: String? {
         guard let value = lastLoginStatus?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
             return nil
