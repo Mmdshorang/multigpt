@@ -16,6 +16,7 @@ struct DashboardProgressRing: View {
         ZStack {
             Circle()
                 .stroke(Color.white.opacity(0.08), lineWidth: lineWidth)
+                .padding(lineWidth / 2)
 
             Circle()
                 .trim(from: 0, to: clampedProgress)
@@ -24,6 +25,7 @@ struct DashboardProgressRing: View {
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
+                .padding(lineWidth / 2)
 
             VStack(spacing: 1) {
                 Text(valueText)
