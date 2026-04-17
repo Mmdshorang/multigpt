@@ -1,16 +1,11 @@
 import SwiftUI
 
-// MARK: - About Page
-// App info, version, shortcuts, support
-
 extension SettingsContentView {
     var aboutPage: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // App Info Card
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 16) {
-                        // App icon placeholder
                         RoundedRectangle(cornerRadius: 12)
                             .fill(DashboardTokens.accent.opacity(0.2))
                             .frame(width: 60, height: 60)
@@ -43,72 +38,61 @@ extension SettingsContentView {
                 }
             }
 
-            // Keyboard Shortcuts Card
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 16) {
                     settingsSectionIntro(
                         title: "Keyboard Shortcuts",
-                        description: "Quick actions from the menu bar"
+                        description: "Quick actions from the menu bar",
+                        symbol: "keyboard"
                     )
 
-                    VStack(spacing: 8) {
+                    VStack(spacing: 6) {
                         shortcutRow(keys: "⌘R", action: "Refresh usage")
                         shortcutRow(keys: "⌘,", action: "Open settings")
                     }
                 }
             }
 
-            // Support Card
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: 16) {
                     settingsSectionIntro(
                         title: "Support",
-                        description: "Need help or found a bug?"
+                        description: "Need help or found a bug?",
+                        symbol: "questionmark.circle"
                     )
 
-                    VStack(spacing: 8) {
-                        Link(destination: URL(string: "https://github.com/momoazn/multicodex")!) {
-                            HStack {
-                                Image(systemName: "arrow.up.forward.square")
-                                    .foregroundStyle(DashboardTokens.accent)
-                                Text("GitHub Repository")
-                                    .foregroundStyle(DashboardTokens.textPrimary)
-                                Spacer()
-                                Image(systemName: "arrow.up.right")
-                                    .font(.caption)
-                                    .foregroundStyle(DashboardTokens.textTertiary)
-                            }
-                        }
+                    VStack(spacing: 4) {
+                        settingsLinkRow(
+                            symbol: "arrow.up.forward.square",
+                            title: "GitHub Repository",
+                            url: "https://github.com/momoazn/multicodex"
+                        )
 
-                        Link(destination: URL(string: "https://github.com/momoazn/multicodex/issues")!) {
-                            HStack {
-                                Image(systemName: "exclamationmark.bubble")
-                                    .foregroundStyle(DashboardTokens.accent)
-                                Text("Report an Issue")
-                                    .foregroundStyle(DashboardTokens.textPrimary)
-                                Spacer()
-                                Image(systemName: "arrow.up.right")
-                                    .font(.caption)
-                                    .foregroundStyle(DashboardTokens.textTertiary)
-                            }
-                        }
+                        settingsLinkRow(
+                            symbol: "exclamationmark.bubble",
+                            title: "Report an Issue",
+                            url: "https://github.com/momoazn/multicodex/issues"
+                        )
                     }
-                    .font(DashboardTokens.Font.metadata())
                 }
             }
         }
     }
 
     func shortcutRow(keys: String, action: String) -> some View {
-        HStack {
+        HStack(spacing: 10) {
             Text(keys)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(DashboardTokens.textPrimary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.white.opacity(0.1))
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(DashboardTokens.inputBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(DashboardTokens.inputBorder, lineWidth: 1)
                 )
 
             Text(action)
@@ -116,6 +100,37 @@ extension SettingsContentView {
                 .foregroundStyle(DashboardTokens.textSecondary)
 
             Spacer()
+        }
+    }
+
+    func settingsLinkRow(symbol: String, title: String, url: String) -> some View {
+        Link(destination: URL(string: url)!) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(DashboardTokens.Font.metadata().weight(.semibold))
+                    .foregroundStyle(DashboardTokens.accent)
+                    .frame(width: 16)
+
+                Text(title)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textPrimary)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textTertiary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(DashboardTokens.segmentedInactiveBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(DashboardTokens.cardBorder, lineWidth: 1)
+            )
         }
     }
 
