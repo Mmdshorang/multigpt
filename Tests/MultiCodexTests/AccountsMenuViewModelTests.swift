@@ -62,13 +62,13 @@ final class AccountsMenuViewModelTests: XCTestCase {
             startImmediately: false
         )
 
-        viewModel.selectSettingsSection(.runtime)
+        viewModel.selectSettingsSection(.accounts)
 
         let persisted = AppPreferencesStore(defaults: defaults)
-        XCTAssertEqual(persisted.selectedSettingsSection, .runtime)
+        XCTAssertEqual(persisted.selectedSettingsSection, .accounts)
     }
 
-    func testResetOnboardingWizardReturnsToRuntimeAndClearsSelectedAccount() {
+    func testResetOnboardingWizardReturnsToGeneralAndClearsSelectedAccount() {
         let defaults = makeEphemeralDefaults()
         defaults.set("beta", forKey: AppPreferencesStore.Keys.selectedSettingsAccountName)
         let service = MockCodexAccountService()
@@ -79,13 +79,13 @@ final class AccountsMenuViewModelTests: XCTestCase {
             startImmediately: false
         )
 
-        viewModel.selectSettingsSection(.dashboard)
+        viewModel.selectSettingsSection(.accounts)
         viewModel.resetOnboardingWizard()
 
-        XCTAssertEqual(viewModel.selectedSettingsSection, .runtime)
+        XCTAssertEqual(viewModel.selectedSettingsSection, .general)
         XCTAssertNil(viewModel.selectedSettingsAccountName)
         let persisted = AppPreferencesStore(defaults: defaults)
-        XCTAssertEqual(persisted.selectedSettingsSection, .runtime)
+        XCTAssertEqual(persisted.selectedSettingsSection, .general)
         XCTAssertNil(persisted.selectedSettingsAccountName)
     }
 
