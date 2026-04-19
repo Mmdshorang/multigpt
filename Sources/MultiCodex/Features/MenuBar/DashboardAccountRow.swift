@@ -296,15 +296,19 @@ struct DashboardAccountRow: View {
                 progress: fiveHourProgressValue,
                 color: DashboardTokens.ringFiveHour,
                 label: "5H",
-                valueText: fiveHourPercentText
+                valueText: fiveHourPercentText,
+                expandHorizontally: false
             )
+            .frame(width: DashboardTokens.Spacing.ringSize, alignment: .leading)
 
             DashboardProgressRing(
                 progress: weeklyProgressValue,
                 color: DashboardTokens.ringWeekly,
                 label: "WEEK",
-                valueText: weeklyPercentText
+                valueText: weeklyPercentText,
+                expandHorizontally: false
             )
+            .frame(width: DashboardTokens.Spacing.ringSize, alignment: .leading)
 
             Spacer()
 

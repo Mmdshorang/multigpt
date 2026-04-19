@@ -7,6 +7,7 @@ struct DashboardProgressRing: View {
     let valueText: String
     var size: CGFloat = DashboardTokens.Spacing.ringSize
     var lineWidth: CGFloat = 4
+    var expandHorizontally = true
 
     private var clampedProgress: Double {
         min(1, max(0, progress))
@@ -38,7 +39,7 @@ struct DashboardProgressRing: View {
             }
         }
         .frame(width: size, height: size)
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: expandHorizontally ? .infinity : nil, alignment: .center)
         .animation(.easeInOut(duration: 0.4), value: clampedProgress)
     }
 }
