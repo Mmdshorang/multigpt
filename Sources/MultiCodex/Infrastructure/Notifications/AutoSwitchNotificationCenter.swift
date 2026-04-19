@@ -18,17 +18,19 @@ protocol AutoSwitchNotificationSending: AnyObject {
     func send(_ payload: AutoSwitchNotificationPayload)
 }
 
-final class AutoSwitchNotificationCenter: AutoSwitchNotificationSending {
+final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSending {
     static let shared = AutoSwitchNotificationCenter()
 
     private let center: UNUserNotificationCenter
 
     init(center: UNUserNotificationCenter = .current()) {
         self.center = center
+        super.init()
+        self.center.delegate = self
     }
 
     func requestAuthorizationIfNeeded() {
-        Task {
+        Task { @MainActor in
             let settings = await center.notificationSettings()
             guard settings.authorizationStatus == .notDetermined else {
                 return
@@ -38,7 +40,7 @@ final class AutoSwitchNotificationCenter: AutoSwitchNotificationSending {
     }
 
     func requestAuthorization() {
-        Task {
+        Task { @MainActor in
             await requestAuthorizationInternal()
         }
     }
@@ -48,8 +50,12 @@ final class AutoSwitchNotificationCenter: AutoSwitchNotificationSending {
     }
 
     func send(_ payload: AutoSwitchNotificationPayload) {
-        Task {
-            let settings = await center.notificationSettings()
+        Task { @MainActor in
+            var settings = await center.notificationSettings()
+            if settings.authorizationStatus == .notDetermined {
+                await requestAuthorizationInternal()
+                settings = await center.notificationSettings()
+            }
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
                 return
             }
@@ -57,10 +63,7 @@ final class AutoSwitchNotificationCenter: AutoSwitchNotificationSending {
             let content = UNMutableNotificationContent()
             content.title = payload.title
             content.body = payload.reason
-            content.sound = nil
-            if #available(macOS 12.0, *) {
-                content.interruptionLevel = .passive
-            }
+            content.sound = .default
 
             let request = UNNotificationRequest(
                 identifier: "multicodex.auto-switch.\(UUID().uuidString)",
@@ -69,5 +72,15 @@ final class AutoSwitchNotificationCenter: AutoSwitchNotificationSending {
             )
             try? await center.add(request)
         }
+    }
+}
+
+extension AutoSwitchNotificationCenter: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _: UNUserNotificationCenter,
+        willPresent _: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.list, .banner, .sound])
     }
 }

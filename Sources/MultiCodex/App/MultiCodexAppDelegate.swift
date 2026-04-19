@@ -4,6 +4,7 @@ final class MultiCodexAppDelegate: NSObject, NSApplicationDelegate {
     private var observers: [NSObjectProtocol] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AutoSwitchNotificationCenter.shared.requestAuthorizationIfNeeded()
         observeWindowLifecycle()
         DispatchQueue.main.async { [weak self] in
             self?.updateActivationPolicyForVisibleWindows()
