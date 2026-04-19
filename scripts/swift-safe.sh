@@ -6,6 +6,9 @@ if [[ $# -eq 0 ]]; then
   exit 2
 fi
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root_dir="$(cd "${script_dir}/.." && pwd)"
+
 log_file="$(mktemp)"
 cleanup() {
   rm -f "$log_file"
@@ -14,7 +17,7 @@ trap cleanup EXIT
 
 run_command() {
   set +e
-  "$@" 2>&1 | tee "$log_file"
+  (cd "$root_dir" && "$@") 2>&1 | tee "$log_file"
   local status="${PIPESTATUS[0]}"
   set -e
   return "$status"
@@ -27,9 +30,12 @@ has_stale_module_cache_error() {
 
 clean_swift_state() {
   echo "Detected stale Swift module cache. Cleaning local build state and retrying once..."
-  swift package clean || true
-  swift package reset || true
-  rm -rf .build
+  (
+    cd "$root_dir"
+    swift package clean || true
+    swift package reset || true
+    rm -rf .build
+  )
 }
 
 if run_command "$@"; then

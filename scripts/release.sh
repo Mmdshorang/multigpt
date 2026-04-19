@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root_dir="$(cd "${script_dir}/.." && pwd)"
+
 usage() {
   cat <<'USAGE'
 Kickstart a new MultiCodex release.
@@ -52,17 +55,10 @@ normalize_version_input() {
 }
 
 latest_version_tag() {
-  local latest_tag legacy_tag
+  local latest_tag
   latest_tag="$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)"
   if [[ -n "$latest_tag" ]]; then
     echo "$latest_tag"
-    return 0
-  fi
-
-  # Backward-compat: migrate from legacy macos-v tags if present.
-  legacy_tag="$(git tag --list 'macos-v*' --sort=-v:refname | head -n1 || true)"
-  if [[ "$legacy_tag" =~ ^macos-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-    echo "v${BASH_REMATCH[1]}"
     return 0
   fi
 
@@ -176,12 +172,15 @@ ensure_tag_available() {
 }
 
 main() {
+  cd "$root_dir"
   command -v git >/dev/null 2>&1 || die "'git' is required."
 
   if [[ $# -eq 0 ]]; then
     usage
     exit 0
   fi
+
+  git remote get-url origin >/dev/null 2>&1 || die "git remote 'origin' is required."
 
   parse_args "$@"
   require_clean_main_branch
@@ -190,7 +189,7 @@ main() {
 
   echo "Preparing release: ${version}"
 
-  git fetch --tags
+  git fetch --tags origin
   ensure_tag_available "$version"
 
   git tag -a "$version" -m "Release ${version}"
