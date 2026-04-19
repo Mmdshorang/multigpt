@@ -55,13 +55,13 @@ Quickstart:
 
 ```bash
 just doctor
-just dev
+just run
 ```
 
-Local CI gate:
+Verification gate:
 
 ```bash
-just ci
+just check
 ```
 
 Swift-only equivalents (same safe behavior used by `just`):
@@ -74,26 +74,33 @@ bash scripts/swift-safe.sh swift test --parallel
 Useful commands:
 
 ```bash
-just list
-just dev
-just ci
-just dmg
+just help
+just run
+just test
+just package
+just check
 just icons
 just clean
 just release patch
 just release 0.2.0
-just kickoff-release
 ```
 
 ## Release
 
 - Workflow: `.github/workflows/release-macos.yml`
 - Tag format: `vMAJOR.MINOR.PATCH`
-- Artifact: `build/dist/MultiCodex.dmg`
+- Local `just package` artifacts:
+  - Versioned DMG: `build/dist/MultiCodex-<version>.dmg`
+  - Latest symlink: `build/dist/MultiCodex.dmg`
 - `scripts/release.sh` enforces:
   - current branch is `main`
   - clean working tree
   - tag must not already exist locally or on `origin`
+
+Version source for `just package`:
+
+- Uses `git describe --tags --always --dirty` (leading `v` removed from tags).
+- You can override manually: `MULTICODEX_BUILD_VERSION=1.2.3 just package`
 
 Important (unsigned app): run after install.
 

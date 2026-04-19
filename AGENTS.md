@@ -74,9 +74,9 @@ Sources/MultiCodex/
 ### Build & Run
 
 ```bash
-just dev          # Build debug, kill existing, open app
-just ci           # Build + test (local CI gate)
-just dmg          # Build release DMG
+just run          # Build debug, kill existing, open app
+just check        # Build + test (local verification gate)
+just package      # Build versioned release DMG
 ```
 
 ### Adding UI Controls

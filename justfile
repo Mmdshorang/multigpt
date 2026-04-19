@@ -15,18 +15,22 @@ _bundle configuration:
     bash scripts/bundle-app.sh "{{configuration}}"
 
 default:
-    @just list
+    @just help
 
-list:
+help:
     @echo "Common commands:"
-    @echo "  just dev               Build + run debug app"
-    @echo "  just dmg               Build release DMG"
-    @echo "  just ci                Local CI checks"
+    @echo "  just run               Build + run debug app"
+    @echo "  just build [debug|release]  Build app bundle"
+    @echo "  just test              Run Swift tests"
+    @echo "  just package           Build versioned DMG"
+    @echo "  just check             Local verification (doctor + build + test)"
     @echo "  just doctor            Verify toolchain and codex runtime"
-    @echo "  just release minor     Create/push v tag"
-    @echo "  just kickoff-release   Patch bump + release tag"
+    @echo "  just release patch     Create/push release tag"
     @echo "  just icons             Regenerate app icon (.icns)"
     @echo "  just clean             Clean build artifacts"
+
+list:
+    @just help
 
 doctor:
     swift --version
@@ -38,24 +42,36 @@ icons:
     bash scripts/generate-app-icon.sh "{{app_iconset}}" "{{app_icon_icns}}"
     @echo "icons: generated {{app_icon_icns}}"
 
-dev:
-    just _bundle debug
+build configuration="debug":
+    just _bundle "{{configuration}}"
+
+run:
+    just build debug
     pkill -x "{{app_name}}" || true
     open "{{app_bundle}}"
 
-dmg:
+test:
+    if [[ -d "Tests" ]]; then bash scripts/swift-safe.sh swift test; else echo "test: no Swift tests found"; fi
+
+package:
+    #!/usr/bin/env bash
+    set -euo pipefail
     just _bundle release
     mkdir -p "{{dist_dir}}" "{{dmg_staging}}"
     if [[ -d "{{dmg_staging}}" ]]; then find "{{dmg_staging}}" -mindepth 1 -delete; fi
     ditto "{{app_bundle}}" "{{dmg_staging}}/{{app_name}}.app"
     ln -snf /Applications "{{dmg_staging}}/Applications"
-    hdiutil create -volname "{{app_name}}" -srcfolder "{{dmg_staging}}" -ov -format UDZO "{{dmg_path}}"
-    @echo "Created {{dmg_path}}"
+    build_version="$(bash scripts/resolve-build-version.sh)"
+    dmg_versioned_path="{{dist_dir}}/{{app_name}}-${build_version}.dmg"
+    hdiutil create -volname "{{app_name}}" -srcfolder "{{dmg_staging}}" -ov -format UDZO "${dmg_versioned_path}"
+    ln -snf "$(basename "${dmg_versioned_path}")" "{{dmg_path}}"
+    echo "Created ${dmg_versioned_path}"
+    echo "Updated latest link {{dmg_path}} -> $(basename "${dmg_versioned_path}")"
 
-ci:
+check:
     just doctor
     bash scripts/swift-safe.sh swift build -c debug
-    if [[ -d "Tests" ]]; then bash scripts/swift-safe.sh swift test; else echo "ci: no Swift tests found"; fi
+    just test
 
 clean:
     swift package clean || true
@@ -63,8 +79,5 @@ clean:
     rm -rf .build
     if [[ -d "{{build_root}}" ]]; then find "{{build_root}}" -mindepth 1 -delete; fi
 
-release version:
-    bash ./scripts/release.sh "{{version}}"
-
-kickoff-release version="patch":
-    scripts/release.sh --bump "{{version}}"
+release target="patch":
+    bash ./scripts/release.sh "{{target}}"
