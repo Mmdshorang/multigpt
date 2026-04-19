@@ -89,7 +89,7 @@ extension SettingsContentView {
                             .frame(maxWidth: 260)
                         }
 
-                        settingsFormRow("Usage bar style", icon: "chart.bar") {
+                        settingsFormRow("Usage bar style", detail: viewModel.usageBarStyle.descriptionText, icon: "chart.bar") {
                             SettingsSegmentedPicker(
                                 options: UsageBarStyle.allCases,
                                 titleForOption: { $0.title },

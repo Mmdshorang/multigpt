@@ -103,7 +103,7 @@ final class AccountsMenuViewModel: ObservableObject {
             return accounts.isEmpty ? "mcx" : "mcx ?"
         }
 
-        if let percent = current.primaryPercentText {
+        if let percent = compactPercentText(for: current.usage) {
             return "mcx \(percent)"
         }
 
@@ -115,7 +115,8 @@ final class AccountsMenuViewModel: ObservableObject {
             return "exclamationmark.triangle.fill"
         }
 
-        switch UsageLevel.from(usedPercent: currentAccount?.usage.fiveHour.usedPercent) {
+        let constrainedUsedPercent = currentAccount.flatMap { compactUsedPercent(for: $0.usage) }
+        switch UsageLevel.from(usedPercent: constrainedUsedPercent) {
         case .critical:
             return "flame.fill"
         case .warning:
@@ -289,16 +290,79 @@ final class AccountsMenuViewModel: ObservableObject {
     func setLimitsCacheTTLSeconds(_ seconds: Int) { settingsController.setLimitsCacheTTLSeconds(seconds) }
 
     func progressValue(for metric: UsageMetric) -> Double {
+        progressValue(fromUsedFraction: usedFraction(for: metric))
+    }
+
+    func displayPercentText(for metric: UsageMetric) -> String {
+        guard let usedPercent = metric.usedPercent else {
+            return "-"
+        }
+        let value: Double
+        switch usageBarStyle {
+        case .depleting:
+            value = 100 - usedPercent
+        case .filling:
+            value = usedPercent
+        }
+        return Self.formatPercent(value)
+    }
+
+    func compactProgressValue(for usage: UsageSummary) -> Double {
+        guard let usedPercent = compactUsedPercent(for: usage) else {
+            return 0
+        }
+        return progressValue(fromUsedFraction: min(1, max(0, usedPercent / 100)))
+    }
+
+    func compactUsedPercent(for usage: UsageSummary) -> Double? {
+        constrainedMetric(in: usage)?.usedPercent
+    }
+
+    func compactPercentText(for usage: UsageSummary) -> String? {
+        guard let constrainedMetric = constrainedMetric(in: usage) else {
+            return nil
+        }
+        return displayPercentText(for: constrainedMetric)
+    }
+
+    private func usedFraction(for metric: UsageMetric) -> Double {
         guard let usedPercent = metric.usedPercent else {
             return 0
         }
-        let usedFraction = min(1, max(0, usedPercent / 100))
+        return min(1, max(0, usedPercent / 100))
+    }
+
+    private func progressValue(fromUsedFraction usedFraction: Double) -> Double {
         switch usageBarStyle {
         case .depleting:
             return 1 - usedFraction
         case .filling:
             return usedFraction
         }
+    }
+
+    private func constrainedMetric(in usage: UsageSummary) -> UsageMetric? {
+        let fiveHourUsed = usage.fiveHour.usedPercent
+        let weeklyUsed = usage.weekly.usedPercent
+        switch (fiveHourUsed, weeklyUsed) {
+        case let (fiveHour?, weekly?):
+            return fiveHour >= weekly ? usage.fiveHour : usage.weekly
+        case (_?, nil):
+            return usage.fiveHour
+        case (nil, _?):
+            return usage.weekly
+        case (nil, nil):
+            return nil
+        }
+    }
+
+    private static func formatPercent(_ value: Double) -> String {
+        let clampedValue = min(100, max(0, value))
+        let rounded = (clampedValue * 10.0).rounded() / 10.0
+        if rounded.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(format: "%.0f%%", rounded)
+        }
+        return String(format: "%.1f%%", rounded)
     }
 
     func dismissFocusHint() {

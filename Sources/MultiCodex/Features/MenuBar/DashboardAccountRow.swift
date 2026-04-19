@@ -5,6 +5,10 @@ struct DashboardAccountRow: View {
     let isExpanded: Bool
     let fiveHourProgressValue: Double
     let weeklyProgressValue: Double
+    let fiveHourPercentText: String
+    let weeklyPercentText: String
+    let compactProgressValue: Double
+    let compactUsedPercent: Double?
     let isBusy: Bool
     let isSwitching: Bool
     let isAuthRunning: Bool
@@ -25,12 +29,12 @@ struct DashboardAccountRow: View {
         }
     }
 
-    private var primaryPercent: Double {
-        max(fiveHourProgressValue, weeklyProgressValue)
+    private var compactProgressFraction: Double {
+        min(1, max(0, compactProgressValue))
     }
 
     private var progressColor: Color {
-        switch UsageLevel.from(usedPercent: primaryPercent * 100) {
+        switch UsageLevel.from(usedPercent: compactUsedPercent) {
         case .critical:
             return DashboardTokens.statusRed
         case .warning:
@@ -179,14 +183,14 @@ struct DashboardAccountRow: View {
                             HStack(spacing: 2) {
                                 Text("5h")
                                     .foregroundColor(DashboardTokens.textTertiary)
-                                Text(row.fiveHourPercent)
+                                Text(fiveHourPercentText)
                                     .foregroundColor(DashboardTokens.textSecondary)
                             }
                             
                             HStack(spacing: 2) {
                                 Text("wk")
                                     .foregroundColor(DashboardTokens.textTertiary)
-                                Text(row.weeklyPercent)
+                                Text(weeklyPercentText)
                                     .foregroundColor(DashboardTokens.textSecondary)
                             }
                         }
@@ -280,7 +284,7 @@ struct DashboardAccountRow: View {
 
                 RoundedRectangle(cornerRadius: 1.5)
                     .fill(progressColor)
-                    .frame(width: geo.size.width * CGFloat(min(1, primaryPercent)))
+                    .frame(width: geo.size.width * CGFloat(compactProgressFraction))
             }
         }
         .frame(width: 44, height: 3)
@@ -292,14 +296,14 @@ struct DashboardAccountRow: View {
                 progress: fiveHourProgressValue,
                 color: DashboardTokens.ringFiveHour,
                 label: "5H",
-                valueText: row.fiveHourPercent
+                valueText: fiveHourPercentText
             )
 
             DashboardProgressRing(
                 progress: weeklyProgressValue,
                 color: DashboardTokens.ringWeekly,
                 label: "WEEK",
-                valueText: row.weeklyPercent
+                valueText: weeklyPercentText
             )
 
             Spacer()

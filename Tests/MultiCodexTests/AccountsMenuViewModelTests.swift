@@ -142,6 +142,93 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(rows.map(\.name), ["beta", "gamma"])
     }
 
+    func testUsageModeChangesBothProgressAndPercentText() {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        let metric = UsageMetric(label: "5h", percentText: "72.4%", usedPercent: 72.4, periodMinutes: 300, resetsAt: nil)
+
+        viewModel.setUsageBarStyle(.filling)
+        XCTAssertEqual(viewModel.progressValue(for: metric), 0.724, accuracy: 0.000_1)
+        XCTAssertEqual(viewModel.displayPercentText(for: metric), "72.4%")
+
+        viewModel.setUsageBarStyle(.depleting)
+        XCTAssertEqual(viewModel.progressValue(for: metric), 0.276, accuracy: 0.000_1)
+        XCTAssertEqual(viewModel.displayPercentText(for: metric), "27.6%")
+    }
+
+    func testCompactIndicatorUsesMostConstrainedWindowInBothModes() {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        let usage = UsageSummary(
+            fiveHour: UsageMetric(label: "5h", percentText: "92%", usedPercent: 92, periodMinutes: 300, resetsAt: nil),
+            weekly: UsageMetric(label: "weekly", percentText: "10%", usedPercent: 10, periodMinutes: 10_080, resetsAt: nil),
+            credits: "unlimited"
+        )
+
+        viewModel.setUsageBarStyle(.filling)
+        XCTAssertEqual(viewModel.compactUsedPercent(for: usage) ?? -1, 92, accuracy: 0.000_1)
+        XCTAssertEqual(viewModel.compactProgressValue(for: usage), 0.92, accuracy: 0.000_1)
+        XCTAssertEqual(viewModel.compactPercentText(for: usage), "92%")
+
+        viewModel.setUsageBarStyle(.depleting)
+        XCTAssertEqual(viewModel.compactUsedPercent(for: usage) ?? -1, 92, accuracy: 0.000_1)
+        XCTAssertEqual(viewModel.compactProgressValue(for: usage), 0.08, accuracy: 0.000_1)
+        XCTAssertEqual(viewModel.compactPercentText(for: usage), "8%")
+    }
+
+    func testMenuBarUsesMostConstrainedWindowForTitleAndSymbol() {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        viewModel.accounts = [
+            AccountUsage(
+                name: "alpha",
+                isCurrent: true,
+                hasAuth: true,
+                lastUsedAt: nil,
+                lastLoginStatus: nil,
+                usage: UsageSummary(
+                    fiveHour: UsageMetric(label: "5h", percentText: "10%", usedPercent: 10, periodMinutes: 300, resetsAt: nil),
+                    weekly: UsageMetric(label: "weekly", percentText: "90%", usedPercent: 90, periodMinutes: 10_080, resetsAt: nil),
+                    credits: "unlimited"
+                ),
+                source: "live-api",
+                usageError: nil
+            ),
+        ]
+
+        viewModel.setUsageBarStyle(.filling)
+        XCTAssertEqual(viewModel.menuBarTitle, "mcx 90%")
+        XCTAssertEqual(viewModel.menuBarSymbol, "gauge.with.dots.needle.67percent")
+
+        viewModel.setUsageBarStyle(.depleting)
+        XCTAssertEqual(viewModel.menuBarTitle, "mcx 10%")
+        XCTAssertEqual(viewModel.menuBarSymbol, "gauge.with.dots.needle.67percent")
+    }
+
     func testPerformRefreshHandlesFirstFailureThenWarningFallback() async {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()

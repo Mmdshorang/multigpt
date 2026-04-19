@@ -45,20 +45,20 @@ extension AccountsMenuContentView {
             if let current = viewModel.currentAccount {
                 HStack(spacing: DashboardTokens.Spacing.cardGap) {
                     usageCard(
-                        title: "5h usage",
+                        title: viewModel.usageBarStyle == .depleting ? "5h remaining" : "5h usage",
                         progress: viewModel.progressValue(for: current.usage.fiveHour),
                         color: DashboardTokens.ringFiveHour,
                         ringLabel: "5H",
-                        valueText: current.usage.fiveHour.percentText,
+                        valueText: viewModel.displayPercentText(for: current.usage.fiveHour),
                         resetText: current.usage.fiveHour.resetText(mode: viewModel.resetDisplayMode)
                     )
 
                     usageCard(
-                        title: "weekly usage",
+                        title: viewModel.usageBarStyle == .depleting ? "weekly remaining" : "weekly usage",
                         progress: viewModel.progressValue(for: current.usage.weekly),
                         color: DashboardTokens.ringWeekly,
                         ringLabel: "WEEK",
-                        valueText: current.usage.weekly.percentText,
+                        valueText: viewModel.displayPercentText(for: current.usage.weekly),
                         resetText: current.usage.weekly.resetText(mode: viewModel.resetDisplayMode)
                     )
                 }
@@ -159,6 +159,10 @@ extension AccountsMenuContentView {
                         isExpanded: expandedAccountNames.contains(row.name),
                         fiveHourProgressValue: viewModel.progressValue(for: row.account.usage.fiveHour),
                         weeklyProgressValue: viewModel.progressValue(for: row.account.usage.weekly),
+                        fiveHourPercentText: viewModel.displayPercentText(for: row.account.usage.fiveHour),
+                        weeklyPercentText: viewModel.displayPercentText(for: row.account.usage.weekly),
+                        compactProgressValue: viewModel.compactProgressValue(for: row.account.usage),
+                        compactUsedPercent: viewModel.compactUsedPercent(for: row.account.usage),
                         isBusy: isActionBusy,
                         isSwitching: viewModel.switchingAccountName == row.name,
                         isAuthRunning: viewModel.accountActionInFlightName == row.name,

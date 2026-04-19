@@ -133,8 +133,6 @@ struct AccountRowState: Identifiable {
     var name: String { account.name }
     var isCurrent: Bool { account.isCurrent }
     var connectionState: AccountConnectionState { account.connectionState }
-    var fiveHourPercent: String { account.usage.fiveHour.percentText }
-    var weeklyPercent: String { account.usage.weekly.percentText }
     var defaultWorkspaceEmail: String? { account.defaultWorkspaceEmail }
     var workspaceEmailHint: String? { account.workspaceEmailHint }
     var resetText: String {

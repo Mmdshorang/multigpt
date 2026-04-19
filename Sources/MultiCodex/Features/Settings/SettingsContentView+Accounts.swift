@@ -153,14 +153,16 @@ extension SettingsContentView {
                                         title: "5h",
                                         metric: account.usage.fiveHour,
                                         resetDisplayMode: viewModel.resetDisplayMode,
-                                        progressValue: viewModel.progressValue(for: account.usage.fiveHour)
+                                        progressValue: viewModel.progressValue(for: account.usage.fiveHour),
+                                        valueText: viewModel.displayPercentText(for: account.usage.fiveHour)
                                     )
 
                                     AccountUsageMetricCard(
                                         title: "Weekly",
                                         metric: account.usage.weekly,
                                         resetDisplayMode: viewModel.resetDisplayMode,
-                                        progressValue: viewModel.progressValue(for: account.usage.weekly)
+                                        progressValue: viewModel.progressValue(for: account.usage.weekly),
+                                        valueText: viewModel.displayPercentText(for: account.usage.weekly)
                                     )
                                 }
                             }

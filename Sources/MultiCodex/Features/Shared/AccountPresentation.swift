@@ -111,6 +111,7 @@ struct AccountUsageMetricCard: View {
     let metric: UsageMetric
     let resetDisplayMode: ResetDisplayMode
     let progressValue: Double
+    let valueText: String
 
     private var tone: Color {
         switch UsageLevel.from(usedPercent: metric.usedPercent) {
@@ -131,7 +132,7 @@ struct AccountUsageMetricCard: View {
                     .tracking(1.5)
                     .foregroundStyle(DashboardTokens.textTertiary)
                 Spacer()
-                Text(metric.percentText)
+                Text(valueText)
                     .font(DashboardTokens.Font.cardHeading())
                     .foregroundStyle(DashboardTokens.textPrimary)
             }

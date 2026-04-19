@@ -119,16 +119,6 @@ struct AccountUsage: Identifiable {
 
     var id: String { name }
 
-    var primaryPercentText: String? {
-        if usage.fiveHour.percentText != "-" {
-            return usage.fiveHour.percentText
-        }
-        if usage.weekly.percentText != "-" {
-            return usage.weekly.percentText
-        }
-        return nil
-    }
-
     var workspaceEmailHint: String? {
         guard let defaultWorkspaceEmail,
               !defaultWorkspaceEmail.isEmpty,
