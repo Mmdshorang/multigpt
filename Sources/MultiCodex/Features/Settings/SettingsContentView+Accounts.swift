@@ -103,9 +103,6 @@ extension SettingsContentView {
                             AccountStatusPill(text: "Active", color: DashboardTokens.accent)
                         }
 
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(DashboardTokens.textTertiary)
                     }
                     .contentShape(Rectangle())
                 }

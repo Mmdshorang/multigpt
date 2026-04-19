@@ -136,20 +136,8 @@ struct DashboardAccountRow: View {
         case .relogin:
             return "Click row to expand details. Use checkbox to re-login account"
         case .none:
-            return "Current account. Click row or chevron to show usage details"
+            return "Current account. Click row to show usage details"
         }
-    }
-
-    private var chevronForegroundColor: Color {
-        isExpanded ? DashboardTokens.textSecondary : DashboardTokens.textTertiary
-    }
-
-    private var chevronBackgroundColor: Color {
-        isExpanded ? Color.white.opacity(0.06) : Color.clear
-    }
-
-    private var chevronBorderColor: Color {
-        isExpanded ? DashboardTokens.accent.opacity(0.3) : Color.white.opacity(0.08)
     }
 
     var body: some View {
@@ -204,24 +192,6 @@ struct DashboardAccountRow: View {
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onRowTap)
                 .help(primaryAreaHelpText)
-
-                Button(action: onToggleExpanded) {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(chevronForegroundColor)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(chevronBackgroundColor)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(chevronBorderColor, lineWidth: 0.5)
-                        )
-                }
-                .buttonStyle(.plain)
-                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .help(isExpanded ? "Collapse account details" : "Expand account details")
             }
 
             expandedContent
