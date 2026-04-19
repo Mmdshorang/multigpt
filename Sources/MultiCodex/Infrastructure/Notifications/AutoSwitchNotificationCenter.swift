@@ -31,8 +31,7 @@ final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSendin
 
     func requestAuthorizationIfNeeded() {
         Task { @MainActor in
-            let settings = await center.notificationSettings()
-            guard settings.authorizationStatus == .notDetermined else {
+            guard await currentAuthorizationStatus() == .notDetermined else {
                 return
             }
             await requestAuthorizationInternal()
@@ -51,12 +50,7 @@ final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSendin
 
     func send(_ payload: AutoSwitchNotificationPayload) {
         Task { @MainActor in
-            var settings = await center.notificationSettings()
-            if settings.authorizationStatus == .notDetermined {
-                await requestAuthorizationInternal()
-                settings = await center.notificationSettings()
-            }
-            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+            guard await ensureAuthorizedForDelivery() else {
                 return
             }
 
@@ -72,6 +66,23 @@ final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSendin
             )
             try? await center.add(request)
         }
+    }
+
+    private func currentAuthorizationStatus() async -> UNAuthorizationStatus {
+        await center.notificationSettings().authorizationStatus
+    }
+
+    private func ensureAuthorizedForDelivery() async -> Bool {
+        let status = await currentAuthorizationStatus()
+        if status == .notDetermined {
+            await requestAuthorizationInternal()
+            return isAuthorized(await currentAuthorizationStatus())
+        }
+        return isAuthorized(status)
+    }
+
+    private func isAuthorized(_ status: UNAuthorizationStatus) -> Bool {
+        status == .authorized || status == .provisional
     }
 }
 

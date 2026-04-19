@@ -69,8 +69,6 @@ final class AccountsMenuViewModel: ObservableObject {
         )
         self.accountService.customCodexPath = customCodexPath.isEmpty ? nil : customCodexPath
         self.accountService.limitsCacheTTLSeconds = limitsCacheTTLSeconds
-        // Request once on first launch so the app is registered in System Settings.
-        self.autoSwitchNotifier.requestAuthorizationIfNeeded()
         refreshController.refreshRuntimeProbe()
         didBecomeActiveObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification,

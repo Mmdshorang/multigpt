@@ -46,8 +46,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.accountSwitchingStrategy, .expiryAware)
         XCTAssertTrue(viewModel.autoSwitchNotificationsEnabled)
-        // One request on init, one when enabling notifications
-        XCTAssertEqual(notifier.authorizationRequests, 2)
+        // Authorization is requested when notifications are explicitly enabled.
+        XCTAssertEqual(notifier.authorizationRequests, 1)
         let persisted = AppPreferencesStore(defaults: defaults)
         XCTAssertEqual(persisted.accountSwitchingStrategy, .expiryAware)
         XCTAssertTrue(persisted.autoSwitchNotificationsEnabled)
@@ -483,8 +483,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         viewModel.sendTestAutoSwitchNotification()
 
         XCTAssertEqual(viewModel.accountActionMessage, "Sent test notification alpha -> beta.")
-        // One request on view model init (authorization is always requested)
-        XCTAssertEqual(notifier.authorizationRequests, 1)
+        XCTAssertEqual(notifier.authorizationRequests, 0)
         XCTAssertEqual(
             notifier.sentPayloads,
             [
