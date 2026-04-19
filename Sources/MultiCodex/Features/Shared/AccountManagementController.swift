@@ -102,7 +102,10 @@ final class AccountManagementController {
 
     func sendTestAutoSwitchNotification() {
         guard viewModel.autoSwitchNotificationsEnabled else {
-            viewModel.accountActions.setAccountFeedback(message: nil, error: "Enable auto-switch notifications to send a test.")
+            viewModel.accountActions.setAccountFeedback(
+                message: nil,
+                error: AutoSwitchNotificationText.enableNotificationsToSendTest
+            )
             return
         }
 
@@ -111,35 +114,15 @@ final class AccountManagementController {
         let payload = AutoSwitchNotificationPayload(
             previousAccountName: previousAccountName,
             newAccountName: newAccountName,
-            reason: "5h window expiring"
+            reason: AutoSwitchNotificationText.testReason
         )
 
         viewModel.autoSwitchNotifier.send(payload) { [weak viewModel] result in
             guard let viewModel else {
                 return
             }
-            switch result {
-            case .delivered:
-                viewModel.accountActions.setAccountFeedback(
-                    message: "Sent test notification \(previousAccountName) -> \(newAccountName).",
-                    error: nil
-                )
-            case .permissionDenied:
-                viewModel.accountActions.setAccountFeedback(
-                    message: nil,
-                    error: "Notifications are blocked for MultiCodex. Enable them in System Settings > Notifications > MultiCodex."
-                )
-            case .notAuthorized:
-                viewModel.accountActions.setAccountFeedback(
-                    message: nil,
-                    error: "Notification permission was not granted."
-                )
-            case .failed:
-                viewModel.accountActions.setAccountFeedback(
-                    message: nil,
-                    error: "Failed to schedule test notification."
-                )
-            }
+            let feedback = self.feedback(for: result, previousAccountName: previousAccountName, newAccountName: newAccountName)
+            viewModel.accountActions.setAccountFeedback(message: feedback.message, error: feedback.error)
         }
     }
 
@@ -149,6 +132,29 @@ final class AccountManagementController {
     }
 
     private var accountActions: AccountActionController { viewModel.accountActions }
+
+    private func feedback(
+        for result: AutoSwitchNotificationSendResult,
+        previousAccountName: String,
+        newAccountName: String
+    ) -> (message: String?, error: String?) {
+        switch result {
+        case .delivered:
+            return (
+                message: AutoSwitchNotificationText.sentTestMessage(
+                    previousAccountName: previousAccountName,
+                    newAccountName: newAccountName
+                ),
+                error: nil
+            )
+        case .permissionDenied:
+            return (message: nil, error: AutoSwitchNotificationText.permissionDenied)
+        case .notAuthorized:
+            return (message: nil, error: AutoSwitchNotificationText.permissionNotGranted)
+        case .failed:
+            return (message: nil, error: AutoSwitchNotificationText.failedToSchedule)
+        }
+    }
 
     private func generateRandomAccountName() -> String {
         let existing = Set(viewModel.accounts.map(\.name))

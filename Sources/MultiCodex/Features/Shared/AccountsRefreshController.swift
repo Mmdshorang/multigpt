@@ -110,8 +110,7 @@ final class AccountsRefreshController {
                         previousAccountName: recommendation.previousAccountName,
                         newAccountName: recommendation.accountName,
                         reason: recommendation.reason
-                    ),
-                    completion: nil
+                    )
                 )
             }
             Task { @MainActor in

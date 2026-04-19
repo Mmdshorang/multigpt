@@ -482,7 +482,10 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         viewModel.sendTestAutoSwitchNotification()
 
-        XCTAssertEqual(viewModel.accountActionMessage, "Sent test notification alpha -> beta.")
+        XCTAssertEqual(
+            viewModel.accountActionMessage,
+            AutoSwitchNotificationText.sentTestMessage(previousAccountName: "alpha", newAccountName: "beta")
+        )
         XCTAssertEqual(notifier.authorizationRequests, 0)
         XCTAssertEqual(
             notifier.sentPayloads,
@@ -490,7 +493,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
                 AutoSwitchNotificationPayload(
                     previousAccountName: "alpha",
                     newAccountName: "beta",
-                    reason: "5h window expiring"
+                    reason: AutoSwitchNotificationText.testReason
                 ),
             ]
         )
@@ -533,7 +536,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.accountActionMessage)
         XCTAssertEqual(
             viewModel.accountActionError,
-            "Notifications are blocked for MultiCodex. Enable them in System Settings > Notifications > MultiCodex."
+            AutoSwitchNotificationText.permissionDenied
         )
     }
 
@@ -555,7 +558,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(notifier.authorizationRequests, 1)
         XCTAssertEqual(
             viewModel.accountActionError,
-            "Notification permission is not granted. Enable it in System Settings > Notifications > MultiCodex."
+            AutoSwitchNotificationText.permissionNotGrantedInSettings
         )
     }
 
@@ -643,7 +646,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
                 AutoSwitchNotificationPayload(
                     previousAccountName: "alpha",
                     newAccountName: "beta",
-                    reason: "5h window expiring"
+                    reason: AutoSwitchNotificationText.testReason
                 ),
             ]
         )

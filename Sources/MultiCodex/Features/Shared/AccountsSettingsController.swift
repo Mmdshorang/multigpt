@@ -81,15 +81,12 @@ final class AccountsSettingsController {
         viewModel.preferences.autoSwitchNotificationsEnabled = isEnabled
         if isEnabled {
             viewModel.autoSwitchNotifier.requestAuthorization { [weak viewModel] granted in
-                guard let viewModel else {
-                    return
-                }
-                if granted {
+                guard let viewModel, !granted else {
                     return
                 }
                 viewModel.accountActions.setAccountFeedback(
                     message: nil,
-                    error: "Notification permission is not granted. Enable it in System Settings > Notifications > MultiCodex."
+                    error: AutoSwitchNotificationText.permissionNotGrantedInSettings
                 )
             }
         }

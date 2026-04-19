@@ -19,10 +19,40 @@ enum AutoSwitchNotificationSendResult: Equatable {
     case failed
 }
 
+enum AutoSwitchNotificationText {
+    static let notificationsSettingsPath = "System Settings > Notifications > MultiCodex"
+    static let testReason = "5h window expiring"
+    static let enableNotificationsToSendTest = "Enable auto-switch notifications to send a test."
+    static let permissionNotGranted = "Notification permission was not granted."
+    static let failedToSchedule = "Failed to schedule test notification."
+
+    static var permissionDenied: String {
+        "Notifications are blocked for MultiCodex. Enable them in \(notificationsSettingsPath)."
+    }
+
+    static var permissionNotGrantedInSettings: String {
+        "Notification permission is not granted. Enable it in \(notificationsSettingsPath)."
+    }
+
+    static func sentTestMessage(previousAccountName: String, newAccountName: String) -> String {
+        "Sent test notification \(previousAccountName) -> \(newAccountName)."
+    }
+}
+
 protocol AutoSwitchNotificationSending: AnyObject {
     func requestAuthorizationIfNeeded()
     func requestAuthorization(completion: ((Bool) -> Void)?)
     func send(_ payload: AutoSwitchNotificationPayload, completion: ((AutoSwitchNotificationSendResult) -> Void)?)
+}
+
+extension AutoSwitchNotificationSending {
+    func requestAuthorization() {
+        requestAuthorization(completion: nil)
+    }
+
+    func send(_ payload: AutoSwitchNotificationPayload) {
+        send(payload, completion: nil)
+    }
 }
 
 final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSending {
@@ -59,12 +89,7 @@ final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSendin
     func send(_ payload: AutoSwitchNotificationPayload, completion: ((AutoSwitchNotificationSendResult) -> Void)? = nil) {
         Task { @MainActor in
             guard await ensureAuthorizedForDelivery() else {
-                let status = await currentAuthorizationStatus()
-                if status == .denied {
-                    completion?(.permissionDenied)
-                } else {
-                    completion?(.notAuthorized)
-                }
+                completion?(unauthorizedResult(for: await currentAuthorizationStatus()))
                 return
             }
 
@@ -102,6 +127,10 @@ final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSendin
 
     private func isAuthorized(_ status: UNAuthorizationStatus) -> Bool {
         status == .authorized || status == .provisional
+    }
+
+    private func unauthorizedResult(for status: UNAuthorizationStatus) -> AutoSwitchNotificationSendResult {
+        status == .denied ? .permissionDenied : .notAuthorized
     }
 }
 

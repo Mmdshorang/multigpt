@@ -73,9 +73,7 @@ copy_binary() {
 copy_resource_bundle_if_present() {
   if [[ -d "${root_dir}/.build/${configuration}/${resource_bundle}" ]]; then
     local target_bundle="$app_bundle/Contents/Resources/${resource_bundle}"
-    if [[ -d "$target_bundle" ]]; then
-      find "$target_bundle" -mindepth 1 -delete
-    fi
+    rm -rf "$target_bundle"
     ditto "${root_dir}/.build/${configuration}/${resource_bundle}" "$target_bundle"
   fi
 }
