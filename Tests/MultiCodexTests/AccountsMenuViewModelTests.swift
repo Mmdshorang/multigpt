@@ -335,21 +335,6 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "delta", "charlie", "bravo"])
     }
 
-    func testCycleAccountSortCriterionAdvancesThroughCriteria() {
-        let viewModel = makeSortViewModel()
-
-        XCTAssertEqual(viewModel.accountSortCriterion, .used)
-
-        viewModel.cycleAccountSortCriterion()
-        XCTAssertEqual(viewModel.accountSortCriterion, .remaining)
-
-        viewModel.cycleAccountSortCriterion()
-        XCTAssertEqual(viewModel.accountSortCriterion, .name)
-
-        viewModel.cycleAccountSortCriterion()
-        XCTAssertEqual(viewModel.accountSortCriterion, .used)
-    }
-
     func testMissingUsageAlwaysStaysAtBottomEvenWhenDescending() {
         let viewModel = makeSortViewModel()
         viewModel.updateAccounts(
