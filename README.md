@@ -6,7 +6,7 @@ Native macOS SwiftUI menu bar app for managing multiple coding agent accounts/pr
 
 - Shows 5h and weekly usage in a compact menu bar view for agents that expose usage.
 - Lets you switch accounts/profiles and re-login when an account needs auth.
-- Opens browser-based `codex login` flows through Terminal and supports pi profile login flows.
+- Opens browser-based `codex login` flows through Terminal.
 - Provides account/profile operations in Settings: use, rename, remove, import auth, status check, and runtime selection.
 - Uses a fully native Swift runtime (no bundled JavaScript CLI runtime).
 
@@ -46,7 +46,7 @@ This cleanup intentionally favors simpler internals over legacy compatibility br
 
 - macOS 13+
 - Xcode 15+ (or Swift 5.9+ toolchain)
-- `codex` CLI available in `PATH` for Codex support and `pi` CLI available in `PATH` for Pi support (or set custom paths in app Settings)
+- `codex` CLI available in `PATH` (or set a custom path in Settings > Runtime)
 - `just` (recommended)
 
 ## Development

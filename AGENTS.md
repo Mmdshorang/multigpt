@@ -1,6 +1,6 @@
 # AGENTS.md — MultiCodex
 
-Native macOS menu bar app for managing multiple coding agent accounts (Codex, Pi) with usage tracking and account switching.
+Native macOS menu bar app for managing multiple Codex accounts with usage tracking and account switching.
 
 ## Project Quick Reference
 
@@ -111,6 +111,6 @@ All async account work goes through controllers:
 ## Important Notes
 
 - **Unsigned app**: Users must run `sudo xattr -dr com.apple.quarantine /Applications/MultiCodex.app`
-- **Runtime requirement**: `codex` or `pi` CLI must be in PATH (or set custom path in Settings)
+- **Runtime requirement**: `codex` CLI must be in PATH (or set custom path in Settings)
 - **No JS runtime**: Pure Swift implementation
 - **Menu bar only**: Uses `MenuBarExtra`, no dock icon in normal operation
