@@ -32,6 +32,27 @@ extension SettingsContentView {
         )
     }
 
+    var accountSortCriterionBinding: Binding<AccountSortCriterion> {
+        Binding(
+            get: { viewModel.accountSortCriterion },
+            set: { viewModel.setAccountSortCriterion($0) }
+        )
+    }
+
+    var accountSortWindowBinding: Binding<AccountSortWindow> {
+        Binding(
+            get: { viewModel.accountSortWindow },
+            set: { viewModel.setAccountSortWindow($0) }
+        )
+    }
+
+    var accountSortDirectionBinding: Binding<SortDirection> {
+        Binding(
+            get: { viewModel.accountSortDirection },
+            set: { viewModel.setAccountSortDirection($0) }
+        )
+    }
+
     var accountSwitchingStrategyBinding: Binding<AccountSwitchingStrategy> {
         Binding(
             get: { viewModel.accountSwitchingStrategy },

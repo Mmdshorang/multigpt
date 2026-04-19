@@ -17,6 +17,8 @@ extension AccountsMenuContentView {
 
             Spacer()
 
+            sortMenu
+
             ActionPillButton(
                 title: "Refresh",
                 symbol: "arrow.clockwise",
@@ -29,6 +31,62 @@ extension AccountsMenuContentView {
             .keyboardShortcut("r", modifiers: [.command])
             .help("Refresh usage (Cmd+R)")
         }
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Section("Criterion") {
+                Button("Used") {
+                    viewModel.setAccountSortCriterion(.used)
+                }
+                Button("Remaining") {
+                    viewModel.setAccountSortCriterion(.remaining)
+                }
+                Button("Name") {
+                    viewModel.setAccountSortCriterion(.name)
+                }
+            }
+
+            if viewModel.accountSortCriterion != .name {
+                Section("Window") {
+                    Button("5h") {
+                        viewModel.setAccountSortWindow(.fiveHour)
+                    }
+                    Button("Weekly") {
+                        viewModel.setAccountSortWindow(.weekly)
+                    }
+                }
+            }
+
+            Section("Direction") {
+                Button("Ascending") {
+                    viewModel.setAccountSortDirection(.ascending)
+                }
+                Button("Descending") {
+                    viewModel.setAccountSortDirection(.descending)
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.arrow.down.circle")
+                    .font(DashboardTokens.Font.button().weight(.medium))
+                Text(viewModel.accountSortMenuLabel)
+                    .font(DashboardTokens.Font.button().weight(.medium))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                    .fill(DashboardTokens.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                    .stroke(DashboardTokens.cardBorder, lineWidth: 1)
+            )
+            .foregroundStyle(DashboardTokens.textSecondary)
+        }
+        .menuStyle(.borderlessButton)
+        .help("Change account sorting")
     }
 
     func alertBanner(_ alert: MenuAlertState) -> some View {

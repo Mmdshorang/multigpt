@@ -76,6 +76,75 @@ enum UsageBarStyle: String, CaseIterable, Identifiable {
     }
 }
 
+enum AccountSortCriterion: String, CaseIterable, Identifiable {
+    case used
+    case remaining
+    case name
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .used:
+            return "Used"
+        case .remaining:
+            return "Remaining"
+        case .name:
+            return "Name"
+        }
+    }
+}
+
+enum AccountSortWindow: String, CaseIterable, Identifiable {
+    case fiveHour
+    case weekly
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fiveHour:
+            return "5h"
+        case .weekly:
+            return "Weekly"
+        }
+    }
+}
+
+enum SortDirection: String, CaseIterable, Identifiable {
+    case ascending
+    case descending
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .ascending:
+            return "Ascending"
+        case .descending:
+            return "Descending"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .ascending:
+            return "Asc"
+        case .descending:
+            return "Desc"
+        }
+    }
+
+    var arrowSymbol: String {
+        switch self {
+        case .ascending:
+            return "↑"
+        case .descending:
+            return "↓"
+        }
+    }
+}
+
 struct MenuAlertState {
     enum Severity: Equatable {
         case runtimeUnavailable

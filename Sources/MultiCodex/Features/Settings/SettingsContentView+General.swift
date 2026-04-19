@@ -97,6 +97,47 @@ extension SettingsContentView {
                             )
                             .frame(maxWidth: 260)
                         }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            settingsFormRow("Accounts sorting", icon: "arrow.up.arrow.down") {
+                                VStack(alignment: .trailing, spacing: 10) {
+                                    SettingsSegmentedPicker(
+                                        options: AccountSortCriterion.allCases,
+                                        titleForOption: { $0.title },
+                                        selection: accountSortCriterionBinding
+                                    )
+                                    .frame(maxWidth: 260)
+
+                                    if viewModel.accountSortCriterion != .name {
+                                        SettingsSegmentedPicker(
+                                            options: AccountSortWindow.allCases,
+                                            titleForOption: { $0.title },
+                                            selection: accountSortWindowBinding
+                                        )
+                                        .frame(maxWidth: 180)
+                                    }
+
+                                    SettingsSegmentedPicker(
+                                        options: SortDirection.allCases,
+                                        titleForOption: { $0.shortTitle },
+                                        selection: accountSortDirectionBinding
+                                    )
+                                    .frame(maxWidth: 220)
+                                }
+                            }
+
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(DashboardTokens.textTertiary)
+                                    .frame(width: 16)
+
+                                Text("Current account stays pinned to the top, and accounts without usage data are pushed to the bottom.")
+                                    .font(DashboardTokens.Font.metadata())
+                                    .foregroundStyle(DashboardTokens.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
                     }
                 }
             }
