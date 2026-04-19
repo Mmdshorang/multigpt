@@ -114,11 +114,33 @@ final class AccountManagementController {
             reason: "5h window expiring"
         )
 
-        viewModel.autoSwitchNotifier.send(payload)
-        viewModel.accountActions.setAccountFeedback(
-            message: "Sent test notification \(previousAccountName) -> \(newAccountName).",
-            error: nil
-        )
+        viewModel.autoSwitchNotifier.send(payload) { [weak viewModel] result in
+            guard let viewModel else {
+                return
+            }
+            switch result {
+            case .delivered:
+                viewModel.accountActions.setAccountFeedback(
+                    message: "Sent test notification \(previousAccountName) -> \(newAccountName).",
+                    error: nil
+                )
+            case .permissionDenied:
+                viewModel.accountActions.setAccountFeedback(
+                    message: nil,
+                    error: "Notifications are blocked for MultiCodex. Enable them in System Settings > Notifications > MultiCodex."
+                )
+            case .notAuthorized:
+                viewModel.accountActions.setAccountFeedback(
+                    message: nil,
+                    error: "Notification permission was not granted."
+                )
+            case .failed:
+                viewModel.accountActions.setAccountFeedback(
+                    message: nil,
+                    error: "Failed to schedule test notification."
+                )
+            }
+        }
     }
 
     func openMulticodexConfigDirectory() {

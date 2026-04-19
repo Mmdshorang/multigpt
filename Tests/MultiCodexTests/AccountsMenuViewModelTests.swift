@@ -496,6 +496,69 @@ final class AccountsMenuViewModelTests: XCTestCase {
         )
     }
 
+    func testSendTestAutoSwitchNotificationReportsPermissionDenied() {
+        let defaults = makeEphemeralDefaults()
+        var preferences = AppPreferencesStore(defaults: defaults)
+        preferences.autoSwitchNotificationsEnabled = true
+
+        let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
+        notifier.sendResult = .permissionDenied
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 25, weeklyUsed: 35), ageSec: nil),
+                LimitsResult(account: "beta", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 15, weeklyUsed: 20), ageSec: nil),
+            ],
+            errors: []
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: preferences,
+            startImmediately: false
+        )
+        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+            limits: service.stubbedLimits
+        )
+
+        viewModel.sendTestAutoSwitchNotification()
+
+        XCTAssertNil(viewModel.accountActionMessage)
+        XCTAssertEqual(
+            viewModel.accountActionError,
+            "Notifications are blocked for MultiCodex. Enable them in System Settings > Notifications > MultiCodex."
+        )
+    }
+
+    func testEnableAutoSwitchNotificationsReportsPermissionDenied() {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        let notifier = MockAutoSwitchNotifier()
+        notifier.authorizationGranted = false
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.setAutoSwitchNotificationsEnabled(true)
+
+        XCTAssertEqual(notifier.authorizationRequests, 1)
+        XCTAssertEqual(
+            viewModel.accountActionError,
+            "Notification permission is not granted. Enable it in System Settings > Notifications > MultiCodex."
+        )
+    }
+
     func testSetAccountSwitchingStrategyTriggersImmediateLiveRefreshForAutomaticModes() async {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
@@ -1329,16 +1392,20 @@ private final class MockCodexAccountService: CodexAccountServicing {
 private final class MockAutoSwitchNotifier: AutoSwitchNotificationSending {
     private(set) var authorizationRequests = 0
     private(set) var sentPayloads: [AutoSwitchNotificationPayload] = []
+    var authorizationGranted = true
+    var sendResult: AutoSwitchNotificationSendResult = .delivered
 
     func requestAuthorizationIfNeeded() {
         authorizationRequests += 1
     }
 
-    func requestAuthorization() {
+    func requestAuthorization(completion: ((Bool) -> Void)?) {
         authorizationRequests += 1
+        completion?(authorizationGranted)
     }
 
-    func send(_ payload: AutoSwitchNotificationPayload) {
+    func send(_ payload: AutoSwitchNotificationPayload, completion: ((AutoSwitchNotificationSendResult) -> Void)?) {
         sentPayloads.append(payload)
+        completion?(sendResult)
     }
 }

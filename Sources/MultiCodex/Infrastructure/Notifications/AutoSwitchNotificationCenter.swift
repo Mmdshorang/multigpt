@@ -12,10 +12,17 @@ struct AutoSwitchNotificationPayload: Equatable {
     }
 }
 
+enum AutoSwitchNotificationSendResult: Equatable {
+    case delivered
+    case permissionDenied
+    case notAuthorized
+    case failed
+}
+
 protocol AutoSwitchNotificationSending: AnyObject {
     func requestAuthorizationIfNeeded()
-    func requestAuthorization()
-    func send(_ payload: AutoSwitchNotificationPayload)
+    func requestAuthorization(completion: ((Bool) -> Void)?)
+    func send(_ payload: AutoSwitchNotificationPayload, completion: ((AutoSwitchNotificationSendResult) -> Void)?)
 }
 
 final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSending {
@@ -34,23 +41,30 @@ final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSendin
             guard await currentAuthorizationStatus() == .notDetermined else {
                 return
             }
-            await requestAuthorizationInternal()
+            _ = await requestAuthorizationInternal()
         }
     }
 
-    func requestAuthorization() {
+    func requestAuthorization(completion: ((Bool) -> Void)? = nil) {
         Task { @MainActor in
-            await requestAuthorizationInternal()
+            let granted = await requestAuthorizationInternal()
+            completion?(granted)
         }
     }
 
-    private func requestAuthorizationInternal() async {
-        _ = try? await center.requestAuthorization(options: [.alert, .sound])
+    private func requestAuthorizationInternal() async -> Bool {
+        (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
-    func send(_ payload: AutoSwitchNotificationPayload) {
+    func send(_ payload: AutoSwitchNotificationPayload, completion: ((AutoSwitchNotificationSendResult) -> Void)? = nil) {
         Task { @MainActor in
             guard await ensureAuthorizedForDelivery() else {
+                let status = await currentAuthorizationStatus()
+                if status == .denied {
+                    completion?(.permissionDenied)
+                } else {
+                    completion?(.notAuthorized)
+                }
                 return
             }
 
@@ -64,7 +78,12 @@ final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSendin
                 content: content,
                 trigger: nil
             )
-            try? await center.add(request)
+            do {
+                try await center.add(request)
+                completion?(.delivered)
+            } catch {
+                completion?(.failed)
+            }
         }
     }
 
@@ -75,7 +94,7 @@ final class AutoSwitchNotificationCenter: NSObject, AutoSwitchNotificationSendin
     private func ensureAuthorizedForDelivery() async -> Bool {
         let status = await currentAuthorizationStatus()
         if status == .notDetermined {
-            await requestAuthorizationInternal()
+            _ = await requestAuthorizationInternal()
             return isAuthorized(await currentAuthorizationStatus())
         }
         return isAuthorized(status)

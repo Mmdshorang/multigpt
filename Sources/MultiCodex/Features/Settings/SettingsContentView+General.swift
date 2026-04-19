@@ -132,6 +132,14 @@ extension SettingsContentView {
                                 viewModel.sendTestAutoSwitchNotification()
                             }
                         }
+
+                        if let message = viewModel.accountActionMessage {
+                            feedbackRow(message, color: .green)
+                        }
+
+                        if let error = viewModel.accountActionError {
+                            feedbackRow(error, color: .red)
+                        }
                     }
                 }
             }

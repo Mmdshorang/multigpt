@@ -52,6 +52,10 @@ build_binary() {
 prepare_bundle_dirs() {
   mkdir -p "$app_bundle/Contents/MacOS" "$app_bundle/Contents/Resources"
 
+  if [[ -d "$app_bundle/$resource_bundle" ]]; then
+    rm -rf "$app_bundle/$resource_bundle"
+  fi
+
   if [[ -d "$app_bundle/Contents/MacOS" ]]; then
     find "$app_bundle/Contents/MacOS" -mindepth 1 -delete
   fi
@@ -68,10 +72,11 @@ copy_binary() {
 
 copy_resource_bundle_if_present() {
   if [[ -d "${root_dir}/.build/${configuration}/${resource_bundle}" ]]; then
-    if [[ -d "$app_bundle/$resource_bundle" ]]; then
-      find "$app_bundle/$resource_bundle" -mindepth 1 -delete
+    local target_bundle="$app_bundle/Contents/Resources/${resource_bundle}"
+    if [[ -d "$target_bundle" ]]; then
+      find "$target_bundle" -mindepth 1 -delete
     fi
-    ditto "${root_dir}/.build/${configuration}/${resource_bundle}" "$app_bundle/$resource_bundle"
+    ditto "${root_dir}/.build/${configuration}/${resource_bundle}" "$target_bundle"
   fi
 }
 
@@ -123,9 +128,16 @@ copy_icon() {
   cp "$app_icon_icns" "$app_bundle/Contents/Resources/AppIcon.icns"
 }
 
+sign_bundle() {
+  # Keep app identity stable across builds so macOS notification/TCC permissions
+  # are associated with CFBundleIdentifier instead of transient linker identifiers.
+  codesign --force --sign - --deep --identifier "$default_bundle_id" "$app_bundle"
+}
+
 main() {
   cd "$root_dir"
   require_command "$plist_buddy"
+  require_command codesign
   require_command swift
   validate_configuration
   resolve_versions
@@ -135,6 +147,7 @@ main() {
   copy_resource_bundle_if_present
   write_info_plist
   copy_icon
+  sign_bundle
   echo "Created $app_bundle"
 }
 
