@@ -125,16 +125,18 @@ final class AccountsMenuViewModelTests: XCTestCase {
             startImmediately: false
         )
 
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
-            accounts: AccountsListPayload(
-                accounts: [
-                    AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-                    AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-                    AccountEntry(name: "gamma", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-                ],
-                currentAccount: "alpha"
-            ),
-            limits: LimitsPayload(results: [], errors: [])
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
+                accounts: AccountsListPayload(
+                    accounts: [
+                        AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+                        AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+                        AccountEntry(name: "gamma", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+                    ],
+                    currentAccount: "alpha"
+                ),
+                limits: LimitsPayload(results: [], errors: [])
+            )
         )
 
         let rows = viewModel.menuAccountRows(limit: 5)
@@ -227,6 +229,168 @@ final class AccountsMenuViewModelTests: XCTestCase {
         viewModel.setUsageBarStyle(.depleting)
         XCTAssertEqual(viewModel.menuBarTitle, "mcx 10%")
         XCTAssertEqual(viewModel.menuBarSymbol, "gauge.with.dots.needle.67percent")
+    }
+
+    func testDefaultSortValuesLoadFromFreshPreferences() {
+        let viewModel = makeSortViewModel()
+
+        XCTAssertEqual(viewModel.accountSortCriterion, .used)
+        XCTAssertEqual(viewModel.accountSortWindow, .fiveHour)
+        XCTAssertEqual(viewModel.accountSortDirection, .descending)
+    }
+
+    func testCurrentAccountRemainsPinnedFirstAcrossSortCriteria() {
+        let viewModel = makeSortViewModel()
+        viewModel.updateAccounts(
+            [
+                makeSortAccount("beta", fiveHourUsed: 20, weeklyUsed: 40),
+                makeSortAccount("alpha", isCurrent: true, fiveHourUsed: 55, weeklyUsed: 35),
+                makeSortAccount("gamma", fiveHourUsed: 80, weeklyUsed: 70),
+            ]
+        )
+
+        for criterion in AccountSortCriterion.allCases {
+            viewModel.setAccountSortCriterion(criterion)
+            if criterion != .name {
+                viewModel.setAccountSortWindow(.weekly)
+            }
+            viewModel.setAccountSortDirection(.ascending)
+
+            XCTAssertEqual(viewModel.currentAccount?.name, "alpha")
+            XCTAssertEqual(viewModel.accounts.first?.name, "alpha")
+        }
+    }
+
+    func testUsedSortByWindowHonorsDirectionAndMissingUsageAtBottom() {
+        let viewModel = makeSortViewModel()
+        viewModel.updateAccounts(
+            [
+                makeSortAccount("alpha", isCurrent: true, fiveHourUsed: 50, weeklyUsed: 50),
+                makeSortAccount("beta", fiveHourUsed: 20, weeklyUsed: 90),
+                makeSortAccount("gamma", fiveHourUsed: 80, weeklyUsed: 30),
+                makeSortAccount("delta", fiveHourUsed: 50, weeklyUsed: 60),
+                makeSortAccount("epsilon", fiveHourUsed: nil, weeklyUsed: nil),
+            ]
+        )
+
+        viewModel.setAccountSortCriterion(.used)
+        viewModel.setAccountSortWindow(.fiveHour)
+        viewModel.setAccountSortDirection(.ascending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "beta", "delta", "gamma", "epsilon"])
+
+        viewModel.setAccountSortDirection(.descending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "gamma", "delta", "beta", "epsilon"])
+
+        viewModel.setAccountSortWindow(.weekly)
+        viewModel.setAccountSortDirection(.ascending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "gamma", "delta", "beta", "epsilon"])
+
+        viewModel.setAccountSortDirection(.descending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "beta", "delta", "gamma", "epsilon"])
+    }
+
+    func testRemainingSortByWindowHonorsDirection() {
+        let viewModel = makeSortViewModel()
+        viewModel.updateAccounts(
+            [
+                makeSortAccount("alpha", isCurrent: true, fiveHourUsed: 50, weeklyUsed: 50),
+                makeSortAccount("beta", fiveHourUsed: 20, weeklyUsed: 90),
+                makeSortAccount("gamma", fiveHourUsed: 80, weeklyUsed: 30),
+                makeSortAccount("delta", fiveHourUsed: 50, weeklyUsed: 60),
+            ]
+        )
+
+        viewModel.setAccountSortCriterion(.remaining)
+        viewModel.setAccountSortWindow(.fiveHour)
+        viewModel.setAccountSortDirection(.ascending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "gamma", "delta", "beta"])
+
+        viewModel.setAccountSortDirection(.descending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "beta", "delta", "gamma"])
+
+        viewModel.setAccountSortWindow(.weekly)
+        viewModel.setAccountSortDirection(.ascending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "beta", "delta", "gamma"])
+
+        viewModel.setAccountSortDirection(.descending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "gamma", "delta", "beta"])
+    }
+
+    func testNameSortHonorsDirection() {
+        let viewModel = makeSortViewModel()
+        viewModel.updateAccounts(
+            [
+                makeSortAccount("delta", fiveHourUsed: 40, weeklyUsed: 40),
+                makeSortAccount("alpha", isCurrent: true, fiveHourUsed: 60, weeklyUsed: 60),
+                makeSortAccount("charlie", fiveHourUsed: 20, weeklyUsed: 20),
+                makeSortAccount("bravo", fiveHourUsed: 80, weeklyUsed: 80),
+            ]
+        )
+
+        viewModel.setAccountSortCriterion(.name)
+        viewModel.setAccountSortDirection(.ascending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "bravo", "charlie", "delta"])
+
+        viewModel.setAccountSortDirection(.descending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "delta", "charlie", "bravo"])
+    }
+
+    func testMissingUsageAlwaysStaysAtBottomEvenWhenDescending() {
+        let viewModel = makeSortViewModel()
+        viewModel.updateAccounts(
+            [
+                makeSortAccount("alpha", isCurrent: true, fiveHourUsed: 25, weeklyUsed: 25),
+                makeSortAccount("beta", fiveHourUsed: nil, weeklyUsed: nil),
+                makeSortAccount("gamma", fiveHourUsed: 90, weeklyUsed: 90),
+                makeSortAccount("delta", fiveHourUsed: 10, weeklyUsed: 10),
+            ]
+        )
+
+        viewModel.setAccountSortCriterion(.used)
+        viewModel.setAccountSortWindow(.fiveHour)
+        viewModel.setAccountSortDirection(.descending)
+
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "gamma", "delta", "beta"])
+    }
+
+    func testTiesFallBackToNameAscending() {
+        let viewModel = makeSortViewModel()
+        viewModel.updateAccounts(
+            [
+                makeSortAccount("alpha", isCurrent: true, fiveHourUsed: 55, weeklyUsed: 55),
+                makeSortAccount("zulu", fiveHourUsed: 50, weeklyUsed: 50),
+                makeSortAccount("bravo", fiveHourUsed: 50, weeklyUsed: 50),
+                makeSortAccount("charlie", fiveHourUsed: 70, weeklyUsed: 70),
+            ]
+        )
+
+        viewModel.setAccountSortCriterion(.used)
+        viewModel.setAccountSortWindow(.fiveHour)
+        viewModel.setAccountSortDirection(.ascending)
+
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "bravo", "zulu", "charlie"])
+
+        viewModel.setAccountSortDirection(.descending)
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "charlie", "bravo", "zulu"])
+    }
+
+    func testSortChangesUpdateMenuAndSettingsSourcesImmediately() {
+        let viewModel = makeSortViewModel()
+        viewModel.updateAccounts(
+            [
+                makeSortAccount("alpha", isCurrent: true, fiveHourUsed: 80, weeklyUsed: 80),
+                makeSortAccount("beta", fiveHourUsed: 30, weeklyUsed: 70),
+                makeSortAccount("gamma", fiveHourUsed: 60, weeklyUsed: 20),
+                makeSortAccount("delta", fiveHourUsed: 50, weeklyUsed: 50),
+            ]
+        )
+
+        viewModel.setAccountSortCriterion(.name)
+        viewModel.setAccountSortDirection(.descending)
+
+        XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "gamma", "delta", "beta"])
+        XCTAssertEqual(viewModel.menuAccountRows(limit: 10).map(\.name), ["gamma", "delta", "beta"])
+        XCTAssertEqual(viewModel.filteredAccounts.map(\.name), ["alpha", "gamma", "delta", "beta"])
     }
 
     func testPerformRefreshHandlesFirstFailureThenWarningFallback() async {
@@ -475,9 +639,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             preferences: preferences,
             startImmediately: false
         )
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
-            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
-            limits: service.stubbedLimits
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
+                accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+                limits: service.stubbedLimits
+            )
         )
 
         viewModel.sendTestAutoSwitchNotification()
@@ -668,9 +834,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
             accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
-            limits: service.stubbedLimits
+                limits: service.stubbedLimits
+            )
         )
 
         viewModel.openLoginInTerminal(for: "alpha")
@@ -803,9 +971,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
             accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
-            limits: service.stubbedLimits
+                limits: service.stubbedLimits
+            )
         )
         service.fetchLimitsDelayNanoseconds = 400_000_000
 
@@ -847,9 +1017,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
             accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
-            limits: service.stubbedLimits
+                limits: service.stubbedLimits
+            )
         )
         viewModel.focusedAccountName = "beta"
         service.fetchLimitsDelayNanoseconds = 400_000_000
@@ -898,9 +1070,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
             accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
-            limits: service.stubbedLimits
+                limits: service.stubbedLimits
+            )
         )
         service.fetchLimitsDelayNanoseconds = 400_000_000
 
@@ -940,9 +1114,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
             accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
-            limits: service.stubbedLimits
+                limits: service.stubbedLimits
+            )
         )
         service.fetchLimitsDelayNanoseconds = 400_000_000
 
@@ -982,9 +1158,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
             accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
-            limits: service.stubbedLimits
+                limits: service.stubbedLimits
+            )
         )
         service.fetchLimitsDelayNanoseconds = 400_000_000
 
@@ -1025,9 +1203,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
             preferences: AppPreferencesStore(defaults: defaults),
             startImmediately: false
         )
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
-            accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
-            limits: service.stubbedLimits
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
+                accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+                limits: service.stubbedLimits
+            )
         )
 
         viewModel.startLoginFlow(accountName: "fresh", createIfNeeded: true)
@@ -1138,6 +1318,61 @@ final class AccountsMenuViewModelTests: XCTestCase {
             ),
             credits: nil
         )
+    }
+
+    private func makeSortViewModel() -> AccountsMenuViewModel {
+        let notifier = MockAutoSwitchNotifier()
+        return AccountsMenuViewModel(
+            accountService: MockCodexAccountService(),
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+    }
+
+    private func makeSortAccount(
+        _ name: String,
+        isCurrent: Bool = false,
+        fiveHourUsed: Double?,
+        weeklyUsed: Double?
+    ) -> AccountUsage {
+        AccountUsage(
+            name: name,
+            isCurrent: isCurrent,
+            hasAuth: true,
+            lastUsedAt: nil,
+            lastLoginStatus: nil,
+            usage: UsageSummary(
+                fiveHour: UsageMetric(
+                    label: "5h",
+                    percentText: percentText(for: fiveHourUsed),
+                    usedPercent: fiveHourUsed,
+                    periodMinutes: 300,
+                    resetsAt: nil
+                ),
+                weekly: UsageMetric(
+                    label: "weekly",
+                    percentText: percentText(for: weeklyUsed),
+                    usedPercent: weeklyUsed,
+                    periodMinutes: 10_080,
+                    resetsAt: nil
+                ),
+                credits: "-"
+            ),
+            source: "live-api",
+            usageError: nil
+        )
+    }
+
+    private func percentText(for value: Double?) -> String {
+        guard let value else {
+            return "-"
+        }
+        if value.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(format: "%.0f%%", value)
+        }
+        return String(format: "%.1f%%", value)
     }
 }
 
