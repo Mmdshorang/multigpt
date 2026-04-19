@@ -292,23 +292,21 @@ struct DashboardAccountRow: View {
 
     private var expandedContent: some View {
         HStack(spacing: DashboardTokens.Spacing.cardGap) {
-            DashboardProgressRing(
-                progress: fiveHourProgressValue,
-                color: DashboardTokens.ringFiveHour,
-                label: "5H",
-                valueText: fiveHourPercentText,
-                expandHorizontally: false
-            )
-            .frame(width: DashboardTokens.Spacing.ringSize, alignment: .leading)
-
-            DashboardProgressRing(
-                progress: weeklyProgressValue,
-                color: DashboardTokens.ringWeekly,
-                label: "WEEK",
-                valueText: weeklyPercentText,
-                expandHorizontally: false
-            )
-            .frame(width: DashboardTokens.Spacing.ringSize, alignment: .leading)
+            VStack(alignment: .leading, spacing: 8) {
+                expandedMetricBar(
+                    label: "5H",
+                    valueText: fiveHourPercentText,
+                    progress: fiveHourProgressValue,
+                    color: DashboardTokens.ringFiveHour
+                )
+                expandedMetricBar(
+                    label: "WEEK",
+                    valueText: weeklyPercentText,
+                    progress: weeklyProgressValue,
+                    color: DashboardTokens.ringWeekly
+                )
+            }
+            .frame(width: 176, alignment: .leading)
 
             Spacer()
 
@@ -324,6 +322,37 @@ struct DashboardAccountRow: View {
                         .lineLimit(1)
                 }
             }
+        }
+    }
+
+    private func expandedMetricBar(
+        label: String,
+        valueText: String,
+        progress: Double,
+        color: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.8)
+                    .foregroundStyle(DashboardTokens.textTertiary)
+                Text(valueText)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(DashboardTokens.textPrimary)
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(color)
+                        .frame(width: geo.size.width * CGFloat(min(1, max(0, progress))))
+                }
+            }
+            .frame(height: 4)
         }
     }
 }
