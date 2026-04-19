@@ -310,6 +310,20 @@ final class AccountsMenuViewModel: ObservableObject {
         resortAccounts()
     }
 
+    func cycleAccountSortCriterion() {
+        let nextCriterion: AccountSortCriterion
+        switch accountSortCriterion {
+        case .used:
+            nextCriterion = .remaining
+        case .remaining:
+            nextCriterion = .name
+        case .name:
+            nextCriterion = .used
+        }
+
+        setAccountSortCriterion(nextCriterion)
+    }
+
     func setAccountSwitchingStrategy(_ strategy: AccountSwitchingStrategy) { settingsController.setAccountSwitchingStrategy(strategy) }
 
     func setAutoSwitchNotificationsEnabled(_ isEnabled: Bool) { settingsController.setAutoSwitchNotificationsEnabled(isEnabled) }

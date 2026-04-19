@@ -20,6 +20,16 @@ extension AccountsMenuContentView {
             sortMenu
 
             ActionPillButton(
+                title: "Cycle sort",
+                symbol: "arrow.triangle.2.circlepath",
+                role: .secondary,
+                layout: .iconOnly
+            ) {
+                viewModel.cycleAccountSortCriterion()
+            }
+            .help("Cycle account sort mode")
+
+            ActionPillButton(
                 title: "Refresh",
                 symbol: "arrow.clockwise",
                 role: .secondary,
