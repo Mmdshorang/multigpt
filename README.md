@@ -1,125 +1,135 @@
-# MultiCodex (macOS Menu Bar App)
+<div align="center">
 
-Native macOS SwiftUI menu bar app for managing multiple coding agent accounts/profiles.
+# MultiCodex
 
-## What It Does
+**Manage multiple Codex accounts from your Mac menu bar.**
 
-- Shows 5h and weekly usage in a compact menu bar view for agents that expose usage.
-- Lets you switch accounts/profiles and re-login when an account needs auth.
-- Opens browser-based `codex login` flows through Terminal.
-- Provides account/profile operations in Settings: use, rename, remove, import auth, status check, and runtime selection.
-- Uses a fully native Swift runtime (no bundled JavaScript CLI runtime).
+Track usage across accounts. Switch instantly. Never hit a rate limit unprepared.
 
-## Architecture
+[Download Latest](https://github.com/momoazn/multicodex/releases/latest) · [Report a Bug](https://github.com/momoazn/multicodex/issues) · [Development Guide](docs/DEVELOPMENT.md)
 
-The app stays in a single SwiftPM executable target and is organized into clear layers:
+</div>
 
-- `Sources/MultiCodex/App`
-  - App lifecycle and top-level scene wiring.
-- `Sources/MultiCodex/Core/Accounts`
-  - Account-focused domain payloads, UI state models, merge policy, alert prioritization.
-- `Sources/MultiCodex/Core/Usage`
-  - Usage/rate-limit models and formatting helpers.
-- `Sources/MultiCodex/Infrastructure/Codex`
-  - Codex-specific auth/runtime/usage implementations.
-- `Sources/MultiCodex/Infrastructure/Preferences`
-  - App preference persistence.
-- `Sources/MultiCodex/Features/MenuBar`
-  - Menu bar content and status UI.
-- `Sources/MultiCodex/Features/Settings`
-  - Settings screens and account management UI.
-- `Sources/MultiCodex/Features/Shared`
-  - Shared view model and reusable UI presentation components.
+---
 
-## Simplification Notes
+## Why MultiCodex?
 
-This cleanup intentionally favors simpler internals over legacy compatibility branches:
+If you use Codex with multiple accounts, you know the friction — checking which account has headroom, manually switching when one runs out, losing track of where you are.
 
-- Storage paths remain unchanged:
-  - `MULTICODEX_HOME` (default `~/.config/multicodex`)
-  - `~/.codex/auth.json`
-- `config.json` continues to use schema version `2`.
-- Legacy schema version `1` config parsing and legacy `UserDefaults` fallback keys were removed.
-- Build/dev workflow is Swift + `just` only (no npm layer).
+MultiCodex makes it invisible. It lives in your menu bar and handles the bookkeeping so you can focus on coding.
 
-## Requirements
+## Features
 
-- macOS 13+
-- Xcode 15+ (or Swift 5.9+ toolchain)
-- `codex` CLI available in `PATH` (or set a custom path in Settings > Runtime)
-- `just` (recommended)
+### 📊 Usage at a Glance
 
-## Development
+See 5-hour and weekly usage for your active account as soon as you click the menu bar icon. Progress rings, compact bars, and percentage readouts — all updating in the background.
 
-Quickstart:
+### ⚡ Instant Account Switching
 
-```bash
-just doctor
-just run
-```
+One click to switch between accounts. No terminal commands, no editing config files. Switch, re-login, or check auth status — all from the menu.
 
-Verification gate:
+### 🔄 Smart Auto-Switching
 
-```bash
-just check
-```
+Let MultiCodex switch accounts for you:
 
-Swift-only equivalents (same safe behavior used by `just`):
+| Strategy | When it switches |
+|----------|-----------------|
+| **Manual** | Never — you're in control |
+| **Failover** | When the current account is near its limit or needs re-auth |
+| **Expiry-Aware** | To the account with the most usage that's about to reset, so nothing goes to waste |
 
-```bash
-bash scripts/swift-safe.sh swift build -c debug
-bash scripts/swift-safe.sh swift test --parallel
-```
+Get a native macOS notification every time it happens.
 
-Useful commands:
+### 🗂️ Flexible Sorting
 
-```bash
-just help
-just run
-just test
-just package
-just check
-just icons
-just clean
-just release patch
-just release 0.2.0
-```
+Sort your account list by usage, remaining headroom, or name. Choose the time window (5h or weekly) and direction. Your sort preference syncs between the menu bar and settings — set it once, see it everywhere.
 
-## Release
+### ⚙️ Full Settings Panel
 
-- Workflow: `.github/workflows/release-macos.yml`
-- Tag format: `vMAJOR.MINOR.PATCH`
-- Local `just package` artifacts:
-  - Versioned DMG: `build/dist/MultiCodex-<version>.dmg`
-  - Latest symlink: `build/dist/MultiCodex.dmg`
-- `scripts/release.sh` enforces:
-  - current branch is `main`
-  - clean working tree
-  - tag must not already exist locally or on `origin`
+A native settings window with everything you need:
 
-Version source for `just package`:
+- **General** — appearance, density, bar style, auto-switching config
+- **Accounts** — login, rename, remove, check status, view per-account usage
+- **System** — Codex CLI path, diagnostics, cache interval
+- **About** — version info, keyboard shortcuts, support links
 
-- Uses `git describe --tags --always --dirty` (leading `v` removed from tags).
-- You can override manually: `MULTICODEX_BUILD_VERSION=1.2.3 just package`
+### 🧑‍💻 Developer-Friendly
 
-Important (unsigned app): run after install.
+- Pure Swift — no Electron, no Node, no JS runtime bundled
+- Built with SwiftUI and modern concurrency
+- Clean architecture with layered separation of concerns
+- ~8,200 lines of source, ~2,400 lines of tests
+
+## Installation
+
+### Download
+
+Grab the latest DMG from [Releases](https://github.com/momoazn/multicodex/releases/latest).
+
+### Install
+
+1. Open the DMG
+2. Drag **MultiCodex.app** to **Applications**
+3. Run this command (unsigned app — macOS requires it once):
 
 ```bash
 sudo xattr -dr com.apple.quarantine /Applications/MultiCodex.app
 ```
 
-To create a release tag and trigger GitHub Actions:
+4. Launch MultiCodex from Applications
+
+### Requirements
+
+- macOS 13 (Ventura) or later
+- [Codex CLI](https://github.com/openai/codex) installed and in your `PATH` (or set a custom path in Settings → System)
+
+## Getting Started
+
+1. **Launch MultiCodex** — the menu bar icon appears
+2. **Login your first account** — click the icon, then "Login First Account"
+3. **Add more accounts** — use "Login New" to add additional accounts
+4. **Configure auto-switching** — open Settings → General and pick a strategy
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `⌘ R` | Refresh usage |
+| `⌘ ,` | Open settings |
+
+## Building from Source
+
+You'll need Xcode 15+ and [just](https://github.com/casey/just):
 
 ```bash
-just release patch
-# or
-just release v0.2.0
+git clone https://github.com/momoazn/multicodex.git
+cd multicodex
+just doctor    # verify your toolchain
+just run       # build and launch
 ```
 
-## Troubleshooting
+For the full development reference, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-- `codex` not found: install `codex` or set the runtime path in Settings > Runtime.
-- Account says auth is needed: use `Re-login` on that account.
-- Swift build fails with module/PCH cache path errors after moving clones:
-  - Normal build flows auto-recover and retry once.
-  - For manual recovery, run `just clean` and build again.
+## Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Make your changes and add tests
+4. Run `just check` to verify everything passes
+5. Open a pull request
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for architecture details, common tasks, and coding patterns.
+
+## License
+
+This project is licensed under the terms found in the [LICENSE](LICENSE) file.
+
+---
+
+<div align="center">
+
+Built with ❤️ using Swift and SwiftUI
+
+</div>

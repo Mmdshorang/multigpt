@@ -1,5 +1,9 @@
 # Account Sorting Feature Plan
 
+> **Status: ✅ Fully Implemented** (merged in PR #8, commit `37c439d`)
+>
+> This document is retained as historical reference. All items below were shipped.
+
 ## Objective
 
 Add flexible sorting for account lists in MultiCodex across both the menu bar accounts list and the Settings > Accounts list.
