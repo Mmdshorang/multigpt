@@ -17,8 +17,6 @@ extension AccountsMenuContentView {
 
             Spacer()
 
-            sortMenu
-
             ActionPillButton(
                 title: "Refresh",
                 symbol: "arrow.clockwise",
@@ -33,60 +31,120 @@ extension AccountsMenuContentView {
         }
     }
 
-    private var sortMenu: some View {
+    private var sortCriterionMenu: some View {
         Menu {
-            Section("Criterion") {
-                Button("Used") {
-                    viewModel.setAccountSortCriterion(.used)
-                }
-                Button("Remaining") {
-                    viewModel.setAccountSortCriterion(.remaining)
-                }
-                Button("Name") {
-                    viewModel.setAccountSortCriterion(.name)
-                }
+            Button {
+                viewModel.setAccountSortCriterion(.used)
+            } label: {
+                menuSelectionLabel("Used", isSelected: viewModel.accountSortCriterion == .used)
             }
-
-            if viewModel.accountSortCriterion != .name {
-                Section("Window") {
-                    Button("5h") {
-                        viewModel.setAccountSortWindow(.fiveHour)
-                    }
-                    Button("Weekly") {
-                        viewModel.setAccountSortWindow(.weekly)
-                    }
-                }
+            Button {
+                viewModel.setAccountSortCriterion(.remaining)
+            } label: {
+                menuSelectionLabel("Remaining", isSelected: viewModel.accountSortCriterion == .remaining)
             }
-
-            Section("Direction") {
-                Button("Ascending") {
-                    viewModel.setAccountSortDirection(.ascending)
-                }
-                Button("Descending") {
-                    viewModel.setAccountSortDirection(.descending)
-                }
+            Button {
+                viewModel.setAccountSortCriterion(.name)
+            } label: {
+                menuSelectionLabel("Name", isSelected: viewModel.accountSortCriterion == .name)
             }
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.up.arrow.down.circle")
-                    .font(DashboardTokens.Font.button().weight(.medium))
-                Text(viewModel.accountSortMenuLabel)
-                    .font(DashboardTokens.Font.button().weight(.medium))
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                    .fill(DashboardTokens.cardBackground)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                    .stroke(DashboardTokens.cardBorder, lineWidth: 1)
-            )
-            .foregroundStyle(DashboardTokens.textSecondary)
+            sortOptionPill(title: "Sort", value: viewModel.accountSortCriterion.title)
         }
         .menuStyle(.borderlessButton)
-        .help("Change account sorting")
+        .help("Sort criterion")
+    }
+
+    private var sortWindowMenu: some View {
+        Menu {
+            Button {
+                viewModel.setAccountSortWindow(.fiveHour)
+            } label: {
+                menuSelectionLabel("5h", isSelected: viewModel.accountSortWindow == .fiveHour)
+            }
+            Button {
+                viewModel.setAccountSortWindow(.weekly)
+            } label: {
+                menuSelectionLabel("Weekly", isSelected: viewModel.accountSortWindow == .weekly)
+            }
+        } label: {
+            sortOptionPill(title: "Window", value: viewModel.accountSortWindow.title)
+        }
+        .menuStyle(.borderlessButton)
+        .help("Sort window")
+    }
+
+    private var sortDirectionMenu: some View {
+        Menu {
+            Button {
+                viewModel.setAccountSortDirection(.ascending)
+            } label: {
+                menuSelectionLabel("Asc", isSelected: viewModel.accountSortDirection == .ascending)
+            }
+            Button {
+                viewModel.setAccountSortDirection(.descending)
+            } label: {
+                menuSelectionLabel("Desc", isSelected: viewModel.accountSortDirection == .descending)
+            }
+        } label: {
+            sortOptionPill(title: "Direction", value: viewModel.accountSortDirection.shortTitle)
+        }
+        .menuStyle(.borderlessButton)
+        .help("Sort direction")
+    }
+
+    private var sortOptionsRow: some View {
+        HStack(spacing: 6) {
+            sortCriterionMenu
+
+            if viewModel.accountSortCriterion != .name {
+                sortWindowMenu
+            }
+
+            sortDirectionMenu
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private func sortOptionPill(title: String, value: String) -> some View {
+        HStack(spacing: 4) {
+            (
+                Text("\(title): ")
+                    .foregroundColor(DashboardTokens.textTertiary)
+                + Text(value)
+                    .foregroundColor(DashboardTokens.textSecondary)
+            )
+            .font(DashboardTokens.Font.metadata().weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .allowsTightening(true)
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(DashboardTokens.textTertiary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .fill(DashboardTokens.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
+        )
+    }
+
+    private func menuSelectionLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+        }
     }
 
     func alertBanner(_ alert: MenuAlertState) -> some View {
@@ -209,6 +267,8 @@ extension AccountsMenuContentView {
                 .help(areAllAccountsExpanded ? "Collapse all accounts" : "Expand all accounts")
             }
             .padding(.horizontal, 4)
+
+            sortOptionsRow
 
             VStack(spacing: 4) {
                 ForEach(visibleRows) { row in
