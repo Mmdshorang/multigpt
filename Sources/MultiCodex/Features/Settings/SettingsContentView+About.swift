@@ -35,6 +35,11 @@ extension SettingsContentView {
                         .font(DashboardTokens.Font.metadata())
                         .foregroundStyle(DashboardTokens.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    Text("Independent project disclaimer: MultiCodex is not affiliated with, endorsed by, or sponsored by OpenAI or the Codex CLI project.")
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 

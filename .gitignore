@@ -17,3 +17,15 @@ build/
 
 # Node (tooling removed, keep local installs ignored)
 node_modules/
+
+# Local secrets and credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local auth/config state
+.codex/
+.config/

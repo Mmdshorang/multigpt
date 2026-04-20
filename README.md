@@ -6,6 +6,8 @@
 
 Track usage across accounts. Switch instantly. Never hit a rate limit unprepared.
 
+> Disclaimer: MultiCodex is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by OpenAI or the Codex CLI project.
+
 [Download Latest](https://github.com/momoazn/multicodex/releases/latest) · [Report a Bug](https://github.com/momoazn/multicodex/issues) · [Development Guide](docs/DEVELOPMENT.md)
 
 </div>
@@ -83,6 +85,14 @@ sudo xattr -dr com.apple.quarantine /Applications/MultiCodex.app
 - macOS 13 (Ventura) or later
 - [Codex CLI](https://github.com/openai/codex) installed and in your `PATH` (or set a custom path in Settings → System)
 
+## Support and Compatibility
+
+- Supported OS: macOS 13+
+- Recommended tools: latest stable Xcode and Swift toolchain
+- Runtime dependency: `codex` CLI available in `PATH` or configured in Settings > System
+- App signing: releases are currently unsigned, so first-run quarantine removal is required
+- Help and bugs: use [GitHub Issues](https://github.com/momoazn/multicodex/issues)
+
 ## Getting Started
 
 1. **Launch MultiCodex** — the menu bar icon appears
@@ -112,7 +122,9 @@ For the full development reference, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.m
 
 ## Contributing
 
-Contributions are welcome! Here's how to get started:
+Contributions are welcome. Please start with [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Quick start:
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/my-feature`)
@@ -125,6 +137,8 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for architecture details, common 
 ## License
 
 This project is licensed under the terms found in the [LICENSE](LICENSE) file.
+
+OpenAI and Codex are trademarks of their respective owners. This repository is provided as an independent utility for users.
 
 ---
 
