@@ -20,6 +20,9 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
                 } label: {
                     Text(titleForOption(option))
                         .font(DashboardTokens.Font.metadata().weight(isSelected ? .semibold : .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .allowsTightening(true)
                         .foregroundStyle(isSelected ? DashboardTokens.textPrimary : DashboardTokens.textSecondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)

@@ -150,12 +150,15 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     var filteredAccounts: [AccountUsage] {
+        let sortedForSettings = accounts.sorted { lhs, rhs in
+            compareAccounts(lhs, rhs)
+        }
         let query = accountSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
-            return accounts
+            return sortedForSettings
         }
 
-        return accounts.filter { account in
+        return sortedForSettings.filter { account in
             account.name.localizedCaseInsensitiveContains(query)
         }
     }

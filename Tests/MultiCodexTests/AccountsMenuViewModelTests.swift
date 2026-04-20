@@ -390,7 +390,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "gamma", "delta", "beta"])
         XCTAssertEqual(viewModel.menuAccountRows(limit: 10).map(\.name), ["gamma", "delta", "beta"])
-        XCTAssertEqual(viewModel.filteredAccounts.map(\.name), ["alpha", "gamma", "delta", "beta"])
+        XCTAssertEqual(viewModel.filteredAccounts.map(\.name), ["gamma", "delta", "beta", "alpha"])
     }
 
     func testPerformRefreshHandlesFirstFailureThenWarningFallback() async {
