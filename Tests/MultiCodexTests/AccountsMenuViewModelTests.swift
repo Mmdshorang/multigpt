@@ -374,7 +374,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "charlie", "bravo", "zulu"])
     }
 
-    func testSortChangesUpdateMenuAndSettingsSourcesImmediately() {
+    func testSortChangesUpdateMenuAndSettingsSourcesImmediatelyAndSettingsDoNotPinCurrentAccount() {
         let viewModel = makeSortViewModel()
         viewModel.updateAccounts(
             [
@@ -388,6 +388,9 @@ final class AccountsMenuViewModelTests: XCTestCase {
         viewModel.setAccountSortCriterion(.name)
         viewModel.setAccountSortDirection(.descending)
 
+        // Intentionally divergent behavior:
+        // - menu rows exclude current account
+        // - settings filtered list includes current account and sorts it with others (not pinned)
         XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha", "gamma", "delta", "beta"])
         XCTAssertEqual(viewModel.menuAccountRows(limit: 10).map(\.name), ["gamma", "delta", "beta"])
         XCTAssertEqual(viewModel.filteredAccounts.map(\.name), ["gamma", "delta", "beta", "alpha"])

@@ -117,7 +117,7 @@ extension SettingsContentView {
                                 .foregroundStyle(DashboardTokens.textTertiary)
                                 .frame(width: 16)
 
-                            Text("Accounts are sorted by the selected list options, and accounts without usage data are pushed to the bottom.")
+                            Text("Settings sorts all accounts (including the active account) by these options, and accounts without usage data are pushed to the bottom.")
                                 .font(DashboardTokens.Font.metadata())
                                 .foregroundStyle(DashboardTokens.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)

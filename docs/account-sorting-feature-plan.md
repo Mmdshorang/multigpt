@@ -18,13 +18,17 @@ The feature must support:
 
 ## Final Product Behavior
 
+### Surface-Specific Note (Implemented)
+
+- **Menu bar accounts list**: current account is handled separately (shown in the dedicated "current account" card) and is excluded from sortable account rows.
+- **Settings > Accounts list**: current account is included in the list and sorted with the same selected sort options as all other accounts (not pinned).
+
 ### Core Behavior Rules
 
-1. The current account is always shown first.
-2. All non-current accounts are sorted by selected sort options.
+1. Menu and Settings share one sort configuration source (criterion/window/direction).
+2. Menu and Settings may render the current account differently by surface (see note above), but both use the same underlying sort policy.
 3. If a sort value is missing for an account (for example no usage metric yet), that account is always placed at the bottom of the non-current list.
 4. If two accounts tie on primary sort key, tie-break by account name (case-insensitive ascending) for deterministic order.
-5. Sort configuration is shared between menu bar and settings views (single source of truth).
 
 ### Default Sort
 
