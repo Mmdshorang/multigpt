@@ -43,30 +43,61 @@ extension SettingsContentView {
                     )
 
                     VStack(alignment: .leading, spacing: 10) {
-                        settingsFormRow("Accounts sorting", icon: "arrow.up.arrow.down") {
-                            VStack(alignment: .trailing, spacing: 10) {
-                                SettingsSegmentedPicker(
-                                    options: AccountSortCriterion.allCases,
-                                    titleForOption: { $0.title },
-                                    selection: accountSortCriterionBinding
-                                )
-                                .frame(maxWidth: 260)
+                        HStack(alignment: .top, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.up.arrow.down")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(DashboardTokens.textTertiary)
+                                        .frame(width: 16)
 
-                                if viewModel.accountSortCriterion != .name {
-                                    SettingsSegmentedPicker(
-                                        options: AccountSortWindow.allCases,
-                                        titleForOption: { $0.title },
-                                        selection: accountSortWindowBinding
-                                    )
-                                    .frame(maxWidth: 180)
+                                    Text("Accounts sorting")
+                                        .font(DashboardTokens.Font.metadata().weight(.semibold))
+                                        .foregroundStyle(DashboardTokens.textPrimary)
                                 }
 
-                                SettingsSegmentedPicker(
-                                    options: SortDirection.allCases,
-                                    titleForOption: { $0.shortTitle },
-                                    selection: accountSortDirectionBinding
-                                )
-                                .frame(maxWidth: 220)
+                                Text("Built for list-style controls")
+                                    .font(DashboardTokens.Font.metadata())
+                                    .foregroundStyle(DashboardTokens.textSecondary)
+                            }
+
+                            Spacer(minLength: 16)
+
+                            HStack(alignment: .top, spacing: 10) {
+                                sortOptionColumn(
+                                    title: "Sort by",
+                                    width: 260
+                                ) {
+                                    SettingsSegmentedPicker(
+                                        options: AccountSortCriterion.allCases,
+                                        titleForOption: { $0.title },
+                                        selection: accountSortCriterionBinding
+                                    )
+                                }
+
+                                if viewModel.accountSortCriterion != .name {
+                                    sortOptionColumn(
+                                        title: "Window",
+                                        width: 180
+                                    ) {
+                                        SettingsSegmentedPicker(
+                                            options: AccountSortWindow.allCases,
+                                            titleForOption: { $0.title },
+                                            selection: accountSortWindowBinding
+                                        )
+                                    }
+                                }
+
+                                sortOptionColumn(
+                                    title: "Direction",
+                                    width: 220
+                                ) {
+                                    SettingsSegmentedPicker(
+                                        options: SortDirection.allCases,
+                                        titleForOption: { $0.shortTitle },
+                                        selection: accountSortDirectionBinding
+                                    )
+                                }
                             }
                         }
 
@@ -115,6 +146,21 @@ extension SettingsContentView {
                 }
             }
         }
+    }
+
+    func sortOptionColumn<Control: View>(
+        title: String,
+        width: CGFloat,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                .foregroundStyle(DashboardTokens.textPrimary)
+
+            control()
+        }
+        .frame(width: width, alignment: .leading)
     }
 
     func expandableAccountRow(_ account: AccountUsage) -> some View {
