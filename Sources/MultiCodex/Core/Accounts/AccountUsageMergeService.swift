@@ -33,11 +33,6 @@ enum AccountUsageMergeService {
             )
         }
 
-        return mapped.sorted { lhs, rhs in
-            if lhs.isCurrent != rhs.isCurrent {
-                return lhs.isCurrent
-            }
-            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-        }
+        return mapped
     }
 }

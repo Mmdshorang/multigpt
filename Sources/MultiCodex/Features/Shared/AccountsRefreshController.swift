@@ -150,10 +150,12 @@ final class AccountsRefreshController {
         limits: LimitsPayload,
         previousAccounts: [AccountUsage]
     ) {
-        viewModel.accounts = AccountUsageMergeService.mergeAccounts(
-            accounts: accountsPayload,
-            limits: limits,
-            previousAccounts: previousAccounts
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
+                accounts: accountsPayload,
+                limits: limits,
+                previousAccounts: previousAccounts
+            )
         )
         viewModel.clearFocusedAccountIfMissing()
         viewModel.syncSelectedSettingsAccount()

@@ -49,4 +49,40 @@ final class AppPreferencesStoreTests: XCTestCase {
         XCTAssertTrue(persisted.autoSwitchNotificationsEnabled)
     }
 
+    func testDefaultsForAccountSorting() {
+        let defaults = makeEphemeralDefaults()
+        let store = AppPreferencesStore(defaults: defaults)
+
+        XCTAssertEqual(store.accountSortCriterion, .used)
+        XCTAssertEqual(store.accountSortWindow, .fiveHour)
+        XCTAssertEqual(store.accountSortDirection, .descending)
+    }
+
+    func testAccountSortingPreferencesRoundTrip() {
+        let defaults = makeEphemeralDefaults()
+        var store = AppPreferencesStore(defaults: defaults)
+
+        store.accountSortCriterion = .remaining
+        store.accountSortWindow = .weekly
+        store.accountSortDirection = .ascending
+
+        let persisted = AppPreferencesStore(defaults: defaults)
+        XCTAssertEqual(persisted.accountSortCriterion, .remaining)
+        XCTAssertEqual(persisted.accountSortWindow, .weekly)
+        XCTAssertEqual(persisted.accountSortDirection, .ascending)
+    }
+
+    func testInvalidAccountSortingRawValuesFallbackToDefaults() {
+        let defaults = makeEphemeralDefaults()
+        defaults.set("bogus", forKey: AppPreferencesStore.Keys.accountSortCriterion)
+        defaults.set("bogus", forKey: AppPreferencesStore.Keys.accountSortWindow)
+        defaults.set("bogus", forKey: AppPreferencesStore.Keys.accountSortDirection)
+
+        let store = AppPreferencesStore(defaults: defaults)
+
+        XCTAssertEqual(store.accountSortCriterion, .used)
+        XCTAssertEqual(store.accountSortWindow, .fiveHour)
+        XCTAssertEqual(store.accountSortDirection, .descending)
+    }
+
 }

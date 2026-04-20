@@ -23,6 +23,9 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var accountSearchQuery: String
     @Published var menuDensity: MenuDensity
     @Published var usageBarStyle: UsageBarStyle
+    @Published var accountSortCriterion: AccountSortCriterion
+    @Published var accountSortWindow: AccountSortWindow
+    @Published var accountSortDirection: SortDirection
     @Published var accountSwitchingStrategy: AccountSwitchingStrategy
     @Published var autoSwitchNotificationsEnabled: Bool
     @Published var limitsCacheTTLSeconds: Int
@@ -61,6 +64,9 @@ final class AccountsMenuViewModel: ObservableObject {
         accountSearchQuery = ""
         menuDensity = preferences.menuDensity
         usageBarStyle = preferences.usageBarStyle
+        accountSortCriterion = preferences.accountSortCriterion
+        accountSortWindow = preferences.accountSortWindow
+        accountSortDirection = preferences.accountSortDirection
         accountSwitchingStrategy = preferences.accountSwitchingStrategy
         autoSwitchNotificationsEnabled = preferences.autoSwitchNotificationsEnabled
         let persistedTTL = preferences.limitsCacheTTLSeconds
@@ -144,12 +150,15 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     var filteredAccounts: [AccountUsage] {
+        let sortedForSettings = accounts.sorted { lhs, rhs in
+            compareAccounts(lhs, rhs)
+        }
         let query = accountSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
-            return accounts
+            return sortedForSettings
         }
 
-        return accounts.filter { account in
+        return sortedForSettings.filter { account in
             account.name.localizedCaseInsensitiveContains(query)
         }
     }
@@ -276,6 +285,33 @@ final class AccountsMenuViewModel: ObservableObject {
     func setMenuDensity(_ density: MenuDensity) { settingsController.setMenuDensity(density) }
 
     func setUsageBarStyle(_ style: UsageBarStyle) { settingsController.setUsageBarStyle(style) }
+
+    func setAccountSortCriterion(_ criterion: AccountSortCriterion) {
+        guard criterion != accountSortCriterion else {
+            return
+        }
+        accountSortCriterion = criterion
+        preferences.accountSortCriterion = criterion
+        resortAccounts()
+    }
+
+    func setAccountSortWindow(_ window: AccountSortWindow) {
+        guard window != accountSortWindow else {
+            return
+        }
+        accountSortWindow = window
+        preferences.accountSortWindow = window
+        resortAccounts()
+    }
+
+    func setAccountSortDirection(_ direction: SortDirection) {
+        guard direction != accountSortDirection else {
+            return
+        }
+        accountSortDirection = direction
+        preferences.accountSortDirection = direction
+        resortAccounts()
+    }
 
     func setAccountSwitchingStrategy(_ strategy: AccountSwitchingStrategy) { settingsController.setAccountSwitchingStrategy(strategy) }
 
@@ -420,16 +456,94 @@ final class AccountsMenuViewModel: ObservableObject {
         }
     }
 
+    var accountSortMenuLabel: String {
+        switch accountSortCriterion {
+        case .name:
+            return accountSortDirection == .ascending ? "Name A→Z" : "Name Z→A"
+        case .used, .remaining:
+            return "\(accountSortCriterion.title) (\(accountSortWindow.title.lowercased())) \(accountSortDirection.arrowSymbol)"
+        }
+    }
+
     // MARK: - Account List Mutation Helpers
 
-    /// Sorts accounts with current first, then by name.
-    private func sortedCurrentFirst(_ accounts: [AccountUsage]) -> [AccountUsage] {
-        accounts.sorted { lhs, rhs in
-            if lhs.isCurrent != rhs.isCurrent {
-                return lhs.isCurrent
-            }
-            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+    /// Sorts accounts with the current account pinned first, then by the active sort policy.
+    private func sortedAccounts(_ accounts: [AccountUsage]) -> [AccountUsage] {
+        let currentAccounts = accounts.filter(\.isCurrent)
+        let otherAccounts = accounts.filter { !$0.isCurrent }
+        let sortedOthers = otherAccounts.sorted { lhs, rhs in
+            compareAccounts(lhs, rhs)
         }
+        return currentAccounts + sortedOthers
+    }
+
+    private func compareAccounts(_ lhs: AccountUsage, _ rhs: AccountUsage) -> Bool {
+        switch accountSortCriterion {
+        case .name:
+            return compareNames(lhs.name, rhs.name, direction: accountSortDirection)
+        case .used, .remaining:
+            let lhsValue = sortValue(for: lhs)
+            let rhsValue = sortValue(for: rhs)
+
+            switch (lhsValue, rhsValue) {
+            case let (lhsValue?, rhsValue?):
+                if lhsValue != rhsValue {
+                    return accountSortDirection == .ascending ? lhsValue < rhsValue : lhsValue > rhsValue
+                }
+                return compareNames(lhs.name, rhs.name, direction: .ascending)
+            case (nil, nil):
+                return compareNames(lhs.name, rhs.name, direction: .ascending)
+            case (nil, _?):
+                return false
+            case (_?, nil):
+                return true
+            }
+        }
+    }
+
+    private func compareNames(_ lhs: String, _ rhs: String, direction: SortDirection) -> Bool {
+        let comparison = lhs.localizedCaseInsensitiveCompare(rhs)
+        if comparison == .orderedSame {
+            return lhs < rhs
+        }
+
+        switch direction {
+        case .ascending:
+            return comparison == .orderedAscending
+        case .descending:
+            return comparison == .orderedDescending
+        }
+    }
+
+    private func sortValue(for account: AccountUsage) -> Double? {
+        switch accountSortCriterion {
+        case .name:
+            return nil
+        case .used:
+            switch accountSortWindow {
+            case .fiveHour:
+                return account.usage.fiveHour.usedPercent
+            case .weekly:
+                return account.usage.weekly.usedPercent
+            }
+        case .remaining:
+            switch accountSortWindow {
+            case .fiveHour:
+                guard let usedPercent = account.usage.fiveHour.usedPercent else {
+                    return nil
+                }
+                return 100 - usedPercent
+            case .weekly:
+                guard let usedPercent = account.usage.weekly.usedPercent else {
+                    return nil
+                }
+                return 100 - usedPercent
+            }
+        }
+    }
+
+    private func resortAccounts() {
+        accounts = sortedAccounts(accounts)
     }
 
     /// Creates a copy of an AccountUsage with specified field overrides.
@@ -458,9 +572,9 @@ final class AccountsMenuViewModel: ObservableObject {
         )
     }
 
-    /// Updates the accounts array and applies current-first sorting.
-    private func updateAccounts(_ newAccounts: [AccountUsage]) {
-        accounts = sortedCurrentFirst(newAccounts)
+    /// Updates the accounts array and applies the active shared sort policy.
+    func updateAccounts(_ newAccounts: [AccountUsage]) {
+        accounts = sortedAccounts(newAccounts)
     }
 
     /// Applies local state change when the current account is switched.

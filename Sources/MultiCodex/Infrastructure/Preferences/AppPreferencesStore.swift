@@ -75,6 +75,36 @@ struct AppPreferencesStore {
         }
     }
 
+    var accountSortCriterion: AccountSortCriterion {
+        get {
+            let raw = defaults.string(forKey: Keys.accountSortCriterion) ?? ""
+            return AccountSortCriterion(rawValue: raw) ?? .used
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.accountSortCriterion)
+        }
+    }
+
+    var accountSortWindow: AccountSortWindow {
+        get {
+            let raw = defaults.string(forKey: Keys.accountSortWindow) ?? ""
+            return AccountSortWindow(rawValue: raw) ?? .fiveHour
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.accountSortWindow)
+        }
+    }
+
+    var accountSortDirection: SortDirection {
+        get {
+            let raw = defaults.string(forKey: Keys.accountSortDirection) ?? ""
+            return SortDirection(rawValue: raw) ?? .descending
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Keys.accountSortDirection)
+        }
+    }
+
     var accountSwitchingStrategy: AccountSwitchingStrategy {
         get {
             let raw = defaults.string(forKey: Keys.accountSwitchingStrategy) ?? ""
@@ -106,6 +136,9 @@ struct AppPreferencesStore {
         static let selectedSettingsAccountName = "multicodexMenu.selectedSettingsAccountName"
         static let menuDensity = "multicodexMenu.menuDensity"
         static let usageBarStyle = "multicodexMenu.usageBarStyle"
+        static let accountSortCriterion = "multicodexMenu.accountSortCriterion"
+        static let accountSortWindow = "multicodexMenu.accountSortWindow"
+        static let accountSortDirection = "multicodexMenu.accountSortDirection"
         static let accountSwitchingStrategy = "multicodexMenu.accountSwitchingStrategy"
         static let autoSwitchNotificationsEnabled = "multicodexMenu.autoSwitchNotificationsEnabled"
         static let limitsCacheTTLSeconds = "multicodexMenu.limitsCacheTTLSeconds"

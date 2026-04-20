@@ -40,7 +40,7 @@ final class AccountUsageMergeServiceTests: XCTestCase {
         XCTAssertEqual(merged[0].usageError, "rate limit endpoint unavailable")
     }
 
-    func testMergeAccountsSortsCurrentFirstThenByName() {
+    func testMergeAccountsPreservesPayloadOrderAndMarksCurrent() {
         let merged = AccountUsageMergeService.mergeAccounts(
             accounts: AccountsListPayload(
                 accounts: [
@@ -53,7 +53,8 @@ final class AccountUsageMergeServiceTests: XCTestCase {
             limits: LimitsPayload(results: [], errors: [])
         )
 
-        XCTAssertEqual(merged.map(\.name), ["alpha", "beta", "charlie"])
+        XCTAssertEqual(merged.map(\.name), ["charlie", "beta", "alpha"])
+        XCTAssertEqual(merged.last?.isCurrent, true)
     }
 
     func testMergeAccountsPreservesPreviousUsageWhileFreshResultsAreStillLoading() {

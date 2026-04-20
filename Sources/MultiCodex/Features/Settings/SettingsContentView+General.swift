@@ -97,6 +97,7 @@ extension SettingsContentView {
                             )
                             .frame(maxWidth: 260)
                         }
+
                     }
                 }
             }

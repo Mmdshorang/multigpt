@@ -62,6 +62,27 @@ final class AccountsSettingsController {
         viewModel.preferences.usageBarStyle = style
     }
 
+    func setAccountSortCriterion(_ criterion: AccountSortCriterion) {
+        guard criterion != viewModel.accountSortCriterion else {
+            return
+        }
+        viewModel.setAccountSortCriterion(criterion)
+    }
+
+    func setAccountSortWindow(_ window: AccountSortWindow) {
+        guard window != viewModel.accountSortWindow else {
+            return
+        }
+        viewModel.setAccountSortWindow(window)
+    }
+
+    func setAccountSortDirection(_ direction: SortDirection) {
+        guard direction != viewModel.accountSortDirection else {
+            return
+        }
+        viewModel.setAccountSortDirection(direction)
+    }
+
     func setAccountSwitchingStrategy(_ strategy: AccountSwitchingStrategy) {
         guard strategy != viewModel.accountSwitchingStrategy else {
             return
