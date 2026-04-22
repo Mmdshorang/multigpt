@@ -3,32 +3,46 @@ import SwiftUI
 
 extension AccountsMenuContentView {
     var header: some View {
-        HStack(alignment: .center, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("MULTICODEX")
-                    .font(DashboardTokens.Font.sectionLabel())
-                    .tracking(1.5)
-                    .foregroundStyle(DashboardTokens.textTertiary)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("MultiCodex")
+                    .font(.system(size: DashboardTokens.scaled(16), weight: .semibold))
+                    .foregroundStyle(DashboardTokens.textPrimary)
 
-                Text(viewModel.lastUpdatedLabel)
+                Text(headerSummaryText)
                     .font(DashboardTokens.Font.metadata())
                     .foregroundStyle(DashboardTokens.textSecondary)
+                    .lineLimit(2)
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
-            ActionPillButton(
-                title: "Refresh",
-                symbol: "arrow.clockwise",
-                role: .secondary,
-                layout: .iconOnly,
-                isDisabled: viewModel.isRefreshing
-            ) {
-                viewModel.refreshLive()
+            HStack(spacing: 8) {
+                ActionPillButton(
+                    title: "Refresh",
+                    symbol: "arrow.clockwise",
+                    role: .secondary,
+                    layout: .iconOnly,
+                    isDisabled: viewModel.isRefreshing
+                ) {
+                    viewModel.refreshLive()
+                }
+                .keyboardShortcut("r", modifiers: [.command])
+                .help("Refresh usage (Cmd+R)")
+
+                ActionPillButton(
+                    title: "Settings",
+                    symbol: "gearshape.fill",
+                    role: .secondary,
+                    layout: .iconOnly
+                ) {
+                    openSettingsWindow()
+                }
+                .keyboardShortcut(",", modifiers: [.command])
+                .help("Open Settings (Cmd+,)")
             }
-            .keyboardShortcut("r", modifiers: [.command])
-            .help("Refresh usage (Cmd+R)")
         }
+        .cardStyle(fill: DashboardTokens.cardBackgroundSubtle)
     }
 
     private var sortCriterionMenu: some View {
@@ -79,22 +93,22 @@ extension AccountsMenuContentView {
             Button {
                 viewModel.setAccountSortDirection(.ascending)
             } label: {
-                menuSelectionLabel("Asc", isSelected: viewModel.accountSortDirection == .ascending)
+                menuSelectionLabel("Low to high", isSelected: viewModel.accountSortDirection == .ascending)
             }
             Button {
                 viewModel.setAccountSortDirection(.descending)
             } label: {
-                menuSelectionLabel("Desc", isSelected: viewModel.accountSortDirection == .descending)
+                menuSelectionLabel("High to low", isSelected: viewModel.accountSortDirection == .descending)
             }
         } label: {
-            sortOptionPill(title: "Direction", value: viewModel.accountSortDirection.shortTitle)
+            sortOptionPill(title: "Order", value: viewModel.accountSortDirection.shortTitle)
         }
         .menuStyle(.borderlessButton)
         .help("Sort direction")
     }
 
     private var sortOptionsRow: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             sortCriterionMenu
 
             if viewModel.accountSortCriterion != .name {
@@ -105,34 +119,30 @@ extension AccountsMenuContentView {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 4)
     }
 
     private func sortOptionPill(title: String, value: String) -> some View {
-        HStack(spacing: 4) {
-            (
-                Text("\(title): ")
-                    .foregroundColor(DashboardTokens.textTertiary)
-                + Text(value)
-                    .foregroundColor(DashboardTokens.textSecondary)
-            )
-            .font(DashboardTokens.Font.metadata().weight(.semibold))
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-            .allowsTightening(true)
+        HStack(spacing: 6) {
+            Text(title)
+                .foregroundColor(DashboardTokens.textTertiary)
+            Text(value)
+                .foregroundColor(DashboardTokens.textPrimary)
+                .fontWeight(.semibold)
 
             Image(systemName: "chevron.down")
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: DashboardTokens.scaled(8), weight: .semibold))
                 .foregroundStyle(DashboardTokens.textTertiary)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .font(DashboardTokens.Font.metadata())
+        .lineLimit(1)
+        .padding(.horizontal, DashboardTokens.scaled(8))
+        .padding(.vertical, DashboardTokens.scaled(6))
         .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(DashboardTokens.cardBackground)
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .fill(DashboardTokens.cardBackgroundSubtle)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                 .stroke(DashboardTokens.cardBorder, lineWidth: 1)
         )
     }
@@ -142,7 +152,7 @@ extension AccountsMenuContentView {
             Text(title)
             if isSelected {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
             }
         }
     }
@@ -161,7 +171,7 @@ extension AccountsMenuContentView {
             if let current = viewModel.currentAccount {
                 HStack(spacing: DashboardTokens.Spacing.cardGap) {
                     usageCard(
-                        title: viewModel.usageBarStyle == .depleting ? "5h remaining" : "5h usage",
+                        title: viewModel.usageBarStyle == .depleting ? "5h Remaining" : "5h Usage",
                         progress: viewModel.progressValue(for: current.usage.fiveHour),
                         color: DashboardTokens.ringFiveHour,
                         ringLabel: "5H",
@@ -170,10 +180,10 @@ extension AccountsMenuContentView {
                     )
 
                     usageCard(
-                        title: viewModel.usageBarStyle == .depleting ? "weekly remaining" : "weekly usage",
+                        title: viewModel.usageBarStyle == .depleting ? "Weekly Remaining" : "Weekly Usage",
                         progress: viewModel.progressValue(for: current.usage.weekly),
                         color: DashboardTokens.ringWeekly,
-                        ringLabel: "WEEK",
+                        ringLabel: "WK",
                         valueText: viewModel.displayPercentText(for: current.usage.weekly),
                         resetText: current.usage.weekly.resetText(mode: viewModel.resetDisplayMode)
                     )
@@ -192,70 +202,122 @@ extension AccountsMenuContentView {
         valueText: String,
         resetText: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 12) {
             DashboardSectionHeader(title: title)
-            DashboardProgressRing(
-                progress: progress,
-                color: color,
-                label: ringLabel,
-                valueText: valueText
-            )
-            Text(resetText)
-                .font(DashboardTokens.Font.metadata())
-                .foregroundStyle(DashboardTokens.textSecondary)
-                .lineLimit(1)
+
+            HStack(spacing: 12) {
+                DashboardProgressRing(
+                    progress: progress,
+                    color: color,
+                    label: ringLabel,
+                    valueText: valueText,
+                    size: DashboardTokens.scaled(58),
+                    expandHorizontally: false
+                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(valueText)
+                        .font(.system(size: DashboardTokens.scaled(16), weight: .semibold))
+                        .foregroundStyle(DashboardTokens.textPrimary)
+                        .monospacedDigit()
+                    Text(resetText)
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textSecondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
-        .frame(maxWidth: .infinity)
-        .cardStyle()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
     }
 
     private func currentAccountCard(_ account: AccountUsage) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            DashboardSectionHeader(title: "current account")
-
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(AccountPresentation.statusColor(for: account.connectionState))
-                    .frame(width: DashboardTokens.Spacing.dotSize, height: DashboardTokens.Spacing.dotSize)
-
-                Text(account.name)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(DashboardTokens.textPrimary)
-                    .lineLimit(1)
-
-                if account.connectionState != .connected {
-                    AccountStatusPill(
-                        text: account.connectionState.label,
-                        color: AccountPresentation.statusColor(for: account.connectionState)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(AccountPresentation.statusColor(for: account.connectionState).opacity(0.16))
+                    .frame(width: DashboardTokens.scaled(34), height: DashboardTokens.scaled(34))
+                    .overlay(
+                        Image(systemName: account.connectionState == .connected ? "person.crop.circle.fill" : "person.crop.circle.badge.exclamationmark")
+                            .font(.system(size: DashboardTokens.scaled(14), weight: .semibold))
+                            .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
                     )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(account.name)
+                            .font(DashboardTokens.Font.accountName())
+                            .foregroundStyle(DashboardTokens.textPrimary)
+                            .lineLimit(1)
+                        AccountStatusPill(text: account.connectionState.label, color: AccountPresentation.statusColor(for: account.connectionState))
+                    }
+
+                    if let email = account.workspaceEmailHint {
+                        Text(email)
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer()
             }
+
+            runtimeStatusPanel
         }
-        .cardStyle()
+        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
+    }
+
+    private var runtimeStatusPanel: some View {
+        HStack(spacing: 10) {
+            Image(systemName: runtimeStatus.symbol)
+                .font(.system(size: DashboardTokens.scaled(11), weight: .semibold))
+                .foregroundStyle(runtimeStatus.color)
+
+            Text(runtimeStatus.text)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textSecondary)
+                .lineLimit(2)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DashboardTokens.scaled(10))
+        .padding(.vertical, DashboardTokens.scaled(8))
+        .background(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .fill(runtimeStatus.color.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .stroke(runtimeStatus.color.opacity(0.16), lineWidth: 1)
+        )
     }
 
     var accountsSection: some View {
         VStack(alignment: .leading, spacing: DashboardTokens.Spacing.cardGap) {
-            HStack {
-                DashboardSectionHeader(title: "accounts")
-                Spacer()
-                if hiddenAccountsCount > 0, !showAllAccounts {
-                    Text("+\(hiddenAccountsCount) more")
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    DashboardSectionHeader(title: "Accounts")
+                    Text(accountsSummaryText)
                         .font(DashboardTokens.Font.metadata())
                         .foregroundStyle(DashboardTokens.textSecondary)
                 }
+
+                Spacer()
+
                 if canToggleShowAll {
                     ActionPillButton(
                         title: showAllAccounts ? "Show Less" : "Show All",
                         symbol: showAllAccounts ? "rectangle.compress.vertical" : "rectangle.expand.vertical",
-                        role: .secondary
+                        role: .secondary,
+                        layout: .iconOnly
                     ) {
                         toggleShowAllAccounts()
                     }
                     .help(showAllAccounts ? "Show fewer accounts in the menu" : "Show all accounts in the menu")
                 }
+
                 ActionPillButton(
                     title: areAllAccountsExpanded ? "Collapse All" : "Expand All",
                     symbol: areAllAccountsExpanded ? "chevron.up" : "chevron.down",
@@ -266,11 +328,10 @@ extension AccountsMenuContentView {
                 }
                 .help(areAllAccountsExpanded ? "Collapse all accounts" : "Expand all accounts")
             }
-            .padding(.horizontal, 4)
 
             sortOptionsRow
 
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 ForEach(visibleRows) { row in
                     DashboardAccountRow(
                         row: row,
@@ -291,24 +352,24 @@ extension AccountsMenuContentView {
                 }
             }
         }
-        .cardStyle()
+        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
     }
 
     var emptyStateCard: some View {
-        VStack(alignment: .leading, spacing: DashboardTokens.Spacing.sectionSpacing) {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(DashboardTokens.accent.opacity(0.15))
-                    .frame(width: 44, height: 44)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill((viewModel.isCodexRuntimeAvailable ? DashboardTokens.accent : DashboardTokens.statusOrange).opacity(0.16))
+                    .frame(width: DashboardTokens.scaled(42), height: DashboardTokens.scaled(42))
                     .overlay(
                         Image(systemName: viewModel.isCodexRuntimeAvailable ? "person.crop.circle.badge.plus" : "exclamationmark.triangle")
-                            .font(.system(size: 20))
-                            .foregroundStyle(DashboardTokens.accent)
+                            .font(.system(size: DashboardTokens.scaled(17), weight: .semibold))
+                            .foregroundStyle(viewModel.isCodexRuntimeAvailable ? DashboardTokens.accent : DashboardTokens.statusOrange)
                     )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    DashboardSectionHeader(title: "getting started")
-                    Text("Set up your first account")
+                    DashboardSectionHeader(title: "Getting Started")
+                    Text(viewModel.isCodexRuntimeAvailable ? "Add your first account" : "Finish runtime setup")
                         .font(DashboardTokens.Font.detailTitle())
                         .foregroundStyle(DashboardTokens.textPrimary)
                 }
@@ -319,30 +380,11 @@ extension AccountsMenuContentView {
                 .foregroundStyle(DashboardTokens.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 6) {
-                Image(systemName: runtimeStatus.symbol)
-                    .font(DashboardTokens.Font.metadata().weight(.semibold))
-                    .foregroundStyle(runtimeStatus.color)
-                Text(runtimeStatus.text)
-                    .font(DashboardTokens.Font.metadata())
-                    .foregroundStyle(viewModel.isCodexRuntimeAvailable ? DashboardTokens.textSecondary : runtimeStatus.color)
-                    .lineLimit(2)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(runtimeStatus.color.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(runtimeStatus.color.opacity(0.12), lineWidth: 1)
-            )
+            runtimeStatusPanel
 
             HStack(spacing: DashboardTokens.Spacing.footerSpacing) {
                 ActionPillButton(
-                    title: viewModel.isCodexRuntimeAvailable ? "Login First Account" : "Fix Runtime",
+                    title: viewModel.isCodexRuntimeAvailable ? "Log In First Account" : "Open Runtime Settings",
                     symbol: viewModel.isCodexRuntimeAvailable ? "person.crop.circle.badge.plus" : "terminal",
                     role: .primary,
                     isDisabled: isActionBusy
@@ -355,18 +397,67 @@ extension AccountsMenuContentView {
                     }
                 }
 
-                ActionPillButton(title: "Settings", symbol: "gearshape.fill") {
-                    openSettingsWindow()
+                if !viewModel.isCodexRuntimeAvailable {
+                    ActionPillButton(title: "Refresh Runtime", symbol: "arrow.clockwise") {
+                        viewModel.refreshLive()
+                    }
                 }
             }
         }
-        .cardStyle()
+        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
+    }
+
+    var loadingStateCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(DashboardTokens.accentBackground)
+                    .frame(width: DashboardTokens.scaled(36), height: DashboardTokens.scaled(36))
+                    .overlay(
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(DashboardTokens.accent)
+                    )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    DashboardSectionHeader(title: "Loading")
+                    Text("Refreshing accounts and usage")
+                        .font(DashboardTokens.Font.cardHeading())
+                        .foregroundStyle(DashboardTokens.textPrimary)
+                }
+            }
+
+            Text("MultiCodex is gathering runtime and account state. This usually takes a moment.")
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: 8) {
+                loadingBar(width: 0.9, height: 11)
+                loadingBar(width: 0.78, height: 11)
+                loadingBar(width: 0.64, height: 11)
+            }
+            .accessibilityHidden(true)
+        }
+        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading account data")
+        .accessibilityValue("Refreshing accounts and usage")
+    }
+
+    private func loadingBar(width: CGFloat, height: CGFloat) -> some View {
+        GeometryReader { geometry in
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(DashboardTokens.cardBorder)
+                .frame(width: geometry.size.width * width, height: height)
+        }
+        .frame(height: height)
     }
 
     var footer: some View {
         HStack(spacing: DashboardTokens.Spacing.footerSpacing) {
             ActionPillButton(
-                title: "Login New",
+                title: viewModel.accounts.isEmpty ? "Start Login" : "Login New",
                 symbol: "person.crop.circle.badge.plus",
                 role: loginNewFooterRole,
                 isDisabled: isActionBusy
@@ -376,16 +467,13 @@ extension AccountsMenuContentView {
 
             Spacer()
 
-            ActionPillButton(
-                title: "Open Settings",
-                symbol: "gearshape.fill",
-                layout: .iconOnly
-            ) {
-                openSettingsWindow()
+            if hiddenAccountsCount > 0, !showAllAccounts {
+                Text("+\(hiddenAccountsCount) hidden")
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textTertiary)
             }
-            .keyboardShortcut(",", modifiers: [.command])
-            .help("Open Settings (Cmd+,)")
         }
+        .padding(.top, 2)
     }
 
     var visibleRows: [AccountRowState] {
@@ -411,22 +499,38 @@ extension AccountsMenuContentView {
 
     var loginNewFooterRole: ActionPillRole {
         if viewModel.prioritizedMenuAlert != nil || viewModel.accounts.isEmpty {
-            return .secondary
+            return .primary
         }
-        return .primary
+        return .secondary
     }
 
     var onboardingCopy: String {
         switch viewModel.onboardingState.step {
         case .runtime:
-            return "Confirm the codex runtime first, then connect your first account."
+            return "Confirm that the Codex runtime is available first. Once that looks healthy, connect your first account and MultiCodex will handle the rest."
         case .login:
-            return "Login once and MultiCodex will start showing usage cards automatically."
+            return "Log in once and MultiCodex will immediately start showing usage, headroom, and switching guidance."
         case .verify:
-            return "Verify authentication status for your account to finish setup."
+            return "Run a quick status check to verify authentication and finish the setup flow with confidence."
         case .done:
             return "Your setup is complete."
         }
+    }
+
+    var headerSummaryText: String {
+        if viewModel.accounts.isEmpty {
+            return "No accounts configured yet"
+        }
+
+        let healthyCount = viewModel.accounts.count - viewModel.accountsNeedingLogin.count
+        return "\(healthyCount) ready • \(viewModel.lastUpdatedLabel)"
+    }
+
+    var accountsSummaryText: String {
+        if hiddenAccountsCount > 0, !showAllAccounts {
+            return "Showing \(visibleRows.count) of \(allRows.count) accounts"
+        }
+        return "\(allRows.count) accounts available"
     }
 
     func performAlertAction(_ alert: MenuAlertState) {
@@ -463,26 +567,27 @@ extension AccountsMenuContentView {
     }
 
     func toastView(text: String, color: Color) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Circle()
                 .fill(color)
-                .frame(width: 6, height: 6)
+                .frame(width: DashboardTokens.scaled(7), height: DashboardTokens.scaled(7))
 
             Text(text)
                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(DashboardTokens.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DashboardTokens.scaled(12))
+        .padding(.vertical, DashboardTokens.scaled(8))
         .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(DashboardTokens.cardBackground)
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .fill(DashboardTokens.cardBackgroundElevated)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                 .stroke(color.opacity(0.3), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.35), radius: 6, y: 2)
+        .shadow(color: DashboardTokens.shadowColor.opacity(0.26), radius: 12, y: 6)
     }
 
     var isActionBusy: Bool {

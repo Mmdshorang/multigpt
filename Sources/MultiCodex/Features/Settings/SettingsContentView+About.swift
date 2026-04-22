@@ -2,22 +2,30 @@ import SwiftUI
 
 extension SettingsContentView {
     var aboutPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
+            settingsHero(
+                title: "About",
+                description: "A focused utility for people who actively manage multiple Codex accounts and want the experience to stay clear under pressure.",
+                symbol: "app.badge"
+            ) {
+                settingsBadge(text: "Version \(appVersion)", symbol: "number", color: DashboardTokens.accent)
+            }
+
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 16) {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(DashboardTokens.accent.opacity(0.2))
-                            .frame(width: 60, height: 60)
+                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
+                    HStack(spacing: DashboardTokens.scaled(14)) {
+                        RoundedRectangle(cornerRadius: DashboardTokens.scaled(16), style: .continuous)
+                            .fill(DashboardTokens.accentBackground)
+                            .frame(width: DashboardTokens.scaled(54), height: DashboardTokens.scaled(54))
                             .overlay(
                                 Image(systemName: "terminal.fill")
-                                    .font(.system(size: 28))
+                                    .font(.system(size: DashboardTokens.scaled(23), weight: .semibold))
                                     .foregroundStyle(DashboardTokens.accent)
                             )
 
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: DashboardTokens.scaled(5)) {
                             Text("MultiCodex")
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: DashboardTokens.scaled(19), weight: .semibold))
                                 .foregroundStyle(DashboardTokens.textPrimary)
 
                             Text("Version \(appVersion)")
@@ -28,30 +36,29 @@ extension SettingsContentView {
                         Spacer()
                     }
 
-                    Divider()
-                        .background(Color.white.opacity(0.1))
-
-                    Text("Manage multiple Codex CLI accounts with ease. Switch between accounts, track usage, and stay within rate limits.")
-                        .font(DashboardTokens.Font.metadata())
+                    Text("Manage multiple Codex CLI accounts, compare usage at a glance, and keep switching simple when limits or login state change mid-session.")
+                        .font(.system(size: DashboardTokens.scaled(12), weight: .regular))
                         .foregroundStyle(DashboardTokens.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Independent project disclaimer: MultiCodex is not affiliated with, endorsed by, or sponsored by OpenAI or the Codex CLI project.")
-                        .font(DashboardTokens.Font.metadata())
-                        .foregroundStyle(DashboardTokens.textTertiary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    settingsInsetPanel(title: "DISCLAIMER") {
+                        Text("MultiCodex is an independent project and is not affiliated with, endorsed by, or sponsored by OpenAI or the Codex CLI project.")
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Keyboard Shortcuts",
-                        description: "Quick actions from the menu bar",
+                        description: "The two commands you are most likely to want when the app is already open.",
                         symbol: "keyboard"
                     )
 
-                    VStack(spacing: 6) {
+                    VStack(spacing: DashboardTokens.scaled(10)) {
                         shortcutRow(keys: "⌘R", action: "Refresh usage")
                         shortcutRow(keys: "⌘,", action: "Open settings")
                     }
@@ -59,14 +66,14 @@ extension SettingsContentView {
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Support",
-                        description: "Need help or found a bug?",
+                        description: "Open the project or report a problem without digging for links.",
                         symbol: "questionmark.circle"
                     )
 
-                    VStack(spacing: 4) {
+                    VStack(spacing: DashboardTokens.scaled(8)) {
                         settingsLinkRow(
                             symbol: "arrow.up.forward.square",
                             title: "GitHub Repository",
@@ -85,18 +92,18 @@ extension SettingsContentView {
     }
 
     func shortcutRow(keys: String, action: String) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DashboardTokens.scaled(12)) {
             Text(keys)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(.system(size: DashboardTokens.scaled(12), weight: .semibold, design: .monospaced))
                 .foregroundStyle(DashboardTokens.textPrimary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, DashboardTokens.scaled(10))
+                .padding(.vertical, DashboardTokens.scaled(7))
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                         .fill(DashboardTokens.inputBackground)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                         .stroke(DashboardTokens.inputBorder, lineWidth: 1)
                 )
 
@@ -110,14 +117,14 @@ extension SettingsContentView {
 
     func settingsLinkRow(symbol: String, title: String, url: String) -> some View {
         Link(destination: URL(string: url)!) {
-            HStack(spacing: 10) {
+            HStack(spacing: DashboardTokens.scaled(12)) {
                 Image(systemName: symbol)
                     .font(DashboardTokens.Font.metadata().weight(.semibold))
                     .foregroundStyle(DashboardTokens.accent)
-                    .frame(width: 16)
+                    .frame(width: DashboardTokens.scaled(18))
 
                 Text(title)
-                    .font(DashboardTokens.Font.metadata())
+                    .font(DashboardTokens.Font.metadata().weight(.medium))
                     .foregroundStyle(DashboardTokens.textPrimary)
 
                 Spacer()
@@ -126,14 +133,14 @@ extension SettingsContentView {
                     .font(DashboardTokens.Font.metadata())
                     .foregroundStyle(DashboardTokens.textTertiary)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, DashboardTokens.scaled(12))
+            .padding(.vertical, DashboardTokens.scaled(10))
             .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                     .fill(DashboardTokens.segmentedInactiveBackground)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                     .stroke(DashboardTokens.cardBorder, lineWidth: 1)
             )
         }

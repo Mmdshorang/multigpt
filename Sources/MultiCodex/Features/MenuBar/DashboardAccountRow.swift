@@ -15,6 +15,7 @@ struct DashboardAccountRow: View {
     let onActivate: () -> Void
     let onRowTap: () -> Void
     let onToggleExpanded: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isActivationHovered = false
     @State private var isRowHovered = false
 
@@ -58,7 +59,7 @@ struct DashboardAccountRow: View {
     private var activationSymbol: String {
         switch row.primaryAction {
         case .switchAccount:
-            return "circle"
+            return "arrow.left.arrow.right.circle.fill"
         case .relogin:
             return "arrow.triangle.2.circlepath.circle.fill"
         case .none:
@@ -84,110 +85,113 @@ struct DashboardAccountRow: View {
     private var activationBackgroundColor: Color {
         switch row.primaryAction {
         case .switchAccount:
-            if isActivationHovered {
-                return DashboardTokens.accentBackground.opacity(0.62)
-            }
-            return isRowHovered ? DashboardTokens.accentBackground.opacity(0.32) : Color.white.opacity(0.03)
+            return isActivationHovered ? DashboardTokens.accentBackground.opacity(0.72) : DashboardTokens.cardBackgroundSubtle
         case .relogin:
-            return DashboardTokens.statusOrange.opacity(0.2)
+            return DashboardTokens.statusOrange.opacity(0.18)
         case .none:
-            return DashboardTokens.accentBackground.opacity(0.78)
+            return DashboardTokens.accentBackground.opacity(0.9)
         }
     }
 
     private var activationBorderColor: Color {
         switch row.primaryAction {
         case .switchAccount:
-            if isActivationHovered || isRowHovered {
-                return DashboardTokens.accent.opacity(0.58)
-            }
-            return Color.white.opacity(0.16)
+            return isActivationHovered ? DashboardTokens.accent.opacity(0.58) : DashboardTokens.cardBorder
         case .relogin:
-            return DashboardTokens.statusOrange.opacity(0.72)
+            return DashboardTokens.statusOrange.opacity(0.52)
         case .none:
-            return DashboardTokens.accent.opacity(0.62)
+            return DashboardTokens.accent.opacity(0.4)
         }
     }
 
     private var rowBackgroundColor: Color {
         if row.isCurrent {
-            return DashboardTokens.accentBackground.opacity(isRowHovered ? 0.5 : 0.34)
+            return DashboardTokens.accentBackground.opacity(isRowHovered ? 0.58 : 0.44)
         }
         if row.primaryAction == .relogin {
-            return DashboardTokens.statusOrange.opacity(isRowHovered ? 0.16 : 0.1)
+            return DashboardTokens.statusOrange.opacity(isRowHovered ? 0.14 : 0.10)
         }
-        return Color.white.opacity(isRowHovered ? 0.05 : 0.025)
+        return isRowHovered ? DashboardTokens.cardBackgroundElevated : DashboardTokens.cardBackgroundSubtle
     }
 
     private var rowBorderColor: Color {
         if row.isCurrent {
-            return DashboardTokens.accent.opacity(isRowHovered ? 0.56 : 0.36)
+            return DashboardTokens.accent.opacity(isRowHovered ? 0.46 : 0.3)
         }
         if row.primaryAction == .relogin {
-            return DashboardTokens.statusOrange.opacity(isRowHovered ? 0.65 : 0.45)
+            return DashboardTokens.statusOrange.opacity(isRowHovered ? 0.42 : 0.24)
         }
-        return isRowHovered ? DashboardTokens.accent.opacity(0.24) : DashboardTokens.cardBorder
+        return isRowHovered ? DashboardTokens.cardBorderStrong : DashboardTokens.cardBorder
     }
 
-    private var primaryAreaHelpText: String {
+    private var statusColor: Color {
+        switch row.account.connectionState {
+        case .connected:
+            return DashboardTokens.statusGreen
+        case .needsLogin:
+            return DashboardTokens.statusOrange
+        case .error:
+            return DashboardTokens.statusRed
+        }
+    }
+
+    private var connectionLabel: String {
+        if row.isCurrent {
+            return "Current"
+        }
+
         switch row.primaryAction {
-        case .switchAccount:
-            return "Click row to expand details. Use checkbox to switch account"
         case .relogin:
-            return "Click row to expand details. Use checkbox to re-login account"
+            return "Needs Login"
+        case .switchAccount:
+            return "Available"
         case .none:
-            return "Current account. Click row to show usage details"
+            return row.account.connectionState.label
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 activationCheckboxButton
 
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
                             Text(row.name)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(DashboardTokens.Font.accountName())
                                 .foregroundStyle(DashboardTokens.textPrimary)
                                 .lineLimit(1)
 
-                            if row.isCurrent {
-                                Text("current")
-                                    .font(.system(size: 9, weight: .medium))
-                                    .tracking(0.5)
-                                    .foregroundStyle(DashboardTokens.accent)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 1)
-                                    .background(
-                                        Capsule()
-                                            .stroke(DashboardTokens.accent.opacity(0.4), lineWidth: 1)
-                                    )
-                            }
+                            AccountStatusPill(
+                                text: connectionLabel,
+                                color: row.isCurrent ? DashboardTokens.accent : statusColor
+                            )
                         }
 
-                        HStack(spacing: 8) {
-                            HStack(spacing: 2) {
-                                Text("5h")
-                                    .foregroundColor(DashboardTokens.textTertiary)
-                                Text(fiveHourPercentText)
-                                    .foregroundColor(DashboardTokens.textSecondary)
-                            }
-                            
-                            HStack(spacing: 2) {
-                                Text("wk")
-                                    .foregroundColor(DashboardTokens.textTertiary)
-                                Text(weeklyPercentText)
-                                    .foregroundColor(DashboardTokens.textSecondary)
-                            }
-                        }
-                        .font(.system(size: 11, weight: .regular))
+                        Text(row.workspaceEmailHint ?? row.resetText)
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                            .lineLimit(1)
                     }
 
                     Spacer(minLength: 8)
 
-                    inlineMicroBar
+                    VStack(alignment: .trailing, spacing: 8) {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("5h \(fiveHourPercentText) • Week \(weeklyPercentText)")
+                                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                                .foregroundStyle(DashboardTokens.textPrimary)
+                                .monospacedDigit()
+
+                            inlineMicroBar
+                        }
+
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
+                            .foregroundStyle(DashboardTokens.textTertiary)
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    }
                 }
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onRowTap)
@@ -195,11 +199,11 @@ struct DashboardAccountRow: View {
             }
 
             expandedContent
-                .padding(.top, isExpanded ? 10 : 0)
+                .padding(.top, isExpanded ? 14 : 0)
                 .frame(height: isExpanded ? nil : 0, alignment: .top)
                 .clipped()
                 .opacity(isExpanded ? 1 : 0)
-                .animation(.easeOut(duration: 0.2), value: isExpanded)
+                .animation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion), value: isExpanded)
         }
         .padding(.horizontal, DashboardTokens.Spacing.rowHPadding)
         .padding(.vertical, DashboardTokens.Spacing.rowVPadding)
@@ -213,15 +217,31 @@ struct DashboardAccountRow: View {
         )
         .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous))
         .onHover { isRowHovered = $0 }
-        .animation(.easeInOut(duration: 0.14), value: isRowHovered)
+        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isRowHovered)
+        .accessibilityElement(children: .contain)
+        .accessibilityHint("Use the primary action button to switch or re-login. Use row action to expand details.")
+        .accessibilityAction(named: Text(isExpanded ? "Collapse details" : "Expand details")) {
+            onToggleExpanded()
+        }
+    }
+
+    private var primaryAreaHelpText: String {
+        switch row.primaryAction {
+        case .switchAccount:
+            return "Click row to expand details. Use the leading button to switch accounts quickly."
+        case .relogin:
+            return "Click row to expand details. Use the leading button to start a fresh login."
+        case .none:
+            return "Current account. Click row to show usage details."
+        }
     }
 
     private var activationCheckboxButton: some View {
         Button(action: onActivate) {
             ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                Circle()
                     .fill(activationBackgroundColor)
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                Circle()
                     .stroke(activationBorderColor, lineWidth: 1)
 
                 if isPrimaryActionInProgress {
@@ -230,39 +250,41 @@ struct DashboardAccountRow: View {
                         .tint(DashboardTokens.accent)
                 } else {
                     Image(systemName: activationSymbol)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: DashboardTokens.scaled(12), weight: .semibold))
                         .foregroundStyle(activationForegroundColor)
                 }
             }
-            .frame(width: 28, height: 28)
+            .frame(width: DashboardTokens.scaled(28), height: DashboardTokens.scaled(28))
             .scaleEffect((isActivationHovered && !isActivationDisabled) ? 1.04 : 1)
         }
         .buttonStyle(.plain)
         .disabled(isActivationDisabled)
         .opacity(isActivationDisabled ? 0.52 : 1)
-        .help(activationHelpText + " (only this checkbox activates account)")
-        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityLabel(activationHelpText)
+        .accessibilityValue(isPrimaryActionInProgress ? "In progress" : "Ready")
+        .help(activationHelpText)
+        .contentShape(Circle())
         .onHover { isActivationHovered = $0 }
-        .animation(.easeInOut(duration: 0.12), value: isActivationHovered)
+        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isActivationHovered)
     }
 
     private var inlineMicroBar: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(Color.white.opacity(0.06))
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(Color.white.opacity(0.08))
 
-                RoundedRectangle(cornerRadius: 1.5)
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(progressColor)
                     .frame(width: geo.size.width * CGFloat(compactProgressFraction))
             }
         }
-        .frame(width: 44, height: 3)
+        .frame(width: DashboardTokens.scaled(70), height: DashboardTokens.scaled(5))
     }
 
     private var expandedContent: some View {
-        HStack(spacing: DashboardTokens.Spacing.cardGap) {
-            VStack(alignment: .leading, spacing: 8) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 expandedMetricBar(
                     label: "5H",
                     valueText: fiveHourPercentText,
@@ -276,14 +298,14 @@ struct DashboardAccountRow: View {
                     color: DashboardTokens.ringWeekly
                 )
             }
-            .frame(width: 176, alignment: .leading)
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            VStack(alignment: .trailing, spacing: 3) {
+            VStack(alignment: .trailing, spacing: 6) {
                 Text(row.resetText)
                     .font(DashboardTokens.Font.metadata())
-                    .foregroundStyle(DashboardTokens.textTertiary)
+                    .foregroundStyle(DashboardTokens.textSecondary)
+                    .multilineTextAlignment(.trailing)
 
                 if let email = row.workspaceEmailHint {
                     Text(email)
@@ -301,28 +323,29 @@ struct DashboardAccountRow: View {
         progress: Double,
         color: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
                 Text(label)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
                     .tracking(0.8)
                     .foregroundStyle(DashboardTokens.textTertiary)
                 Text(valueText)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DashboardTokens.Font.metadata().weight(.semibold))
                     .foregroundStyle(DashboardTokens.textPrimary)
+                    .monospacedDigit()
             }
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(Color.white.opacity(0.06))
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
 
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .fill(color)
                         .frame(width: geo.size.width * CGFloat(min(1, max(0, progress))))
                 }
             }
-            .frame(height: 4)
+            .frame(width: DashboardTokens.scaled(144), height: DashboardTokens.scaled(5))
         }
     }
 }

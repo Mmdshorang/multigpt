@@ -5,16 +5,17 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
     let titleForOption: (T) -> String
     @Binding var selection: T
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveredOption: T?
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             ForEach(options, id: \.self) { option in
                 let isSelected = selection == option
                 let isHovered = hoveredOption == option
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withAnimation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion)) {
                         selection = option
                     }
                 } label: {
@@ -24,31 +25,35 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
                         .minimumScaleFactor(0.85)
                         .allowsTightening(true)
                         .foregroundStyle(isSelected ? DashboardTokens.textPrimary : DashboardTokens.textSecondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, DashboardTokens.scaled(10))
+                        .padding(.vertical, DashboardTokens.scaled(6))
                         .frame(maxWidth: .infinity)
                         .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(isSelected ? DashboardTokens.segmentedActiveBackground : (isHovered ? Color.white.opacity(0.04) : Color.clear))
+                            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.smallRadius, style: .continuous)
+                                .fill(isSelected ? DashboardTokens.segmentedActiveBackground : (isHovered ? DashboardTokens.segmentedInactiveBackground : Color.clear))
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.smallRadius, style: .continuous)
                                 .stroke(isSelected ? DashboardTokens.segmentedActiveBorder : Color.clear, lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
+                .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.smallRadius, style: .continuous))
+                .accessibilityLabel(titleForOption(option))
+                .accessibilityValue(isSelected ? "Selected" : "Not selected")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
                 .onHover { hovering in
                     hoveredOption = hovering ? option : nil
                 }
             }
         }
-        .padding(3)
+        .padding(DashboardTokens.scaled(3))
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                 .fill(DashboardTokens.segmentedTrackBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                 .stroke(DashboardTokens.cardBorder, lineWidth: 1)
         )
     }

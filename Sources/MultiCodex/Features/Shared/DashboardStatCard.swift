@@ -5,8 +5,8 @@ struct DashboardSectionHeader: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(.system(size: 9, weight: .medium))
-            .tracking(1.2)
+            .font(DashboardTokens.Font.sectionLabel())
+            .tracking(1.1)
             .foregroundStyle(DashboardTokens.textTertiary)
     }
 }
@@ -17,30 +17,24 @@ struct DashboardStatCard: View {
     var sublabel: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
             DashboardSectionHeader(title: label)
 
             Text(value)
-                .font(DashboardTokens.Font.cardHeading())
+                .font(DashboardTokens.Font.statValue())
                 .foregroundStyle(DashboardTokens.textPrimary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
 
             if let sublabel {
                 Text(sublabel)
                     .font(DashboardTokens.Font.metadata())
                     .foregroundStyle(DashboardTokens.textSecondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(DashboardTokens.Spacing.cardPadding)
-        .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(DashboardTokens.cardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
-        )
+        .frame(maxWidth: .infinity, minHeight: DashboardTokens.scaled(112), alignment: .leading)
+        .cardStyle(padding: DashboardTokens.Spacing.cardPadding, fill: DashboardTokens.cardBackgroundSubtle)
     }
 }

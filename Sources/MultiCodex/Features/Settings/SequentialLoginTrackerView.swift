@@ -3,10 +3,11 @@ import SwiftUI
 struct SequentialLoginTrackerView: View {
     @ObservedObject var viewModel: AccountsMenuViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         ZStack {
-            DashboardTokens.background
+            DashboardTokens.backgroundGradient
                 .ignoresSafeArea()
 
             if let state = viewModel.sequentialLoginState {
@@ -18,156 +19,179 @@ struct SequentialLoginTrackerView: View {
     }
 
     private func content(state: SequentialLoginState) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        settingsSectionIntro(
+        VStack(alignment: .leading, spacing: DashboardTokens.scaled(14)) {
+            SettingsPanelCard(fill: DashboardTokens.cardBackground) {
+                VStack(alignment: .leading, spacing: DashboardTokens.scaled(14)) {
+                    HStack(alignment: .top, spacing: DashboardTokens.scaled(12)) {
+                        trackerSectionIntro(
                             title: "Batch Login Tracker",
-                            description: "Sequentially create and login new accounts",
+                            description: "Monitor each account login step and recover cleanly when one fails.",
                             symbol: "list.number"
                         )
-                        Spacer()
+
+                        Spacer(minLength: DashboardTokens.scaled(10))
+
+                        statusBadge(state: state)
                     }
 
-                    HStack(spacing: 8) {
+                    ProgressView(value: Double(state.completedCount), total: Double(max(1, state.totalCount)))
+                        .tint(statusColor(state: state))
+
+                    Text(statusLine(state: state))
+                        .font(DashboardTokens.Font.metadata().weight(.semibold))
+                        .foregroundStyle(statusColor(state: state))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    LazyVGrid(columns: metricsColumns, spacing: DashboardTokens.scaled(10)) {
                         trackerMetric(label: "Total", value: "\(state.totalCount)")
                         trackerMetric(label: "Done", value: "\(state.completedCount)")
                         trackerMetric(label: "Success", value: "\(state.successCount)")
                         trackerMetric(label: "Failed", value: "\(state.failedCount)")
                     }
-
-                    ProgressView(value: Double(state.completedCount), total: Double(max(1, state.totalCount)))
-                        .tint(DashboardTokens.accent)
-
-                    Text(statusLine(state: state))
-                        .font(DashboardTokens.Font.metadata().weight(.semibold))
-                        .foregroundStyle(statusColor(state: state))
                 }
             }
 
-            SettingsPanelCard(padding: 10) {
-                ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
-                            row(item: item, index: index, isCurrent: state.currentIndex == index)
+            SettingsPanelCard(padding: DashboardTokens.Spacing.compactCardPadding) {
+                VStack(alignment: .leading, spacing: DashboardTokens.scaled(10)) {
+                    HStack(alignment: .center) {
+                        DashboardSectionHeader(title: "Timeline")
+                        Spacer(minLength: DashboardTokens.scaled(8))
+                        Text("\(state.completedCount)/\(state.totalCount)")
+                            .font(DashboardTokens.Font.metadata().weight(.semibold))
+                            .foregroundStyle(DashboardTokens.textTertiary)
+                            .monospacedDigit()
+                    }
+
+                    ScrollView {
+                        LazyVStack(spacing: DashboardTokens.scaled(8)) {
+                            ForEach(Array(state.items.enumerated()), id: \.element.id) { index, item in
+                                row(item: item, index: index, isCurrent: state.currentIndex == index)
+                            }
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: DashboardTokens.scaled(220))
                 }
-                .frame(minHeight: 220)
             }
 
             if state.isFinished {
-                SettingsPanelCard {
-                    settingsInfoRow(
-                        symbol: state.failedCount == 0 ? "checkmark.seal.fill" : "exclamationmark.triangle.fill",
-                        text: "Finished: \(state.successCount) succeeded, \(state.failedCount) failed.",
-                        color: state.failedCount == 0 ? DashboardTokens.statusGreen : DashboardTokens.statusOrange
-                    )
+                SettingsPanelCard(fill: DashboardTokens.cardBackgroundSubtle) {
+                    HStack(alignment: .top, spacing: DashboardTokens.scaled(10)) {
+                        Image(systemName: state.failedCount == 0 ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                            .font(.system(size: DashboardTokens.scaled(11), weight: .semibold))
+                            .foregroundStyle(state.failedCount == 0 ? DashboardTokens.statusGreen : DashboardTokens.statusOrange)
+                            .padding(.top, DashboardTokens.scaled(2))
+
+                        Text("Finished with \(state.successCount) successful logins, \(state.failedCount) failures, and \(state.cancelledCount) cancelled steps.")
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Spacer(minLength: 0)
+                    }
                 }
             }
 
-            HStack(spacing: 8) {
-                ActionPillButton(
-                    title: state.isFinished ? "Run Again" : "Start",
-                    symbol: "play.fill",
-                    role: .primary,
-                    isDisabled: !canStart(state)
-                ) {
-                    viewModel.startSequentialNewAccountLogin()
-                }
+            SettingsPanelCard(fill: DashboardTokens.cardBackgroundSubtle) {
+                HStack(spacing: DashboardTokens.scaled(8)) {
+                    ActionPillButton(
+                        title: state.isFinished ? "Run Again" : "Start",
+                        symbol: "play.fill",
+                        role: .primary,
+                        isDisabled: !canStart(state)
+                    ) {
+                        viewModel.startSequentialNewAccountLogin()
+                    }
 
-                ActionPillButton(
-                    title: state.cancellationRequested ? "Stopping..." : "Cancel",
-                    symbol: "xmark",
-                    role: .secondary,
-                    isDisabled: !state.isRunning || state.cancellationRequested
-                ) {
-                    viewModel.cancelSequentialNewAccountLogin()
-                }
+                    ActionPillButton(
+                        title: state.cancellationRequested ? "Stopping" : "Cancel",
+                        symbol: "xmark",
+                        role: .secondary,
+                        isDisabled: !state.isRunning || state.cancellationRequested
+                    ) {
+                        viewModel.cancelSequentialNewAccountLogin()
+                    }
 
-                ActionPillButton(
-                    title: "Retry Failed Only",
-                    symbol: "arrow.clockwise",
-                    role: .secondary,
-                    isDisabled: !(state.isFinished && state.hasFailures && !state.isRunning)
-                ) {
-                    viewModel.retryFailedSequentialNewAccountLogin()
-                }
+                    ActionPillButton(
+                        title: "Retry Failed",
+                        symbol: "arrow.clockwise",
+                        role: .secondary,
+                        isDisabled: !(state.isFinished && state.hasFailures && !state.isRunning)
+                    ) {
+                        viewModel.retryFailedSequentialNewAccountLogin()
+                    }
 
-                Spacer()
+                    Spacer(minLength: 0)
 
-                ActionPillButton(
-                    title: "Close",
-                    symbol: "xmark.circle",
-                    role: .secondary
-                ) {
-                    dismiss()
+                    ActionPillButton(
+                        title: "Close",
+                        symbol: "xmark.circle",
+                        role: .secondary
+                    ) {
+                        dismiss()
+                    }
                 }
             }
         }
-        .padding(14)
+        .padding(DashboardTokens.scaled(16))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SettingsPanelCard {
-                settingsSectionIntro(
-                    title: "No Batch Prepared",
-                    description: "Go to Settings > Accounts, pick a count, and click Start Batch Login.",
-                    symbol: "tray"
-                )
-            }
+        VStack(alignment: .leading, spacing: DashboardTokens.scaled(14)) {
+            SettingsPanelCard(fill: DashboardTokens.cardBackground) {
+                VStack(alignment: .leading, spacing: DashboardTokens.scaled(12)) {
+                    trackerSectionIntro(
+                        title: "No Batch Prepared",
+                        description: "Open Accounts settings, choose a count, and start a new batch login.",
+                        symbol: "tray"
+                    )
 
-            HStack {
-                Spacer()
-                ActionPillButton(title: "Close", symbol: "xmark.circle", role: .secondary) {
-                    dismiss()
+                    Text("The tracker appears here only after creating a batch. This keeps the workflow quiet when no background onboarding is running.")
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: DashboardTokens.scaled(8)) {
+                        ActionPillButton(
+                            title: "Open Accounts Settings",
+                            symbol: "gearshape.fill",
+                            role: .primary
+                        ) {
+                            openAccountsSettingsAndClose()
+                        }
+
+                        ActionPillButton(title: "Close", symbol: "xmark.circle", role: .secondary) {
+                            dismiss()
+                        }
+                    }
                 }
             }
+
+            Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(DashboardTokens.scaled(16))
     }
 
     private func row(item: SequentialLoginItem, index: Int, isCurrent: Bool) -> some View {
-        let color: Color
-        let symbol: String
-        switch item.status {
-        case .pending:
-            color = DashboardTokens.textTertiary
-            symbol = "circle"
-        case .inProgress:
-            color = DashboardTokens.accent
-            symbol = "arrow.triangle.2.circlepath"
-        case .success:
-            color = DashboardTokens.statusGreen
-            symbol = "checkmark.circle.fill"
-        case .failed:
-            color = DashboardTokens.statusRed
-            symbol = "xmark.octagon.fill"
-        case .cancelled:
-            color = DashboardTokens.statusOrange
-            symbol = "stop.circle.fill"
-        }
+        let appearance = rowAppearance(for: item.status)
 
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Image(systemName: symbol)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(color)
-                    .frame(width: 14)
+        return VStack(alignment: .leading, spacing: DashboardTokens.scaled(5)) {
+            HStack(spacing: DashboardTokens.scaled(9)) {
+                Image(systemName: appearance.symbol)
+                    .font(.system(size: DashboardTokens.scaled(11), weight: .semibold))
+                    .foregroundStyle(appearance.color)
+                    .frame(width: DashboardTokens.scaled(14))
 
                 Text("\(index + 1). \(item.resolvedAccountName ?? item.accountName)")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DashboardTokens.Font.metadata().weight(.semibold))
                     .foregroundStyle(DashboardTokens.textPrimary)
+                    .lineLimit(1)
 
-                Spacer()
+                Spacer(minLength: DashboardTokens.scaled(10))
 
                 Text(item.status.rawValue.capitalized)
-                    .font(DashboardTokens.Font.metadata().weight(.semibold))
-                    .foregroundStyle(color)
+                    .font(.system(size: DashboardTokens.scaled(10), weight: .semibold))
+                    .foregroundStyle(appearance.color)
             }
 
             if let message = item.message?.trimmingCharacters(in: .whitespacesAndNewlines), !message.isEmpty {
@@ -177,37 +201,86 @@ struct SequentialLoginTrackerView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DashboardTokens.scaled(11))
+        .padding(.vertical, DashboardTokens.scaled(9))
         .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill((isCurrent ? DashboardTokens.accent.opacity(0.10) : Color.white.opacity(0.02)))
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .fill(isCurrent ? DashboardTokens.accentBackground.opacity(0.7) : DashboardTokens.cardBackgroundSubtle)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .stroke((isCurrent ? DashboardTokens.accent.opacity(0.35) : Color.white.opacity(0.05)), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .stroke(isCurrent ? DashboardTokens.accent.opacity(0.42) : DashboardTokens.cardBorder, lineWidth: 1)
         )
     }
 
     private func trackerMetric(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased())
-                .font(DashboardTokens.Font.sectionLabel())
-                .foregroundStyle(DashboardTokens.textTertiary)
+        VStack(alignment: .leading, spacing: DashboardTokens.scaled(4)) {
+            DashboardSectionHeader(title: label)
             Text(value)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: DashboardTokens.scaled(16), weight: .semibold))
                 .foregroundStyle(DashboardTokens.textPrimary)
+                .monospacedDigit()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
+        .padding(DashboardTokens.scaled(10))
         .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(Color.white.opacity(0.02))
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .fill(DashboardTokens.cardBackgroundSubtle)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
         )
+    }
+
+    private var metricsColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: DashboardTokens.scaled(8)), count: 4)
+    }
+
+    private func statusBadge(state: SequentialLoginState) -> some View {
+        let color = statusColor(state: state)
+        let title: String
+        if state.isRunning {
+            title = state.cancellationRequested ? "Stopping" : "Running"
+        } else if state.isFinished {
+            title = state.hasFailures ? "Finished with Issues" : "Completed"
+        } else {
+            title = "Ready"
+        }
+
+        return HStack(spacing: DashboardTokens.scaled(6)) {
+            Circle()
+                .fill(color)
+                .frame(width: DashboardTokens.scaled(7), height: DashboardTokens.scaled(7))
+            Text(title)
+                .font(.system(size: DashboardTokens.scaled(10), weight: .semibold))
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, DashboardTokens.scaled(10))
+        .padding(.vertical, DashboardTokens.scaled(7))
+        .background(
+            Capsule()
+                .fill(color.opacity(0.12))
+        )
+        .overlay(
+            Capsule()
+                .stroke(color.opacity(0.24), lineWidth: 1)
+        )
+    }
+
+    private func rowAppearance(for status: SequentialLoginItemStatus) -> (color: Color, symbol: String) {
+        switch status {
+        case .pending:
+            return (DashboardTokens.textTertiary, "circle")
+        case .inProgress:
+            return (DashboardTokens.accent, "arrow.triangle.2.circlepath")
+        case .success:
+            return (DashboardTokens.statusGreen, "checkmark.circle.fill")
+        case .failed:
+            return (DashboardTokens.statusRed, "xmark.octagon.fill")
+        case .cancelled:
+            return (DashboardTokens.statusOrange, "stop.circle.fill")
+        }
     }
 
     private func canStart(_ state: SequentialLoginState) -> Bool {
@@ -221,20 +294,20 @@ struct SequentialLoginTrackerView: View {
     private func statusLine(state: SequentialLoginState) -> String {
         if state.isRunning {
             if state.cancellationRequested {
-                return "Stopping after current step and cleaning up unfinished accounts..."
+                return "Stopping after the current step and cleaning unfinished items."
             }
             if let currentIndex = state.currentIndex, currentIndex < state.items.count {
                 let current = state.items[currentIndex]
-                return "Logging in \(current.accountName) (\(currentIndex + 1)/\(state.totalCount))"
+                return "Logging in \(current.accountName) (\(currentIndex + 1) of \(state.totalCount))."
             }
-            return "Running batch login..."
+            return "Running batch login."
         }
 
         if state.isFinished {
-            return "Finished: \(state.successCount) succeeded, \(state.failedCount) failed, \(state.cancelledCount) cancelled."
+            return "Run complete. Review any failed items and retry only what needs attention."
         }
 
-        return "Ready to start."
+        return "Ready to start this batch."
     }
 
     private func statusColor(state: SequentialLoginState) -> Color {
@@ -247,14 +320,15 @@ struct SequentialLoginTrackerView: View {
         return DashboardTokens.textSecondary
     }
 
-    private func settingsSectionIntro(title: String, description: String, symbol: String) -> some View {
-        HStack(spacing: 8) {
+    private func trackerSectionIntro(title: String, description: String, symbol: String) -> some View {
+        HStack(alignment: .top, spacing: DashboardTokens.scaled(9)) {
             Image(systemName: symbol)
                 .font(DashboardTokens.Font.cardHeading())
                 .foregroundStyle(DashboardTokens.accent)
-                .frame(width: 16)
+                .frame(width: DashboardTokens.scaled(16))
+                .padding(.top, DashboardTokens.scaled(1))
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DashboardTokens.scaled(4)) {
                 Text(title)
                     .font(DashboardTokens.Font.cardHeading())
                     .foregroundStyle(DashboardTokens.textPrimary)
@@ -267,15 +341,9 @@ struct SequentialLoginTrackerView: View {
         }
     }
 
-    private func settingsInfoRow(symbol: String, text: String, color: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(DashboardTokens.Font.metadata().weight(.semibold))
-                .foregroundStyle(color)
-            Text(text)
-                .font(DashboardTokens.Font.metadata())
-                .foregroundStyle(DashboardTokens.textSecondary)
-            Spacer(minLength: 0)
-        }
+    private func openAccountsSettingsAndClose() {
+        viewModel.selectSettingsSection(.accounts)
+        openWindow(id: "settings")
+        dismiss()
     }
 }

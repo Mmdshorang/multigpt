@@ -2,119 +2,126 @@ import SwiftUI
 
 extension SettingsContentView {
     var systemPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
+            settingsHero(
+                title: "System",
+                description: "Keep the Codex runtime trustworthy, make diagnostics obvious, and avoid mysterious failures caused by path or refresh issues.",
+                symbol: "terminal.fill"
+            ) {
+                settingsBadge(
+                    text: viewModel.isCodexRuntimeAvailable ? "Runtime Ready" : "Runtime Needs Attention",
+                    symbol: runtimeStatus.symbol,
+                    color: runtimeStatus.color
+                )
+            }
+
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Runtime",
-                        description: "Codex CLI configuration",
-                        symbol: "terminal.fill"
+                        description: "Use automatic detection when possible, and only pin a custom path when you need deterministic behavior.",
+                        symbol: "terminal"
                     )
 
-                    HStack(spacing: 8) {
-                        Image(systemName: runtimeStatus.symbol)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(runtimeStatus.color)
-
-                        Text(runtimeStatus.text)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(runtimeStatus.color)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(runtimeStatus.color.opacity(0.06))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(runtimeStatus.color.opacity(0.15), lineWidth: 1)
-                    )
-
-                    HStack(spacing: 8) {
-                        SettingsTextField(
-                            placeholder: "/opt/homebrew/bin/codex",
-                            text: $codexPathDraft
-                        )
-
-                        ActionPillButton(title: "Choose", symbol: "folder") {
-                            viewModel.chooseCustomCodexPath()
-                        }
+                    HStack(alignment: .top, spacing: DashboardTokens.scaled(12)) {
+                        settingsBadge(text: runtimeStatus.text, symbol: runtimeStatus.symbol, color: runtimeStatus.color)
+                        Spacer(minLength: 0)
                     }
 
-                    HStack(spacing: 8) {
-                        ActionPillButton(title: "Save", symbol: "checkmark", role: .primary) {
-                            viewModel.updateCustomCodexPath(codexPathDraft)
-                        }
-                        .disabled(normalized(codexPathDraft) == viewModel.customCodexPath)
+                    settingsInsetPanel(title: "EXECUTABLE", description: "Point MultiCodex to the exact `codex` binary if automatic resolution is not finding the right one.") {
+                        VStack(alignment: .leading, spacing: DashboardTokens.scaled(10)) {
+                            HStack(spacing: DashboardTokens.scaled(10)) {
+                                SettingsTextField(
+                                    placeholder: "/opt/homebrew/bin/codex",
+                                    text: $codexPathDraft
+                                )
 
-                        ActionPillButton(title: "Auto", symbol: "sparkles") {
-                            codexPathDraft = ""
-                            viewModel.clearCustomCodexPath()
+                                ActionPillButton(title: "Choose", symbol: "folder") {
+                                    viewModel.chooseCustomCodexPath()
+                                }
+                            }
+
+                            HStack(spacing: DashboardTokens.scaled(8)) {
+                                ActionPillButton(title: "Save Path", symbol: "checkmark", role: .primary) {
+                                    viewModel.updateCustomCodexPath(codexPathDraft)
+                                }
+                                .disabled(normalized(codexPathDraft) == viewModel.customCodexPath)
+
+                                ActionPillButton(title: "Use Automatic Detection", symbol: "sparkles") {
+                                    codexPathDraft = ""
+                                    viewModel.clearCustomCodexPath()
+                                }
+                                .disabled(viewModel.customCodexPath.isEmpty)
+                            }
                         }
-                        .disabled(viewModel.customCodexPath.isEmpty)
                     }
 
                     if let probe = viewModel.runtimeProbeSummary, !probe.isEmpty {
-                        Text(probe)
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        settingsInfoRow(symbol: "info.circle", text: probe, color: DashboardTokens.textTertiary)
                     }
                 }
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Diagnostics",
-                        description: "System information and tools",
+                        description: "Surface the operational details you need without forcing you into the terminal for every small question.",
                         symbol: "stethoscope"
                     )
 
-                    HStack(spacing: 8) {
-                        ActionPillButton(title: "Open Config", symbol: "folder.fill") {
+                    HStack(spacing: DashboardTokens.scaled(8)) {
+                        ActionPillButton(title: "Open Config Folder", symbol: "folder.fill") {
                             viewModel.openMulticodexConfigDirectory()
                         }
 
-                        ActionPillButton(title: "Refresh Live", symbol: "bolt.horizontal.fill", role: .primary) {
+                        ActionPillButton(title: "Run Live Refresh", symbol: "bolt.horizontal.fill", role: .primary) {
                             viewModel.refreshLive()
                         }
                     }
 
                     if let hint = viewModel.cliResolutionHint {
-                        Text(hint)
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        settingsInsetPanel(title: "RESOLUTION NOTES") {
+                            Text(hint)
+                                .font(DashboardTokens.Font.metadata())
+                                .foregroundStyle(DashboardTokens.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     } else {
-                        Text("Run a refresh to capture command resolution details.")
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
+                        settingsInfoRow(
+                            symbol: "arrow.clockwise",
+                            text: "Run a live refresh to capture fresh runtime resolution details.",
+                            color: DashboardTokens.textTertiary
+                        )
                     }
                 }
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
-                        title: "Cache",
-                        description: "Data refresh interval",
+                        title: "Refresh Cache",
+                        description: "A shorter interval feels more alive, but a slightly longer interval is often calmer and easier on the CLI.",
                         symbol: "timer"
                     )
 
-                    settingsFormRow("Refresh interval", icon: "arrow.triangle.2.circlepath") {
-                        Stepper(value: limitsCacheTTLMinutesBinding, in: 1...120) {
+                    settingsFormRow("Refresh interval", detail: "Choose how often background usage data is refreshed.", icon: "arrow.triangle.2.circlepath") {
+                        HStack(spacing: DashboardTokens.scaled(12)) {
                             Text("\(viewModel.limitsCacheTTLMinutes) min")
                                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                                 .foregroundStyle(DashboardTokens.textPrimary)
+                                .monospacedDigit()
+
+                            Stepper("", value: limitsCacheTTLMinutesBinding, in: 1...120)
+                                .labelsHidden()
                         }
                     }
 
-                    Text("Lower values update more frequently but may impact performance.")
-                        .font(DashboardTokens.Font.metadata())
-                        .foregroundStyle(DashboardTokens.textSecondary)
+                    settingsInfoRow(
+                        symbol: "lightbulb",
+                        text: "Lower values update more frequently but may cost responsiveness and make the app feel busier than it needs to.",
+                        color: DashboardTokens.textTertiary
+                    )
                 }
             }
         }
