@@ -5,7 +5,7 @@ extension SettingsContentView {
         VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
             settingsHero(
                 title: "About",
-                description: "A focused utility for people who actively manage multiple Codex accounts and want the experience to stay clear under pressure.",
+                description: "Version, shortcuts, and support links.",
                 symbol: "app.badge"
             ) {
                 settingsBadge(text: "Version \(appVersion)", symbol: "number", color: DashboardTokens.accent)
@@ -36,7 +36,7 @@ extension SettingsContentView {
                         Spacer()
                     }
 
-                    Text("Manage multiple Codex CLI accounts, compare usage at a glance, and keep switching simple when limits or login state change mid-session.")
+                    Text("Menu bar utility for managing multiple Codex accounts.")
                         .font(.system(size: DashboardTokens.scaled(12), weight: .regular))
                         .foregroundStyle(DashboardTokens.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -54,7 +54,7 @@ extension SettingsContentView {
                 VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Keyboard Shortcuts",
-                        description: "The two commands you are most likely to want when the app is already open.",
+                        description: "Quick actions.",
                         symbol: "keyboard"
                     )
 
@@ -69,7 +69,7 @@ extension SettingsContentView {
                 VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Support",
-                        description: "Open the project or report a problem without digging for links.",
+                        description: "Project and issue links.",
                         symbol: "questionmark.circle"
                     )
 

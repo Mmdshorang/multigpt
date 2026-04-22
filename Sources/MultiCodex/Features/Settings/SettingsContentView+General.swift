@@ -5,7 +5,7 @@ extension SettingsContentView {
         VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
             settingsHero(
                 title: "General",
-                description: "Keep the menu bar calm and readable while staying ahead of account availability, refresh health, and automation behavior.",
+                description: "General behavior and menu display settings.",
                 symbol: "slider.horizontal.3"
             ) {
                 VStack(alignment: .trailing, spacing: 8) {
@@ -34,7 +34,7 @@ extension SettingsContentView {
                     HStack(alignment: .top, spacing: DashboardTokens.scaled(16)) {
                         settingsSectionIntro(
                             title: "Overview",
-                            description: "A quick read on account health and the state of your runtime before you do anything else.",
+                            description: "Account and runtime status.",
                             symbol: "chart.bar.fill"
                         )
 
@@ -65,7 +65,7 @@ extension SettingsContentView {
                         DashboardStatCard(
                             label: "Accounts",
                             value: "\(viewModel.accounts.count)",
-                            sublabel: viewModel.accounts.isEmpty ? "Add your first account" : "Configured in MultiCodex"
+                            sublabel: viewModel.accounts.isEmpty ? "No accounts" : "Configured"
                         )
 
                         DashboardStatCard(
@@ -91,7 +91,7 @@ extension SettingsContentView {
                 VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Menu Appearance",
-                        description: "Tune information density without losing the calm, glanceable quality a menu bar utility needs.",
+                        description: "Control density and display format.",
                         symbol: "paintbrush.fill"
                     )
 
@@ -130,7 +130,7 @@ extension SettingsContentView {
                 VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Auto-Switching",
-                        description: "Let MultiCodex recover gracefully when an account is exhausted or needs to be re-authenticated.",
+                        description: "Automatic account switching behavior.",
                         symbol: "arrow.triangle.swap"
                     )
 
@@ -144,7 +144,7 @@ extension SettingsContentView {
                             .frame(maxWidth: DashboardTokens.scaled(360))
                         }
 
-                        settingsInsetPanel(title: "NOTIFICATIONS", description: "Keep notifications available for automatic changes, then send a quick test to confirm the experience feels right.") {
+                        settingsInsetPanel(title: "NOTIFICATIONS", description: "Enable notifications and send a test alert.") {
                             HStack(spacing: DashboardTokens.scaled(12)) {
                                 SettingsToggle(label: "Show notifications", isOn: autoSwitchNotificationsBinding)
 

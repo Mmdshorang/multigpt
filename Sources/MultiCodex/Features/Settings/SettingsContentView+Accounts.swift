@@ -5,7 +5,7 @@ extension SettingsContentView {
         VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
             settingsHero(
                 title: "Accounts",
-                description: "Manage identities, keep usage readable, and make switching or recovery feel simple even when you are juggling several accounts.",
+                description: "Manage accounts, login, and sorting.",
                 symbol: "person.2.fill"
             ) {
                 VStack(alignment: .trailing, spacing: 8) {
@@ -25,11 +25,11 @@ extension SettingsContentView {
             SettingsPanelCard {
                 VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     HStack(alignment: .top, spacing: DashboardTokens.scaled(16)) {
-                        settingsSectionIntro(
-                            title: "Add Accounts",
-                            description: "Start a new login instantly or queue a short batch when you are preparing fresh accounts.",
-                            symbol: "person.crop.circle.badge.plus"
-                        )
+                    settingsSectionIntro(
+                        title: "Add Accounts",
+                        description: "Start a single or batch login.",
+                        symbol: "person.crop.circle.badge.plus"
+                    )
 
                         Spacer(minLength: DashboardTokens.scaled(12))
 
@@ -45,7 +45,7 @@ extension SettingsContentView {
 
                     settingsInsetPanel(
                         title: "BATCH LOGIN",
-                        description: "Create and log in multiple new accounts sequentially. Keep the batch modest so the flow stays predictable and easy to monitor."
+                        description: "Log in multiple accounts in sequence."
                     ) {
                         HStack(spacing: 10) {
                             SettingsTextField(
@@ -91,7 +91,7 @@ extension SettingsContentView {
 
                         settingsInfoRow(
                             symbol: "clock",
-                            text: "This usually completes quickly after startup or a live refresh.",
+                            text: "Loading account and usage data.",
                             color: DashboardTokens.textTertiary
                         )
                     }
@@ -101,7 +101,7 @@ extension SettingsContentView {
                     VStack(alignment: .leading, spacing: 14) {
                         settingsSectionIntro(
                             title: "No Accounts Yet",
-                            description: "Log in your first Codex account to unlock usage tracking, switching, and automation.",
+                            description: "Log in your first account.",
                             symbol: "person.2.slash"
                         )
 
@@ -134,7 +134,7 @@ extension SettingsContentView {
                     VStack(alignment: .leading, spacing: 16) {
                         settingsSectionIntro(
                             title: "Organize the List",
-                            description: "Find what you need quickly and keep sort rules aligned with how you actually choose accounts.",
+                            description: "Search and sort accounts.",
                             symbol: "line.3.horizontal.decrease.circle"
                         )
 
@@ -193,7 +193,7 @@ extension SettingsContentView {
 
                         settingsInfoRow(
                             symbol: "info.circle",
-                            text: "Current account pinning stays intact in the menu bar, while settings sorting includes every account so maintenance work remains predictable. Accounts without usage data are still pushed to the bottom.",
+                            text: "Menu view pins current account first. Accounts without usage stay at the bottom.",
                             color: DashboardTokens.textTertiary
                         )
                     }
@@ -225,6 +225,24 @@ extension SettingsContentView {
                     }
                 }
             }
+        }
+        .alert(
+            "Delete Account?",
+            isPresented: Binding(
+                get: { pendingRemovalAccountName != nil },
+                set: { if !$0 { pendingRemovalAccountName = nil } }
+            ),
+            presenting: pendingRemovalAccountName
+        ) { accountName in
+            Button("Cancel", role: .cancel) {
+                pendingRemovalAccountName = nil
+            }
+            Button("Delete", role: .destructive) {
+                viewModel.removeAccount(named: accountName, deleteData: true)
+                pendingRemovalAccountName = nil
+            }
+        } message: { accountName in
+            Text("This will remove \(accountName) and delete its local account data.")
         }
     }
 
@@ -355,20 +373,18 @@ extension SettingsContentView {
             }
 
             if account.usage.fiveHour.usedPercent != nil || account.usage.weekly.usedPercent != nil {
-                settingsInsetPanel(title: "USAGE", description: "Quickly compare short-window pressure against weekly headroom before switching or retiring this account.") {
-                    HStack(spacing: DashboardTokens.scaled(12)) {
-                        AccountUsageMetricCard(
+                expandedDetailSection(title: "USAGE", description: "Compare 5h and weekly usage.") {
+                    VStack(spacing: DashboardTokens.scaled(10)) {
+                        inlineUsageMetricRow(
                             title: "5h",
                             metric: account.usage.fiveHour,
-                            resetDisplayMode: viewModel.resetDisplayMode,
                             progressValue: viewModel.progressValue(for: account.usage.fiveHour),
                             valueText: viewModel.displayPercentText(for: account.usage.fiveHour)
                         )
 
-                        AccountUsageMetricCard(
+                        inlineUsageMetricRow(
                             title: "Weekly",
                             metric: account.usage.weekly,
-                            resetDisplayMode: viewModel.resetDisplayMode,
                             progressValue: viewModel.progressValue(for: account.usage.weekly),
                             valueText: viewModel.displayPercentText(for: account.usage.weekly)
                         )
@@ -376,7 +392,9 @@ extension SettingsContentView {
                 }
             }
 
-            settingsInsetPanel(title: "RENAME", description: "Use a stable, human-readable name so switching remains obvious in the menu bar.") {
+            sectionDivider
+
+            expandedDetailSection(title: "RENAME", description: "Rename this account.") {
                 HStack(spacing: 10) {
                     SettingsTextField(
                         placeholder: "New name",
@@ -390,25 +408,14 @@ extension SettingsContentView {
                 }
             }
 
-            settingsInsetPanel(title: "REMOVE", description: "Only remove accounts you no longer need. You can optionally delete local data at the same time.") {
-                VStack(alignment: .leading, spacing: 12) {
-                    SettingsToggle(
-                        label: "Delete local account data on removal",
-                        isOn: removeStoredDataBinding(for: account.name)
-                    )
+            sectionDivider
 
-                    SettingsDestructiveButton(
-                        title: removeStoredDataBinding(for: account.name).wrappedValue
-                            ? "Remove and Delete Data"
-                            : "Remove from MultiCodex",
-                        isDisabled: isAccountActionRunning
-                    ) {
-                        viewModel.removeAccount(
-                            named: account.name,
-                            deleteData: removeStoredDataBinding(for: account.name).wrappedValue
-                        )
-                        removalDeleteDataChoice[account.name] = false
-                    }
+            expandedDetailSection(title: "REMOVE", description: "Delete this account and its local data.") {
+                SettingsDestructiveButton(
+                    title: "Delete Account",
+                    isDisabled: isAccountActionRunning
+                ) {
+                    pendingRemovalAccountName = account.name
                 }
             }
         }
@@ -420,6 +427,82 @@ extension SettingsContentView {
         } else {
             expandedAccountNames.insert(accountName)
         }
+    }
+
+    private var sectionDivider: some View {
+        Rectangle()
+            .fill(DashboardTokens.cardBorder.opacity(0.9))
+            .frame(height: 1)
+    }
+
+    private func expandedDetailSection<Content: View>(
+        title: String,
+        description: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+            DashboardSectionHeader(title: title)
+
+            Text(description)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func inlineUsageMetricRow(
+        title: String,
+        metric: UsageMetric,
+        progressValue: Double,
+        valueText: String
+    ) -> some View {
+        let tone: Color = {
+            switch UsageLevel.from(usedPercent: metric.usedPercent) {
+            case .critical:
+                return DashboardTokens.statusRed
+            case .warning:
+                return DashboardTokens.statusOrange
+            case .normal:
+                return DashboardTokens.accentSoft
+            }
+        }()
+
+        return VStack(alignment: .leading, spacing: DashboardTokens.scaled(6)) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title.uppercased())
+                    .font(DashboardTokens.Font.sectionLabel())
+                    .tracking(1.0)
+                    .foregroundStyle(DashboardTokens.textTertiary)
+
+                Spacer(minLength: DashboardTokens.scaled(8))
+
+                Text(valueText)
+                    .font(DashboardTokens.Font.metadata().weight(.semibold))
+                    .foregroundStyle(DashboardTokens.textPrimary)
+                    .monospacedDigit()
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: DashboardTokens.scaled(3), style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+
+                    RoundedRectangle(cornerRadius: DashboardTokens.scaled(3), style: .continuous)
+                        .fill(tone)
+                        .frame(width: geo.size.width * CGFloat(min(1, max(0, progressValue))))
+                }
+            }
+            .frame(height: DashboardTokens.scaled(5))
+
+            Text(metric.resetText(mode: viewModel.resetDisplayMode))
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textTertiary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     func syncExpandedAccounts() {

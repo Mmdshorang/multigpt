@@ -119,21 +119,6 @@ extension SettingsContentView {
         }
     }
 
-    func removeStoredDataBinding(for accountName: String) -> Binding<Bool> {
-        Binding(
-            get: { removalDeleteDataChoice[accountName] ?? false },
-            set: { removalDeleteDataChoice[accountName] = $0 }
-        )
-    }
-
-    func syncRemovalChoices() {
-        let names = Set(viewModel.accounts.map(\.name))
-        removalDeleteDataChoice = removalDeleteDataChoice.filter { names.contains($0.key) }
-        for account in viewModel.accounts where removalDeleteDataChoice[account.name] == nil {
-            removalDeleteDataChoice[account.name] = false
-        }
-    }
-
     func isSelectedAccount(_ name: String) -> Bool {
         viewModel.selectedSettingsAccountName == name
     }

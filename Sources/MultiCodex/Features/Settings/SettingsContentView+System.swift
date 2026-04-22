@@ -5,7 +5,7 @@ extension SettingsContentView {
         VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
             settingsHero(
                 title: "System",
-                description: "Keep the Codex runtime trustworthy, make diagnostics obvious, and avoid mysterious failures caused by path or refresh issues.",
+                description: "Runtime path, diagnostics, and refresh settings.",
                 symbol: "terminal.fill"
             ) {
                 settingsBadge(
@@ -19,7 +19,7 @@ extension SettingsContentView {
                 VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Runtime",
-                        description: "Use automatic detection when possible, and only pin a custom path when you need deterministic behavior.",
+                        description: "Configure Codex executable resolution.",
                         symbol: "terminal"
                     )
 
@@ -28,7 +28,7 @@ extension SettingsContentView {
                         Spacer(minLength: 0)
                     }
 
-                    settingsInsetPanel(title: "EXECUTABLE", description: "Point MultiCodex to the exact `codex` binary if automatic resolution is not finding the right one.") {
+                    settingsInsetPanel(title: "EXECUTABLE", description: "Set a custom `codex` path when auto-detection fails.") {
                         VStack(alignment: .leading, spacing: DashboardTokens.scaled(10)) {
                             HStack(spacing: DashboardTokens.scaled(10)) {
                                 SettingsTextField(
@@ -66,7 +66,7 @@ extension SettingsContentView {
                 VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Diagnostics",
-                        description: "Surface the operational details you need without forcing you into the terminal for every small question.",
+                        description: "Open config and inspect runtime resolution.",
                         symbol: "stethoscope"
                     )
 
@@ -90,7 +90,7 @@ extension SettingsContentView {
                     } else {
                         settingsInfoRow(
                             symbol: "arrow.clockwise",
-                            text: "Run a live refresh to capture fresh runtime resolution details.",
+                            text: "Run Live Refresh to populate resolution notes.",
                             color: DashboardTokens.textTertiary
                         )
                     }
@@ -101,7 +101,7 @@ extension SettingsContentView {
                 VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
                     settingsSectionIntro(
                         title: "Refresh Cache",
-                        description: "A shorter interval feels more alive, but a slightly longer interval is often calmer and easier on the CLI.",
+                        description: "Background refresh interval.",
                         symbol: "timer"
                     )
 
@@ -119,7 +119,7 @@ extension SettingsContentView {
 
                     settingsInfoRow(
                         symbol: "lightbulb",
-                        text: "Lower values update more frequently but may cost responsiveness and make the app feel busier than it needs to.",
+                        text: "Lower values refresh more often and increase CLI activity.",
                         color: DashboardTokens.textTertiary
                     )
                 }

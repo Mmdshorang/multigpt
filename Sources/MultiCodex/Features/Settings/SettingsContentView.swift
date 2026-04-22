@@ -8,10 +8,10 @@ struct SettingsContentView: View {
 
     @State var codexPathDraft = ""
     @State var renameDrafts: [String: String] = [:]
-    @State var removalDeleteDataChoice: [String: Bool] = [:]
     @State var expandedAccountNames: Set<String> = []
     @State var sequentialLoginCountText = "1"
     @State private var hoveredSidebarSection: SettingsSection?
+    @State var pendingRemovalAccountName: String?
 
     var body: some View {
         NavigationSplitView {
@@ -34,13 +34,11 @@ struct SettingsContentView: View {
         .onAppear {
             codexPathDraft = viewModel.customCodexPath
             syncRenameDrafts()
-            syncRemovalChoices()
             syncExpandedAccounts()
         }
         .onChange(of: viewModel.customCodexPath) { codexPathDraft = $0 }
         .onChange(of: viewModel.accounts.map(\.name)) { _ in
             syncRenameDrafts()
-            syncRemovalChoices()
             syncExpandedAccounts()
         }
     }
@@ -93,7 +91,7 @@ struct SettingsContentView: View {
                             settingsBadge(text: viewModel.isCodexRuntimeAvailable ? "Ready" : "Needs Attention", symbol: runtimeStatus.symbol, color: runtimeStatus.color)
                         }
 
-                        Text("Configure accounts, sorting, and automation without hunting through utility-style panels.")
+                        Text("Manage accounts, sorting, and automation.")
                             .font(DashboardTokens.Font.metadata())
                             .foregroundStyle(DashboardTokens.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
