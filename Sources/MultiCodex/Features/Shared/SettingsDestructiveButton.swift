@@ -5,9 +5,6 @@ struct SettingsDestructiveButton: View {
     var isDisabled: Bool = false
     let action: () -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isHovered = false
-
     var body: some View {
         Button(action: action) {
             Text(title)
@@ -17,7 +14,7 @@ struct SettingsDestructiveButton: View {
                 .padding(.vertical, DashboardTokens.scaled(7))
                 .background(
                     RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                        .fill(isDisabled ? Color.clear : (isHovered ? DashboardTokens.destructiveBackground : Color.clear))
+                        .fill(isDisabled ? Color.clear : DashboardTokens.destructiveBackground.opacity(0.6))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
@@ -28,7 +25,5 @@ struct SettingsDestructiveButton: View {
         .disabled(isDisabled)
         .accessibilityLabel(title)
         .accessibilityHint("Destructive action")
-        .onHover { isHovered = $0 }
-        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isHovered)
     }
 }

@@ -19,9 +19,18 @@ struct ActionPillButton: View {
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isHovered = false
 
     var body: some View {
+        Group {
+            if layout == .iconOnly {
+                baseButton.help(title)
+            } else {
+                baseButton
+            }
+        }
+    }
+
+    private var baseButton: some View {
         Button(action: action) {
             buttonContent
         }
@@ -31,8 +40,6 @@ struct ActionPillButton: View {
         .accessibilityLabel(title)
         .accessibilityHint(accessibilityHint)
         .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous))
-        .onHover { isHovered = $0 }
-        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isHovered)
     }
 
     @ViewBuilder
@@ -48,7 +55,7 @@ struct ActionPillButton: View {
                 .background(backgroundShape)
                 .overlay(borderShape)
                 .foregroundStyle(foregroundColor)
-                .shadow(color: shadowColor, radius: role == .primary ? 12 : 0, y: role == .primary ? 6 : 0)
+                .shadow(color: shadowColor, radius: role == .primary ? 6 : 0, y: role == .primary ? 3 : 0)
         case .iconOnly:
             Image(systemName: symbol)
                 .font(.system(size: DashboardTokens.scaled(12), weight: .semibold))
@@ -56,7 +63,7 @@ struct ActionPillButton: View {
                 .background(backgroundShape)
                 .overlay(borderShape)
                 .foregroundStyle(foregroundColor)
-                .shadow(color: shadowColor, radius: role == .primary ? 10 : 0, y: role == .primary ? 5 : 0)
+                .shadow(color: shadowColor, radius: role == .primary ? 5 : 0, y: role == .primary ? 2 : 0)
         }
     }
 
@@ -73,8 +80,8 @@ struct ActionPillButton: View {
     private var primaryBackground: LinearGradient {
         LinearGradient(
             colors: [
-                (isHovered ? DashboardTokens.accentSoft : DashboardTokens.accent).opacity(0.98),
-                (isHovered ? DashboardTokens.accent : DashboardTokens.accent).opacity(0.88)
+                DashboardTokens.accent.opacity(0.98),
+                DashboardTokens.accent.opacity(0.88)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -84,7 +91,7 @@ struct ActionPillButton: View {
     private var secondaryBackground: LinearGradient {
         LinearGradient(
             colors: [
-                isHovered ? DashboardTokens.cardBackgroundElevated : DashboardTokens.cardBackgroundSubtle,
+                DashboardTokens.cardBackgroundSubtle,
                 DashboardTokens.cardBackgroundSubtle
             ],
             startPoint: .topLeading,
@@ -93,7 +100,7 @@ struct ActionPillButton: View {
     }
 
     private var borderColor: Color {
-        isHovered ? DashboardTokens.cardBorderStrong : DashboardTokens.cardBorder
+        DashboardTokens.cardBorder
     }
 
     private var foregroundColor: Color {

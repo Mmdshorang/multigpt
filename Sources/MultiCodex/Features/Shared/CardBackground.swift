@@ -5,6 +5,7 @@ struct CardBackgroundModifier: ViewModifier {
     var cornerRadius: CGFloat = DashboardTokens.Spacing.cardRadius
     var fill: Color = DashboardTokens.cardBackground
     var border: Color = DashboardTokens.cardBorder
+    var hasShadow = false
 
     func body(content: Content) -> some View {
         content
@@ -16,17 +17,14 @@ struct CardBackgroundModifier: ViewModifier {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(DashboardTokens.cardHighlightGradient.opacity(0.45))
-                    .blendMode(.screen)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                    .allowsHitTesting(false)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(border, lineWidth: 1)
                     .allowsHitTesting(false)
             )
-            .shadow(color: DashboardTokens.shadowColor.opacity(0.18), radius: 18, y: 10)
+            .shadow(
+                color: DashboardTokens.shadowColor.opacity(hasShadow ? 0.12 : 0),
+                radius: hasShadow ? 8 : 0,
+                y: hasShadow ? 4 : 0
+            )
     }
 }
 
@@ -35,13 +33,15 @@ extension View {
         padding: CGFloat = DashboardTokens.Spacing.cardPadding,
         cornerRadius: CGFloat = DashboardTokens.Spacing.cardRadius,
         fill: Color = DashboardTokens.cardBackground,
-        border: Color = DashboardTokens.cardBorder
+        border: Color = DashboardTokens.cardBorder,
+        hasShadow: Bool = false
     ) -> some View {
         modifier(CardBackgroundModifier(
             padding: padding,
             cornerRadius: cornerRadius,
             fill: fill,
-            border: border
+            border: border,
+            hasShadow: hasShadow
         ))
     }
 }

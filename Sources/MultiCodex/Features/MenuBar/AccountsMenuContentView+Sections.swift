@@ -544,7 +544,9 @@ extension AccountsMenuContentView {
             guard !isActionBusy else { return }
             viewModel.openLoginInTerminal(for: row.name)
         case .none:
-            toggleExpanded(row.name)
+            withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+                toggleExpanded(row.name)
+            }
         }
     }
 
@@ -579,7 +581,6 @@ extension AccountsMenuContentView {
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                 .stroke(color.opacity(0.3), lineWidth: 1)
         )
-        .shadow(color: DashboardTokens.shadowColor.opacity(0.26), radius: 12, y: 6)
     }
 
     var isActionBusy: Bool {
@@ -645,14 +646,18 @@ extension AccountsMenuContentView {
 
     func toggleAllAccountsExpanded() {
         let visibleNames = Set(visibleRows.map(\.name))
-        if areAllAccountsExpanded {
-            expandedAccountNames.subtract(visibleNames)
-        } else {
-            expandedAccountNames.formUnion(visibleNames)
+        withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+            if areAllAccountsExpanded {
+                expandedAccountNames.subtract(visibleNames)
+            } else {
+                expandedAccountNames.formUnion(visibleNames)
+            }
         }
     }
 
     func toggleShowAllAccounts() {
-        showAllAccounts.toggle()
+        withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+            showAllAccounts.toggle()
+        }
     }
 }

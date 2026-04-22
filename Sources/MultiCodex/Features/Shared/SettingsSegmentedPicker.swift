@@ -5,17 +5,13 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
     let titleForOption: (T) -> String
     @Binding var selection: T
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var hoveredOption: T?
-
     var body: some View {
         HStack(spacing: 6) {
             ForEach(options, id: \.self) { option in
                 let isSelected = selection == option
-                let isHovered = hoveredOption == option
 
                 Button {
-                    withAnimation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion)) {
+                    withAnimation(.easeInOut(duration: 0.12)) {
                         selection = option
                     }
                 } label: {
@@ -30,7 +26,7 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
                         .frame(maxWidth: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.smallRadius, style: .continuous)
-                                .fill(isSelected ? DashboardTokens.segmentedActiveBackground : (isHovered ? DashboardTokens.segmentedInactiveBackground : Color.clear))
+                                .fill(isSelected ? DashboardTokens.segmentedActiveBackground : Color.clear)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.smallRadius, style: .continuous)
@@ -42,9 +38,6 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
                 .accessibilityLabel(titleForOption(option))
                 .accessibilityValue(isSelected ? "Selected" : "Not selected")
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
-                .onHover { hovering in
-                    hoveredOption = hovering ? option : nil
-                }
             }
         }
         .padding(DashboardTokens.scaled(3))

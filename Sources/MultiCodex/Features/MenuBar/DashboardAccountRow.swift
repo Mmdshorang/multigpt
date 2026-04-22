@@ -16,8 +16,6 @@ struct DashboardAccountRow: View {
     let onRowTap: () -> Void
     let onToggleExpanded: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isActivationHovered = false
-    @State private var isRowHovered = false
 
     private var isPrimaryActionInProgress: Bool {
         switch row.primaryAction {
@@ -74,7 +72,7 @@ struct DashboardAccountRow: View {
     private var activationForegroundColor: Color {
         switch row.primaryAction {
         case .switchAccount:
-            return (isActivationHovered || isRowHovered) ? DashboardTokens.accent : DashboardTokens.textSecondary
+            return DashboardTokens.textSecondary
         case .relogin:
             return DashboardTokens.statusOrange
         case .none:
@@ -85,7 +83,7 @@ struct DashboardAccountRow: View {
     private var activationBackgroundColor: Color {
         switch row.primaryAction {
         case .switchAccount:
-            return isActivationHovered ? DashboardTokens.accentBackground.opacity(0.72) : DashboardTokens.cardBackgroundSubtle
+            return DashboardTokens.cardBackgroundSubtle
         case .relogin:
             return DashboardTokens.statusOrange.opacity(0.18)
         case .none:
@@ -96,7 +94,7 @@ struct DashboardAccountRow: View {
     private var activationBorderColor: Color {
         switch row.primaryAction {
         case .switchAccount:
-            return isActivationHovered ? DashboardTokens.accent.opacity(0.58) : DashboardTokens.cardBorder
+            return DashboardTokens.cardBorder
         case .relogin:
             return DashboardTokens.statusOrange.opacity(0.52)
         case .none:
@@ -106,22 +104,22 @@ struct DashboardAccountRow: View {
 
     private var rowBackgroundColor: Color {
         if row.isCurrent {
-            return DashboardTokens.accentBackground.opacity(isRowHovered ? 0.58 : 0.44)
+            return DashboardTokens.accentBackground.opacity(0.44)
         }
         if row.primaryAction == .relogin {
-            return DashboardTokens.statusOrange.opacity(isRowHovered ? 0.14 : 0.10)
+            return DashboardTokens.statusOrange.opacity(0.10)
         }
-        return isRowHovered ? DashboardTokens.cardBackgroundElevated : DashboardTokens.cardBackgroundSubtle
+        return DashboardTokens.cardBackgroundSubtle
     }
 
     private var rowBorderColor: Color {
         if row.isCurrent {
-            return DashboardTokens.accent.opacity(isRowHovered ? 0.46 : 0.3)
+            return DashboardTokens.accent.opacity(0.3)
         }
         if row.primaryAction == .relogin {
-            return DashboardTokens.statusOrange.opacity(isRowHovered ? 0.42 : 0.24)
+            return DashboardTokens.statusOrange.opacity(0.24)
         }
-        return isRowHovered ? DashboardTokens.cardBorderStrong : DashboardTokens.cardBorder
+        return DashboardTokens.cardBorder
     }
 
     private var statusColor: Color {
@@ -193,18 +191,9 @@ struct DashboardAccountRow: View {
                             .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
                             .foregroundStyle(DashboardTokens.textTertiary)
                             .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                            .animation(
-                                DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion),
-                                value: isExpanded
-                            )
                     }
                 }
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
-                        onRowTap()
-                    }
-                }
                 .help(primaryAreaHelpText)
             }
 
@@ -230,9 +219,11 @@ struct DashboardAccountRow: View {
                 .stroke(rowBorderColor, lineWidth: 1)
         )
         .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous))
-        .onHover { isRowHovered = $0 }
-        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isRowHovered)
-        .animation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion), value: isExpanded)
+        .onTapGesture {
+            withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+                onRowTap()
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityHint("Use the primary action button to switch or re-login. Use row action to expand details.")
         .accessibilityAction(named: Text(isExpanded ? "Collapse details" : "Expand details")) {
@@ -272,7 +263,6 @@ struct DashboardAccountRow: View {
                 }
             }
             .frame(width: DashboardTokens.scaled(28), height: DashboardTokens.scaled(28))
-            .scaleEffect((isActivationHovered && !isActivationDisabled) ? 1.04 : 1)
         }
         .buttonStyle(.plain)
         .disabled(isActivationDisabled)
@@ -281,22 +271,19 @@ struct DashboardAccountRow: View {
         .accessibilityValue(isPrimaryActionInProgress ? "In progress" : "Ready")
         .help(activationHelpText)
         .contentShape(Circle())
-        .onHover { isActivationHovered = $0 }
-        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isActivationHovered)
     }
 
     private var inlineMicroBar: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(Color.white.opacity(0.08))
+        let barWidth = DashboardTokens.scaled(70)
+        return ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Color.white.opacity(0.08))
 
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(progressColor)
-                    .frame(width: geo.size.width * CGFloat(compactProgressFraction))
-            }
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(progressColor)
+                .frame(width: barWidth * CGFloat(compactProgressFraction))
         }
-        .frame(width: DashboardTokens.scaled(70), height: DashboardTokens.scaled(5))
+        .frame(width: barWidth, height: DashboardTokens.scaled(5))
     }
 
     private var expandedContent: some View {
@@ -352,17 +339,16 @@ struct DashboardAccountRow: View {
                     .monospacedDigit()
             }
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+            let barWidth = DashboardTokens.scaled(144)
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(Color.white.opacity(0.08))
 
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(color)
-                        .frame(width: geo.size.width * CGFloat(min(1, max(0, progress))))
-                }
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(color)
+                    .frame(width: barWidth * CGFloat(min(1, max(0, progress))))
             }
-            .frame(width: DashboardTokens.scaled(144), height: DashboardTokens.scaled(5))
+            .frame(width: barWidth, height: DashboardTokens.scaled(5))
         }
     }
 }

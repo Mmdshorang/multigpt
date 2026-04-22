@@ -62,9 +62,5 @@ struct AccountsMenuContentView: View {
                 showAllAccounts = false
             }
         }
-        .animation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion), value: viewModel.accounts.map(\.name))
-        .animation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion), value: viewModel.switchingAccountName)
-        .animation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion), value: viewModel.accountActionInFlightName)
-        .animation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion), value: showAllAccounts)
     }
 }
