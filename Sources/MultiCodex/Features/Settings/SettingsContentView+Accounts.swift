@@ -269,59 +269,52 @@ extension SettingsContentView {
             fill: account.isCurrent ? DashboardTokens.accentBackground.opacity(0.5) : DashboardTokens.cardBackgroundElevated
         ) {
             VStack(alignment: .leading, spacing: 0) {
-                Button {
-                    withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
-                        toggleExpanded(account.name)
-                    }
-                } label: {
-                    HStack(spacing: DashboardTokens.scaled(14)) {
-                        Circle()
-                            .fill(statusColor)
-                            .frame(width: DashboardTokens.scaled(10), height: DashboardTokens.scaled(10))
+                HStack(spacing: DashboardTokens.scaled(14)) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: DashboardTokens.scaled(10), height: DashboardTokens.scaled(10))
 
-                        VStack(alignment: .leading, spacing: DashboardTokens.scaled(5)) {
-                            HStack(spacing: DashboardTokens.scaled(8)) {
-                                Text(account.name)
-                                    .font(DashboardTokens.Font.accountName())
-                                    .foregroundStyle(DashboardTokens.textPrimary)
-
-                                if account.isCurrent {
-                                    AccountStatusPill(text: "Active", color: DashboardTokens.accent)
-                                } else if account.connectionState != .connected {
-                                    AccountStatusPill(text: account.connectionState.label, color: statusColor)
-                                }
-                            }
-
-                            Text(account.workspaceEmailHint ?? account.connectionState.label)
-                                .font(DashboardTokens.Font.metadata())
-                                .foregroundStyle(DashboardTokens.textSecondary)
-                                .lineLimit(1)
-                        }
-
-                        Spacer(minLength: DashboardTokens.scaled(12))
-
-                        VStack(alignment: .trailing, spacing: DashboardTokens.scaled(5)) {
-                            Text("5h \(fiveHourText) • Week \(weeklyText)")
-                                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                    VStack(alignment: .leading, spacing: DashboardTokens.scaled(5)) {
+                        HStack(spacing: DashboardTokens.scaled(8)) {
+                            Text(account.name)
+                                .font(DashboardTokens.Font.accountName())
                                 .foregroundStyle(DashboardTokens.textPrimary)
-                                .monospacedDigit()
 
-                            Text(account.usage.fiveHour.resetText(mode: viewModel.resetDisplayMode))
-                                .font(.system(size: DashboardTokens.scaled(11), weight: .regular))
-                                .foregroundStyle(DashboardTokens.textTertiary)
-                                .lineLimit(1)
+                            if account.isCurrent {
+                                AccountStatusPill(text: "Active", color: DashboardTokens.accent)
+                            } else if account.connectionState != .connected {
+                                AccountStatusPill(text: account.connectionState.label, color: statusColor)
+                            }
                         }
 
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: DashboardTokens.scaled(11), weight: .semibold))
-                            .foregroundStyle(DashboardTokens.textTertiary)
-                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                            .frame(width: DashboardTokens.scaled(14), height: DashboardTokens.scaled(14))
-                            .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isExpanded)
+                        Text(account.workspaceEmailHint ?? account.connectionState.label)
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                            .lineLimit(1)
                     }
-                    .contentShape(Rectangle())
+
+                    Spacer(minLength: DashboardTokens.scaled(12))
+
+                    VStack(alignment: .trailing, spacing: DashboardTokens.scaled(5)) {
+                        Text("5h \(fiveHourText) • Week \(weeklyText)")
+                            .font(DashboardTokens.Font.metadata().weight(.semibold))
+                            .foregroundStyle(DashboardTokens.textPrimary)
+                            .monospacedDigit()
+
+                        Text(account.usage.fiveHour.resetText(mode: viewModel.resetDisplayMode))
+                            .font(.system(size: DashboardTokens.scaled(11), weight: .regular))
+                            .foregroundStyle(DashboardTokens.textTertiary)
+                            .lineLimit(1)
+                    }
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: DashboardTokens.scaled(11), weight: .semibold))
+                        .foregroundStyle(DashboardTokens.textTertiary)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .frame(width: DashboardTokens.scaled(14), height: DashboardTokens.scaled(14))
+                        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isExpanded)
                 }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle())
 
                 if isExpanded {
                     expandedAccountContent(account)
@@ -331,7 +324,13 @@ extension SettingsContentView {
                                 insertion: .opacity.combined(with: .scale(scale: 0.985, anchor: .top)),
                                 removal: .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
                             )
-                        )
+                    )
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+                    toggleExpanded(account.name)
                 }
             }
         }

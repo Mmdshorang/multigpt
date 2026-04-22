@@ -144,7 +144,16 @@ extension SettingsContentView {
                             .frame(maxWidth: DashboardTokens.scaled(360))
                         }
 
-                        settingsInsetPanel(title: "NOTIFICATIONS", description: "Enable notifications and send a test alert.") {
+                        Rectangle()
+                            .fill(DashboardTokens.cardBorder)
+                            .frame(height: 1)
+
+                        VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+                            DashboardSectionHeader(title: "Notifications")
+                            Text("Enable notifications and send a test alert.")
+                                .font(DashboardTokens.Font.metadata())
+                                .foregroundStyle(DashboardTokens.textSecondary)
+
                             HStack(spacing: DashboardTokens.scaled(12)) {
                                 SettingsToggle(label: "Show notifications", isOn: autoSwitchNotificationsBinding)
 

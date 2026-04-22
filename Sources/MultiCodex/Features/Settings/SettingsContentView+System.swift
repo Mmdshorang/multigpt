@@ -28,31 +28,38 @@ extension SettingsContentView {
                         Spacer(minLength: 0)
                     }
 
-                    settingsInsetPanel(title: "EXECUTABLE", description: "Set a custom `codex` path when auto-detection fails.") {
-                        VStack(alignment: .leading, spacing: DashboardTokens.scaled(10)) {
-                            HStack(spacing: DashboardTokens.scaled(10)) {
-                                SettingsTextField(
-                                    placeholder: "/opt/homebrew/bin/codex",
-                                    text: $codexPathDraft
-                                )
+                    Rectangle()
+                        .fill(DashboardTokens.cardBorder)
+                        .frame(height: 1)
 
-                                ActionPillButton(title: "Choose", symbol: "folder") {
-                                    viewModel.chooseCustomCodexPath()
-                                }
+                    VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+                        DashboardSectionHeader(title: "Executable")
+                        Text("Set a custom `codex` path when auto-detection fails.")
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+
+                        HStack(spacing: DashboardTokens.scaled(10)) {
+                            SettingsTextField(
+                                placeholder: "/opt/homebrew/bin/codex",
+                                text: $codexPathDraft
+                            )
+
+                            ActionPillButton(title: "Choose", symbol: "folder") {
+                                viewModel.chooseCustomCodexPath()
                             }
+                        }
 
-                            HStack(spacing: DashboardTokens.scaled(8)) {
-                                ActionPillButton(title: "Save Path", symbol: "checkmark", role: .primary) {
-                                    viewModel.updateCustomCodexPath(codexPathDraft)
-                                }
-                                .disabled(normalized(codexPathDraft) == viewModel.customCodexPath)
-
-                                ActionPillButton(title: "Use Automatic Detection", symbol: "sparkles") {
-                                    codexPathDraft = ""
-                                    viewModel.clearCustomCodexPath()
-                                }
-                                .disabled(viewModel.customCodexPath.isEmpty)
+                        HStack(spacing: DashboardTokens.scaled(8)) {
+                            ActionPillButton(title: "Save Path", symbol: "checkmark", role: .primary) {
+                                viewModel.updateCustomCodexPath(codexPathDraft)
                             }
+                            .disabled(normalized(codexPathDraft) == viewModel.customCodexPath)
+
+                            ActionPillButton(title: "Use Automatic Detection", symbol: "sparkles") {
+                                codexPathDraft = ""
+                                viewModel.clearCustomCodexPath()
+                            }
+                            .disabled(viewModel.customCodexPath.isEmpty)
                         }
                     }
 
@@ -81,7 +88,12 @@ extension SettingsContentView {
                     }
 
                     if let hint = viewModel.cliResolutionHint {
-                        settingsInsetPanel(title: "RESOLUTION NOTES") {
+                        Rectangle()
+                            .fill(DashboardTokens.cardBorder)
+                            .frame(height: 1)
+
+                        VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+                            DashboardSectionHeader(title: "Resolution Notes")
                             Text(hint)
                                 .font(DashboardTokens.Font.metadata())
                                 .foregroundStyle(DashboardTokens.textSecondary)

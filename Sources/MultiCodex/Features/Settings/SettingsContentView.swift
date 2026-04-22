@@ -90,11 +90,6 @@ struct SettingsContentView: View {
 
                             settingsBadge(text: viewModel.isCodexRuntimeAvailable ? "Ready" : "Needs Attention", symbol: runtimeStatus.symbol, color: runtimeStatus.color)
                         }
-
-                        Text("Manage accounts, sorting, and automation.")
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }

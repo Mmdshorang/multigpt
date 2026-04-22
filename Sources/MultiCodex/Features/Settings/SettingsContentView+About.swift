@@ -41,7 +41,12 @@ extension SettingsContentView {
                         .foregroundStyle(DashboardTokens.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    settingsInsetPanel(title: "DISCLAIMER") {
+                    Rectangle()
+                        .fill(DashboardTokens.cardBorder)
+                        .frame(height: 1)
+
+                    VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+                        DashboardSectionHeader(title: "Disclaimer")
                         Text("MultiCodex is an independent project and is not affiliated with, endorsed by, or sponsored by OpenAI or the Codex CLI project.")
                             .font(DashboardTokens.Font.metadata())
                             .foregroundStyle(DashboardTokens.textSecondary)
