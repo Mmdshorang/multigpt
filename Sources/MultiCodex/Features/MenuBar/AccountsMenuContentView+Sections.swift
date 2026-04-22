@@ -126,10 +126,6 @@ extension AccountsMenuContentView {
             Text(value)
                 .foregroundColor(DashboardTokens.textPrimary)
                 .fontWeight(.semibold)
-
-            Image(systemName: "chevron.down")
-                .font(.system(size: DashboardTokens.scaled(8), weight: .semibold))
-                .foregroundStyle(DashboardTokens.textTertiary)
         }
         .font(DashboardTokens.Font.metadata())
         .lineLimit(1)
@@ -261,8 +257,6 @@ extension AccountsMenuContentView {
 
                 Spacer()
             }
-
-            runtimeStatusPanel
         }
         .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
     }

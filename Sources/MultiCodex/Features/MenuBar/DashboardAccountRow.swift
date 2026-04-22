@@ -193,19 +193,31 @@ struct DashboardAccountRow: View {
                             .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
                             .foregroundStyle(DashboardTokens.textTertiary)
                             .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            .animation(
+                                DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion),
+                                value: isExpanded
+                            )
                     }
                 }
                 .contentShape(Rectangle())
-                .onTapGesture(perform: onRowTap)
+                .onTapGesture {
+                    withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+                        onRowTap()
+                    }
+                }
                 .help(primaryAreaHelpText)
             }
 
-            expandedContent
-                .padding(.top, isExpanded ? 14 : 0)
-                .frame(height: isExpanded ? nil : 0, alignment: .top)
-                .clipped()
-                .opacity(isExpanded ? 1 : 0)
-                .animation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion), value: isExpanded)
+            if isExpanded {
+                expandedContent
+                    .padding(.top, DashboardTokens.scaled(14))
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .top)),
+                            removal: .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
+                        )
+                    )
+            }
         }
         .padding(.horizontal, DashboardTokens.Spacing.rowHPadding)
         .padding(.vertical, DashboardTokens.Spacing.rowVPadding)
@@ -220,10 +232,13 @@ struct DashboardAccountRow: View {
         .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous))
         .onHover { isRowHovered = $0 }
         .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isRowHovered)
+        .animation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion), value: isExpanded)
         .accessibilityElement(children: .contain)
         .accessibilityHint("Use the primary action button to switch or re-login. Use row action to expand details.")
         .accessibilityAction(named: Text(isExpanded ? "Collapse details" : "Expand details")) {
-            onToggleExpanded()
+            withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+                onToggleExpanded()
+            }
         }
     }
 

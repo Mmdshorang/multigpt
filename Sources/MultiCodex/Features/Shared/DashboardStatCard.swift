@@ -34,7 +34,7 @@ struct DashboardStatCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: DashboardTokens.scaled(112), alignment: .leading)
-        .cardStyle(padding: DashboardTokens.Spacing.cardPadding, fill: DashboardTokens.cardBackgroundSubtle)
+        .frame(maxWidth: .infinity, minHeight: DashboardTokens.scaled(92), alignment: .leading)
+        .cardStyle(padding: DashboardTokens.Spacing.compactCardPadding, fill: DashboardTokens.cardBackgroundSubtle)
     }
 }
