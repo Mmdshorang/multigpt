@@ -24,6 +24,30 @@ extension SettingsContentView {
                         }
                     }
 
+                    settingsInsetPanel(
+                        title: "BATCH LOGIN",
+                        description: "Create and login multiple new accounts sequentially. Max \(SequentialLoginState.maxAccountCount) accounts per batch."
+                    ) {
+                        HStack(spacing: 8) {
+                            SettingsTextField(
+                                placeholder: "Count",
+                                text: sequentialLoginCountTextBinding
+                            )
+                            .frame(width: 78)
+
+                            ActionPillButton(
+                                title: "Start Batch Login",
+                                symbol: "list.number",
+                                role: .primary,
+                                isDisabled: isAccountActionRunning
+                            ) {
+                                openSequentialLoginTracker()
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+                    }
+
                     if let message = viewModel.accountActionMessage {
                         feedbackRow(message, color: .green)
                     }
@@ -345,5 +369,34 @@ extension SettingsContentView {
     func syncExpandedAccounts() {
         let names = Set(viewModel.accounts.map(\.name))
         expandedAccountNames = expandedAccountNames.intersection(names)
+    }
+
+    private var sequentialLoginCountTextBinding: Binding<String> {
+        Binding(
+            get: { sequentialLoginCountText },
+            set: { newValue in
+                let digitsOnly = newValue.filter(\.isNumber)
+                guard !digitsOnly.isEmpty else {
+                    sequentialLoginCountText = ""
+                    return
+                }
+                let parsed = Int(digitsOnly) ?? 1
+                let clamped = max(1, min(SequentialLoginState.maxAccountCount, parsed))
+                sequentialLoginCountText = String(clamped)
+            }
+        )
+    }
+
+    private func openSequentialLoginTracker() {
+        let count = max(
+            1,
+            min(
+                SequentialLoginState.maxAccountCount,
+                Int(sequentialLoginCountText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 1
+            )
+        )
+        sequentialLoginCountText = String(count)
+        viewModel.prepareSequentialNewAccountLogin(count: count)
+        openWindow(id: "batch-login")
     }
 }

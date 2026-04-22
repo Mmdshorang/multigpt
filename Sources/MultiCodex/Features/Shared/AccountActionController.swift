@@ -7,6 +7,13 @@ enum AccountActionOutcome {
 
 @MainActor
 final class AccountActionController {
+    struct InteractiveLoginOutcome {
+        let success: Bool
+        let effectiveAccountName: String
+        let message: String?
+        let error: String?
+    }
+
     unowned let viewModel: AccountsMenuViewModel
 
     init(viewModel: AccountsMenuViewModel) {
@@ -59,7 +66,7 @@ final class AccountActionController {
                     createIfNeeded: createIfNeeded,
                     loginHome: session.loginSandboxHome
                 )
-                await self.completeInteractiveLogin(session: session, preserveFailedSession: false)
+                _ = await self.completeInteractiveLogin(session: session, preserveFailedSession: false)
             } catch {
                 if self.shouldFallbackToTerminal(error) {
                     self.launchTerminalLoginFallback(accountName: accountName, createIfNeeded: createIfNeeded, rootError: error)
@@ -113,11 +120,92 @@ final class AccountActionController {
             viewModel.focusedAccountName = session.accountName
             defer { viewModel.accountActionInFlightName = nil }
 
-            await self.completeInteractiveLogin(session: session, preserveFailedSession: true)
+            _ = await self.completeInteractiveLogin(session: session, preserveFailedSession: true)
         }
     }
 
-    func completeInteractiveLogin(session: PendingInteractiveLoginSession, preserveFailedSession: Bool) async {
+    func prepareSequentialNewAccountLogin(accountNames: [String]) {
+        guard !accountNames.isEmpty else {
+            setAccountFeedback(message: nil, error: "Choose at least one account.")
+            return
+        }
+        guard viewModel.sequentialLoginState?.isRunning != true else {
+            return
+        }
+
+        viewModel.sequentialLoginTask?.cancel()
+        viewModel.sequentialLoginTask = nil
+        let items = accountNames.map { SequentialLoginItem(accountName: $0) }
+        viewModel.sequentialLoginState = SequentialLoginState(items: items)
+        setAccountFeedback(
+            message: "Prepared batch login for \(items.count) account\(items.count == 1 ? "" : "s").",
+            error: nil
+        )
+    }
+
+    func startSequentialNewAccountLogin() {
+        guard var state = viewModel.sequentialLoginState,
+              !state.items.isEmpty,
+              !state.isRunning,
+              viewModel.accountActionInFlightName == nil,
+              viewModel.pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
+        else {
+            return
+        }
+
+        state.isRunning = true
+        state.currentIndex = nil
+        state.startedAt = Date()
+        state.finishedAt = nil
+        state.items = state.items.map { item in
+            var next = item
+            next.status = .pending
+            next.message = nil
+            return next
+        }
+        viewModel.sequentialLoginState = state
+        viewModel.sequentialLoginTask?.cancel()
+        viewModel.sequentialLoginTask = Task { @MainActor [weak self] in
+            await self?.runSequentialLogin()
+        }
+    }
+
+    func cancelSequentialNewAccountLogin() {
+        viewModel.sequentialLoginTask?.cancel()
+        viewModel.sequentialLoginTask = nil
+
+        guard var state = viewModel.sequentialLoginState else {
+            return
+        }
+        state.isRunning = false
+        state.currentIndex = nil
+        state.finishedAt = Date()
+        viewModel.sequentialLoginState = state
+        setAccountFeedback(
+            message: "Batch login cancelled. Completed \(state.attemptedCount)/\(state.totalCount).",
+            error: nil
+        )
+    }
+
+    func retryFailedSequentialNewAccountLogin() {
+        guard let state = viewModel.sequentialLoginState, !state.isRunning else {
+            return
+        }
+
+        let failedNames = state.items
+            .filter { $0.status == .failed }
+            .map(\.accountName)
+
+        guard !failedNames.isEmpty else {
+            setAccountFeedback(message: nil, error: "No failed accounts to retry.")
+            return
+        }
+
+        prepareSequentialNewAccountLogin(accountNames: failedNames)
+        startSequentialNewAccountLogin()
+    }
+
+    func completeInteractiveLogin(session: PendingInteractiveLoginSession, preserveFailedSession: Bool) async -> InteractiveLoginOutcome {
         do {
             let status = try await viewModel.accountService.fetchStatusForLoginHome(
                 session.loginSandboxHome,
@@ -146,7 +234,12 @@ final class AccountActionController {
                             : message
                     )
                 }
-                return
+                return InteractiveLoginOutcome(
+                    success: false,
+                    effectiveAccountName: session.accountName,
+                    message: nil,
+                    error: status.output.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
             }
 
             _ = try await viewModel.accountService.importAuth(fromHome: session.loginSandboxHome, into: session.accountName)
@@ -157,7 +250,7 @@ final class AccountActionController {
             var effectiveAccountName = session.accountName
             var renameNote: String?
             if session.createIfNeeded,
-               let preferredName = await suggestedAccountNameForNewLogin(currentName: session.accountName),
+               let preferredName = await suggestedAccountNameForNewLogin(session: session),
                preferredName != session.accountName
             {
                 do {
@@ -196,17 +289,33 @@ final class AccountActionController {
                 successFallback: successFallback
             ) {
             case let .success(message):
+                let fullMessage: String
                 if let renameNote {
-                    setAccountFeedback(message: "\(message) \(renameNote)", error: nil)
+                    fullMessage = "\(message) \(renameNote)"
+                    setAccountFeedback(message: fullMessage, error: nil)
                 } else {
+                    fullMessage = message
                     setAccountFeedback(message: message, error: nil)
                 }
+
+                Task { @MainActor in
+                    await viewModel.refreshController.performRefresh(refreshLive: true, allowAutoSwitch: false)
+                }
+
+                return InteractiveLoginOutcome(
+                    success: true,
+                    effectiveAccountName: effectiveAccountName,
+                    message: fullMessage,
+                    error: nil
+                )
             case let .failure(message):
                 setAccountFeedback(message: nil, error: message)
-            }
-
-            Task { @MainActor in
-                await viewModel.refreshController.performRefresh(refreshLive: true, allowAutoSwitch: false)
+                return InteractiveLoginOutcome(
+                    success: false,
+                    effectiveAccountName: effectiveAccountName,
+                    message: nil,
+                    error: message
+                )
             }
         } catch {
             if preserveFailedSession {
@@ -219,20 +328,29 @@ final class AccountActionController {
                 viewModel.pendingInteractiveLoginSession = nil
                 setAccountFeedback(message: nil, error: error.localizedDescription)
             }
+            return InteractiveLoginOutcome(
+                success: false,
+                effectiveAccountName: session.accountName,
+                message: nil,
+                error: error.localizedDescription
+            )
         }
     }
 
-    private func suggestedAccountNameForNewLogin(currentName: String) async -> String? {
-        guard let accountsPayload = try? await viewModel.accountService.fetchAccounts(),
-              let accountEntry = accountsPayload.accounts.first(where: { $0.name == currentName }),
-              let preferredName = accountEntry.defaultWorkspaceEmail?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-              !preferredName.isEmpty
+    private func suggestedAccountNameForNewLogin(session: PendingInteractiveLoginSession) async -> String? {
+        let currentName = session.accountName
+        guard let preferredName = viewModel.accountService
+            .inferDefaultWorkspaceEmail(fromLoginHome: session.loginSandboxHome)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !preferredName.isEmpty
         else {
             return nil
         }
 
-        let existingNames = Set(accountsPayload.accounts.map(\.name))
+        let existingNames = Set(
+            (try? await viewModel.accountService.fetchAccounts())?.accounts.map(\.name)
+                ?? viewModel.accounts.map(\.name)
+        )
         return uniqueName(base: preferredName, currentName: currentName, existingNames: existingNames)
     }
 
@@ -329,5 +447,115 @@ final class AccountActionController {
         try viewModel.fileManager.createDirectory(at: codexURL, withIntermediateDirectories: true)
         try viewModel.fileManager.createDirectory(at: multicodexURL, withIntermediateDirectories: true)
         return rootURL.path
+    }
+
+    private func runSequentialLogin() async {
+        guard let total = viewModel.sequentialLoginState?.items.count else {
+            return
+        }
+
+        for index in 0..<total {
+            if Task.isCancelled {
+                break
+            }
+            await runSequentialLoginItem(at: index)
+        }
+
+        finishSequentialLogin(cancelled: Task.isCancelled)
+    }
+
+    private func runSequentialLoginItem(at index: Int) async {
+        guard var state = viewModel.sequentialLoginState,
+              index < state.items.count,
+              state.isRunning
+        else {
+            return
+        }
+
+        var item = state.items[index]
+        item.status = .inProgress
+        item.message = nil
+        state.currentIndex = index
+        state.items[index] = item
+        viewModel.sequentialLoginState = state
+
+        let outcome = await runSingleSequentialNewLogin(accountName: item.accountName)
+        guard var latestState = viewModel.sequentialLoginState, index < latestState.items.count else {
+            return
+        }
+
+        latestState.items[index].resolvedAccountName = outcome.success ? outcome.effectiveAccountName : nil
+        latestState.items[index].status = outcome.success ? .success : .failed
+        latestState.items[index].message = outcome.success ? outcome.message : outcome.error
+        latestState.currentIndex = nil
+        viewModel.sequentialLoginState = latestState
+    }
+
+    private func runSingleSequentialNewLogin(accountName: String) async -> InteractiveLoginOutcome {
+        viewModel.accountActionInFlightName = accountName
+        viewModel.focusedAccountName = accountName
+        viewModel.feedbackAutoClearTask?.cancel()
+        viewModel.feedbackAutoClearTask = nil
+        viewModel.accountActionMessage = "Starting login for \(accountName)..."
+        viewModel.accountActionError = nil
+        defer {
+            viewModel.accountActionInFlightName = nil
+        }
+
+        do {
+            let session = try makeInteractiveLoginSession(accountName: accountName, createIfNeeded: true)
+            viewModel.pendingInteractiveLoginSession = nil
+            _ = try await viewModel.accountService.loginInApp(
+                account: accountName,
+                createIfNeeded: true,
+                loginHome: session.loginSandboxHome
+            )
+            return await completeInteractiveLogin(session: session, preserveFailedSession: false)
+        } catch {
+            viewModel.pendingInteractiveLoginSession = nil
+            if shouldFallbackToTerminal(error) {
+                let message = "\(accountName): requires terminal login in this environment. Skipping."
+                setAccountFeedback(message: nil, error: message)
+                return InteractiveLoginOutcome(
+                    success: false,
+                    effectiveAccountName: accountName,
+                    message: nil,
+                    error: message
+                )
+            }
+
+            let message = "\(accountName): \(error.localizedDescription)"
+            setAccountFeedback(message: nil, error: message)
+            return InteractiveLoginOutcome(
+                success: false,
+                effectiveAccountName: accountName,
+                message: nil,
+                error: message
+            )
+        }
+    }
+
+    private func finishSequentialLogin(cancelled: Bool) {
+        viewModel.sequentialLoginTask = nil
+        guard var state = viewModel.sequentialLoginState else {
+            return
+        }
+        state.isRunning = false
+        state.currentIndex = nil
+        state.finishedAt = Date()
+        viewModel.sequentialLoginState = state
+
+        if cancelled {
+            setAccountFeedback(
+                message: "Batch login cancelled. Completed \(state.attemptedCount)/\(state.totalCount).",
+                error: nil
+            )
+            return
+        }
+
+        setAccountFeedback(
+            message: "Batch login finished. \(state.successCount) succeeded, \(state.failedCount) failed.",
+            error: nil
+        )
     }
 }

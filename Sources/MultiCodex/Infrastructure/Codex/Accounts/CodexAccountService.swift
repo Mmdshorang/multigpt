@@ -215,6 +215,11 @@ final class CodexAccountService {
         return combined
     }
 
+    func inferDefaultWorkspaceEmail(fromLoginHome homePath: String) -> String? {
+        let authPath = (homePath as NSString).appendingPathComponent(".codex/auth.json")
+        return inferDefaultWorkspaceEmail(fromAuthPath: authPath)
+    }
+
     func effectiveMulticodexHomePath() -> String {
         currentPaths().multicodexHome
     }

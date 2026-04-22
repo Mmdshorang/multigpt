@@ -16,6 +16,7 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var runtimeProbeSummary: String?
     @Published var isCodexRuntimeAvailable = false
     @Published var focusedAccountName: String?
+    @Published var sequentialLoginState: SequentialLoginState?
     @Published var customCodexPath: String
     @Published var resetDisplayMode: ResetDisplayMode
     @Published var selectedSettingsSection: SettingsSection
@@ -39,6 +40,7 @@ final class AccountsMenuViewModel: ObservableObject {
     var didBecomeActiveObserver: NSObjectProtocol?
     var pendingInteractiveLoginSession: PendingInteractiveLoginSession?
     var feedbackAutoClearTask: Task<Void, Never>?
+    var sequentialLoginTask: Task<Void, Never>?
     lazy var autoSwitchNotifier: any AutoSwitchNotificationSending = autoSwitchNotifierFactory()
     lazy var refreshController = AccountsRefreshController(viewModel: self)
     lazy var accountActions = AccountActionController(viewModel: self)
@@ -95,6 +97,7 @@ final class AccountsMenuViewModel: ObservableObject {
             NotificationCenter.default.removeObserver(didBecomeActiveObserver)
         }
         feedbackAutoClearTask?.cancel()
+        sequentialLoginTask?.cancel()
         refreshLoopTask?.cancel()
     }
 
@@ -424,6 +427,22 @@ final class AccountsMenuViewModel: ObservableObject {
     func startLoginFlow(accountName: String, createIfNeeded: Bool) { accountActions.startLoginFlow(accountName: accountName, createIfNeeded: createIfNeeded) }
 
     func openLoginInTerminal(for name: String) { accountManagement.openLoginInTerminal(for: name) }
+
+    func prepareSequentialNewAccountLogin(count: Int) {
+        accountManagement.prepareSequentialNewAccountLogin(count: count)
+    }
+
+    func startSequentialNewAccountLogin() {
+        accountManagement.startSequentialNewAccountLogin()
+    }
+
+    func cancelSequentialNewAccountLogin() {
+        accountManagement.cancelSequentialNewAccountLogin()
+    }
+
+    func retryFailedSequentialNewAccountLogin() {
+        accountManagement.retryFailedSequentialNewAccountLogin()
+    }
 
     func clearAccountActionFeedback() { accountManagement.clearAccountActionFeedback() }
 
