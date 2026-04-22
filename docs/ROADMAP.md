@@ -2650,6 +2650,444 @@ Show in About settings section: "Update available: v0.5.0 → [Download](...)"
 
 ---
 
+### 5.6 Mass Export / Import Accounts
+
+**Problem:** No way to back up account configurations or migrate between machines. If a user reinstalls macOS or switches to a new Mac, they must manually re-add and re-login every account.
+
+**Goal:** Export all accounts (names, config, auth data) to a single encrypted JSON file. Import restores everything — accounts reappear with working auth, no re-login needed.
+
+**File to Create:**
+
+```
+Sources/MultiCodex/Features/Shared/
+└── AccountExportService.swift      # NEW — export/import logic
+
+Sources/MultiCodex/Features/Settings/
+└── SettingsContentView+Data.swift   # NEW — export/import UI in settings
+```
+
+#### Export Format
+
+```json
+{
+  "version": 1,
+  "exportedAt": "2026-04-22T14:30:00Z",
+  "appVersion": "0.5.0",
+  "accounts": [
+    {
+      "name": "Work",
+      "auth": { ... },
+      "meta": {
+        "createdAt": "2025-12-01T10:00:00Z",
+        "lastUsedAt": "2026-04-22T12:00:00Z"
+      }
+    },
+    {
+      "name": "Personal",
+      "auth": { ... },
+      "meta": {
+        "createdAt": "2026-01-15T09:00:00Z",
+        "lastUsedAt": "2026-04-21T18:00:00Z"
+      }
+    }
+  ],
+  "preferences": {
+    "accountSwitchingStrategy": "expiryAware",
+    "menuDensity": "comfortable",
+    "accountSortCriterion": "used",
+    "accountSortWindow": "fiveHour",
+    "accountSortDirection": "descending",
+    "limitsCacheTTLSeconds": 1200
+  },
+  "currentAccount": "Work"
+}
+```
+
+#### `Sources/MultiCodex/Features/Shared/AccountExportService.swift`
+
+```swift
+import Foundation
+
+/// Exports and imports all account data for backup/migration purposes.
+/// The export file contains auth tokens — treated as sensitive data.
+enum AccountExportService {
+
+    struct ExportPayload: Codable {
+        let version: Int
+        let exportedAt: String
+        let appVersion: String
+        let accounts: [ExportedAccount]
+        let preferences: ExportedPreferences?
+        let currentAccount: String?
+    }
+
+    struct ExportedAccount: Codable {
+        let name: String
+        let auth: [String: AnyCodable]  // auth.json contents
+        let meta: AccountMeta?
+    }
+
+    struct ExportedPreferences: Codable {
+        let accountSwitchingStrategy: String?
+        let menuDensity: String?
+        let accountSortCriterion: String?
+        let accountSortWindow: String?
+        let accountSortDirection: String?
+        let limitsCacheTTLSeconds: Int?
+    }
+
+    // Type-erasing wrapper for heterogeneous JSON values
+    struct AnyCodable: Codable, Equatable {
+        let value: Any
+        // ... encode/decode implementations
+    }
+
+    // MARK: - Export
+
+    /// Export all accounts and preferences to a JSON file.
+    /// Returns the URL of the exported file.
+    static func export(
+        accountService: CodexAccountService,
+        preferencesStore: AppPreferencesStore
+    ) async throws -> URL {
+        let paths = accountService.currentPaths()
+        let config = try accountService.loadConfig(paths: paths)
+
+        var exportedAccounts: [ExportedAccount] = []
+        for accountName in config.accounts {
+            let authPath: String
+
+            // With managed homes (Phase 4), read from isolated home
+            if let managedHome = ManagedCodexHomeFactory.homeURL(for: accountName) {
+                authPath = managedHome.appendingPathComponent("auth.json").path
+            } else {
+                // Legacy path
+                authPath = paths.accountAuthPath(accountName)
+            }
+
+            guard let authData = try? Data(contentsOf: URL(fileURLWithPath: authPath)) else {
+                MultiCodexLog.log(.config, level: .warning,
+                    "Skipping account \(accountName) — auth data missing")
+                continue
+            }
+
+            let authJSON = try? JSONSerialization.jsonObject(with: authData) as? [String: Any]
+            let meta = try? accountService.loadAccountMeta(account: accountName, paths: paths)
+
+            exportedAccounts.append(ExportedAccount(
+                name: accountName,
+                auth: authJSON?.mapValues { AnyCodable($0) } ?? [:],
+                meta: meta
+            ))
+
+            MultiCodexLog.log(.config, level: .debug,
+                "Exported account \(accountName)")
+        }
+
+        let payload = ExportPayload(
+            version: 1,
+            exportedAt: ISO8601DateFormatter().string(from: Date()),
+            appVersion: "0.5.0",
+            accounts: exportedAccounts,
+            preferences: ExportedPreferences(
+                accountSwitchingStrategy: preferencesStore.accountSwitchingStrategy.rawValue,
+                menuDensity: preferencesStore.menuDensity.rawValue,
+                accountSortCriterion: preferencesStore.accountSortCriterion.rawValue,
+                accountSortWindow: preferencesStore.accountSortWindow.rawValue,
+                accountSortDirection: preferencesStore.accountSortDirection.rawValue,
+                limitsCacheTTLSeconds: preferencesStore.limitsCacheTTLSeconds
+            ),
+            currentAccount: config.currentAccount
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(payload)
+
+        // Write to user-chosen location via NSSavePanel (called from UI)
+        // The caller handles the panel; this returns the data
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("multicodex-export-\(Date().timeIntervalSince1970).json")
+        try data.write(to: tempURL, options: .atomic)
+
+        MultiCodexLog.log(.config, level: .info,
+            "Exported \(exportedAccounts.count) accounts")
+
+        return tempURL
+    }
+
+    // MARK: - Import
+
+    struct ImportResult {
+        let imported: Int
+        let skipped: Int   // already existing with same name
+        let failed: Int    // auth data invalid
+        let conflicts: [String]  // account names that already exist
+    }
+
+    /// Import accounts from a JSON file.
+    /// Merge strategy: skip accounts that already exist (don't overwrite).
+    /// Returns a summary of what happened.
+    static func importAccounts(
+        from url: URL,
+        accountService: CodexAccountService,
+        preferencesStore: AppPreferencesStore,
+        mergeStrategy: ImportMergeStrategy = .skipExisting
+    ) async throws -> ImportResult {
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        let payload = try decoder.decode(ExportPayload.self, from: data)
+
+        guard payload.version == 1 else {
+            throw ExportError.unsupportedVersion(payload.version)
+        }
+
+        let paths = accountService.currentPaths()
+        let existingConfig = try accountService.loadConfig(paths: paths)
+        var imported = 0
+        var skipped = 0
+        var failed = 0
+        var conflicts: [String] = []
+
+        for account in payload.accounts {
+            let exists = existingConfig.accounts.contains(account.name)
+
+            if exists {
+                switch mergeStrategy {
+                case .skipExisting:
+                    skipped += 1
+                    conflicts.append(account.name)
+                    continue
+                case .overwrite:
+                    // Will be replaced below
+                    break
+                }
+            }
+
+            // Reconstruct auth.json data
+            let authDict = account.auth.reduce(into: [String: Any]()) { $0[$1.key] = $1.value.value }
+            let authData = try JSONSerialization.data(
+                withJSONObject: authDict,
+                options: [.prettyPrinted, .sortedKeys]
+            )
+
+            // Write to managed home (Phase 4) or legacy path
+            if let managedHome = ManagedCodexHomeFactory.homeURL(for: account.name)
+                ?? (try? ManagedCodexHomeFactory.createHome(for: account.name)) {
+                try ManagedCodexHomeFactory.writeAuthData(authData, to: managedHome)
+            } else {
+                // Legacy fallback
+                let legacyAuthPath = paths.accountAuthPath(account.name)
+                let dir = (legacyAuthPath as NSString).deletingLastPathComponent
+                try FileManager.default.createDirectory(
+                    atPath: dir, withIntermediateDirectories: true
+                )
+                try authData.write(to: URL(fileURLWithPath: legacyAuthPath), options: .atomic)
+            }
+
+            // Register account in config
+            try accountService.registerAccount(named: account.name, paths: paths)
+
+            // Restore metadata if available
+            if let meta = account.meta {
+                try? accountService.updateAccountMeta(
+                    account: account.name, paths: paths
+                ) { existing in
+                    existing.createdAt = meta.createdAt
+                    existing.lastUsedAt = meta.lastUsedAt
+                    existing.lastLoginStatus = meta.lastLoginStatus
+                }
+            }
+
+            imported += 1
+            MultiCodexLog.log(.config, level: .info,
+                "Imported account \(account.name)")
+        }
+
+        // Restore preferences (only if payload includes them)
+        if let prefs = payload.preferences {
+            if let strategy = prefs.accountSwitchingStrategy,
+               let value = AccountSwitchingStrategy(rawValue: strategy) {
+                preferencesStore.accountSwitchingStrategy = value
+            }
+            if let density = prefs.menuDensity,
+               let value = MenuDensity(rawValue: density) {
+                preferencesStore.menuDensity = value
+            }
+            if let criterion = prefs.accountSortCriterion,
+               let value = AccountSortCriterion(rawValue: criterion) {
+                preferencesStore.accountSortCriterion = value
+            }
+            if let window = prefs.accountSortWindow,
+               let value = AccountSortWindow(rawValue: window) {
+                preferencesStore.accountSortWindow = value
+            }
+            if let direction = prefs.accountSortDirection,
+               let value = SortDirection(rawValue: direction) {
+                preferencesStore.accountSortDirection = value
+            }
+            if let ttl = prefs.limitsCacheTTLSeconds {
+                preferencesStore.limitsCacheTTLSeconds = ttl
+            }
+        }
+
+        // Set current account if specified
+        if let current = payload.currentAccount {
+            try? accountService.switchAccount(name: current)
+        }
+
+        MultiCodexLog.log(.config, level: .info,
+            "Import complete: \(imported) imported, \(skipped) skipped, \(failed) failed")
+
+        return ImportResult(
+            imported: imported,
+            skipped: skipped,
+            failed: failed,
+            conflicts: conflicts
+        )
+    }
+
+    enum ImportMergeStrategy {
+        case skipExisting     // Don't overwrite accounts that already exist
+        case overwrite        // Replace existing accounts with imported versions
+    }
+
+    enum ExportError: LocalizedError {
+        case unsupportedVersion(Int)
+        case noAccounts
+
+        var errorDescription: String? {
+            switch self {
+            case .unsupportedVersion(let v):
+                return "Unsupported export file version: \(v)"
+            case .noAccounts:
+                return "No accounts to export."
+            }
+        }
+    }
+}
+```
+
+#### UI Integration (Settings)
+
+Add a new **Data** section to Settings with export/import buttons:
+
+```swift
+// In SettingsContentView — new section
+enum SettingsSection {
+    case general
+    case accounts
+    case system
+    case data        // NEW
+    case about
+}
+
+// SettingsContentView+Data.swift
+struct SettingsDataPane: View {
+    @ObservedObject var viewModel: AccountsMenuViewModel
+    @State private var isExporting = false
+    @State private var isImporting = false
+    @State private var importResult: AccountExportService.ImportResult?
+    @State private var showImportResult = false
+
+    var body: some View {
+        SettingsPanelCard {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Backup & Restore")
+                    .font(.headline)
+
+                Text("Export all accounts and preferences to a JSON file. Import restores them on any Mac.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    // Export button
+                    Button {
+                        isExporting = true
+                    } label: {
+                        Label("Export Accounts", systemImage: "square.and.arrow.up")
+                    }
+                    .fileExporter(
+                        isPresented: $isExporting,
+                        document: ExportDocument(data: exportData),
+                        contentType: .json,
+                        defaultFilename: "multicodex-backup"
+                    ) { result in
+                        handleExportResult(result)
+                    }
+
+                    // Import button
+                    Button {
+                        isImporting = true
+                    } label: {
+                        Label("Import Accounts", systemImage: "square.and.arrow.down")
+                    }
+                    .fileImporter(
+                        isPresented: $isImporting,
+                        allowedContentTypes: [.json],
+                        allowsMultipleSelection: false
+                    ) { result in
+                        handleImportResult(result)
+                    }
+                }
+
+                // Import result sheet
+                if let result = importResult {
+                    ImportResultSummary(result: result)
+                }
+
+                Divider()
+
+                // Warning
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.yellow)
+                    Text("Exported files contain auth tokens. Store them securely.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+```
+
+#### Also add to Menu Bar (Quick Access)
+
+A compact export/import action in the menu bar footer, next to refresh and settings:
+
+```swift
+// In AccountsMenuContentView — footer actions
+HStack {
+    Button { viewModel.refreshController.triggerRefresh(refreshLive: true) } label: {
+        Image(systemName: "arrow.clockwise")
+    }
+    Button { viewModel.exportAccounts() } label: {       // NEW
+        Image(systemName: "square.and.arrow.up")
+    }
+    Button { openSettings() } label: {
+        Image(systemName: "gear")
+    }
+}
+```
+
+**Use cases:**
+1. **Backup before OS reinstall** — export to USB drive, import after reinstall
+2. **Migration to new Mac** — export on old Mac, AirDrop/import on new Mac
+3. **Team setup** — admin exports team config, each team member imports (then re-authenticates individually — auth tokens are account-specific)
+4. **Debugging** — export and inspect account state when reporting issues
+
+**Security considerations:**
+- Export file contains live auth tokens — marked as sensitive
+- File written with `0o600` permissions (owner read/write only)
+- UI warning: "Exported files contain auth tokens. Store them securely."
+- Import validates file version before applying changes
+- Merge strategy lets user choose: skip existing or overwrite
+
+**Effort:** ~8 hours | **Impact:** Essential for data safety. Users with 5+ accounts can't afford to lose their setup. Also enables team workflows.
+
+---
+
 ## Phase 6: UI Polish (Low-Medium Effort, Medium Impact)
 
 ### 6.1 Pace Display in Account Rows
@@ -2719,10 +3157,10 @@ HStack {
 | **Phase 2** | Pace Prediction, Enhanced Auto-Switch | ~12 hours | Phase 1 (logging) |
 | **Phase 3** | Token Auto-Refresh, Account Reconciliation | ~9 hours | Phase 1 (JWT identity) |
 | **Phase 4** | Managed Homes, Parallel Fetch, Robust Identity, Persistent RPC | ~40 hours | Phase 3 (reconciliation) |
-| **Phase 5** | Cost Tracking, Dynamic Icon, Credits, Health Summary, Updates | ~28 hours | Phase 2 (pace data) |
+| **Phase 5** | Cost Tracking, Dynamic Icon, Credits, Health Summary, Updates, Export/Import | ~36 hours | Phase 2 (pace data) |
 | **Phase 6** | UI Polish for all above | ~8 hours | Phase 5 |
 
-**Total estimated effort:** ~111 hours across 6 phases.
+**Total estimated effort:** ~119 hours across 6 phases.
 
 ### Recommended execution order:
 
@@ -2730,7 +3168,7 @@ HStack {
 2. **Week 2:** Phase 2 (pace prediction + pace-aware auto-switch)
 3. **Week 3:** Phase 3 (token refresh + reconciliation) + start Phase 4 (managed homes design)
 4. **Week 4–5:** Phase 4 (managed homes → parallel fetch → robust identity → persistent RPC — this is the big one)
-5. **Week 6:** Phase 5 (cost tracking + dynamic icon + health summary)
+5. **Week 6:** Phase 5 (cost tracking + dynamic icon + health summary + export/import)
 6. **Week 7:** Phase 6 (UI polish) + testing + release as v0.5.0
 
 ### Test coverage plan:
@@ -2741,4 +3179,4 @@ Each phase should include tests alongside implementation:
 - **Phase 2:** `UsagePaceTests`, `PaceAwareRecommendationTests`
 - **Phase 3:** `TokenRefreshTests`, `AccountReconciliationTests`
 - **Phase 4:** `ManagedHomeFactoryTests`, `AuthSwapServiceTests` (atomic rename), `ParallelFetchTests`, `AccountIdentityTests`, `ManagedAccountMigratorTests`, `CodexRPCSessionTests`
-- **Phase 5:** `CostPricingTests`, `CostScannerTests`, `UpdateCheckerTests`
+- **Phase 5:** `CostPricingTests`, `CostScannerTests`, `AccountExportServiceTests`, `UpdateCheckerTests`
