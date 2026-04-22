@@ -897,6 +897,11 @@ final class AccountsMenuViewModelTests: XCTestCase {
         }
 
         XCTAssertEqual(viewModel.pendingInteractiveLoginSession?.phase, .needsRetry)
+        if let retainedSandbox = viewModel.pendingInteractiveLoginSession?.loginSandboxHome {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: retainedSandbox))
+        } else {
+            XCTFail("Expected retained sandbox for retryable terminal login session.")
+        }
         XCTAssertTrue(service.importFromHomeCalls.isEmpty)
     }
 
