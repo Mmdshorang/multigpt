@@ -1006,6 +1006,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.sequentialLoginState?.successCount, 2)
         XCTAssertEqual(viewModel.sequentialLoginState?.failedCount, 1)
+        XCTAssertTrue(service.removeCalls.contains(where: { $0.name == preparedNames[1] && $0.deleteData }))
 
         service.loginInAppErrorByAccount[preparedNames[1]] = nil
         viewModel.retryFailedSequentialNewAccountLogin()
@@ -1017,6 +1018,47 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.sequentialLoginState?.successCount, 1)
         XCTAssertEqual(viewModel.sequentialLoginState?.failedCount, 0)
+    }
+
+    func testCancelSequentialNewAccountLoginMarksRemainingAsCancelledAndCleansUp() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.loginInAppDelayNanoseconds = 300_000_000
+
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.prepareSequentialNewAccountLogin(count: 3)
+        let preparedNames = viewModel.sequentialLoginState?.items.map(\.accountName) ?? []
+        XCTAssertEqual(preparedNames.count, 3)
+
+        viewModel.startSequentialNewAccountLogin()
+        viewModel.cancelSequentialNewAccountLogin()
+
+        await waitUntil(timeoutSeconds: 2.0) {
+            viewModel.sequentialLoginState?.isFinished == true
+        }
+
+        let cancelledOrFailed = Set(
+            viewModel.sequentialLoginState?.items
+                .filter { $0.status == .cancelled || $0.status == .failed }
+                .map(\.accountName) ?? []
+        )
+        XCTAssertFalse(cancelledOrFailed.isEmpty)
+        XCTAssertTrue(
+            service.removeCalls.contains(where: { call in
+                cancelledOrFailed.contains(call.name) && call.deleteData
+            })
+        )
     }
 
     func testSwitchToAccountCompletesBeforeBackgroundRefreshFinishes() async throws {
@@ -1475,6 +1517,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var openNewLoginError: Error?
     var loginInAppError: Error?
     var loginInAppErrorByAccount: [String: Error] = [:]
+    var loginInAppDelayNanoseconds: UInt64 = 0
     var fetchLimitsDelayNanoseconds: UInt64 = 0
     var loginHomeStatusError: Error?
     var loginHomeStatusExitCode = 0
@@ -1685,6 +1728,9 @@ private final class MockCodexAccountService: CodexAccountServicing {
 
     func loginInApp(account name: String, createIfNeeded: Bool, loginHome: String?) async throws -> String {
         loginInAppCalls.append(LoginCall(account: name, createIfNeeded: createIfNeeded, loginHome: loginHome))
+        if loginInAppDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: loginInAppDelayNanoseconds)
+        }
         if let accountSpecificError = loginInAppErrorByAccount[name] {
             throw accountSpecificError
         }

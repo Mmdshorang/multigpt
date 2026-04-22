@@ -154,6 +154,7 @@ final class AccountActionController {
         }
 
         state.isRunning = true
+        state.cancellationRequested = false
         state.currentIndex = nil
         state.startedAt = Date()
         state.finishedAt = nil
@@ -161,6 +162,8 @@ final class AccountActionController {
             var next = item
             next.status = .pending
             next.message = nil
+            next.didCleanup = false
+            next.resolvedAccountName = nil
             return next
         }
         viewModel.sequentialLoginState = state
@@ -171,18 +174,14 @@ final class AccountActionController {
     }
 
     func cancelSequentialNewAccountLogin() {
-        viewModel.sequentialLoginTask?.cancel()
-        viewModel.sequentialLoginTask = nil
-
-        guard var state = viewModel.sequentialLoginState else {
+        guard var state = viewModel.sequentialLoginState, state.isRunning else {
             return
         }
-        state.isRunning = false
-        state.currentIndex = nil
-        state.finishedAt = Date()
+        state.cancellationRequested = true
         viewModel.sequentialLoginState = state
+        viewModel.sequentialLoginTask?.cancel()
         setAccountFeedback(
-            message: "Batch login cancelled. Completed \(state.attemptedCount)/\(state.totalCount).",
+            message: "Stopping batch login after current step and cleaning up unfinished accounts...",
             error: nil
         )
     }
@@ -461,7 +460,7 @@ final class AccountActionController {
             await runSequentialLoginItem(at: index)
         }
 
-        finishSequentialLogin(cancelled: Task.isCancelled)
+        await finishSequentialLogin(cancelled: Task.isCancelled)
     }
 
     private func runSequentialLoginItem(at index: Int) async {
@@ -489,6 +488,10 @@ final class AccountActionController {
         latestState.items[index].message = outcome.success ? outcome.message : outcome.error
         latestState.currentIndex = nil
         viewModel.sequentialLoginState = latestState
+
+        if !outcome.success {
+            await cleanupSequentialAccount(at: index, reason: "Removed incomplete account.")
+        }
     }
 
     private func runSingleSequentialNewLogin(accountName: String) async -> InteractiveLoginOutcome {
@@ -535,27 +538,95 @@ final class AccountActionController {
         }
     }
 
-    private func finishSequentialLogin(cancelled: Bool) {
+    private func finishSequentialLogin(cancelled: Bool) async {
         viewModel.sequentialLoginTask = nil
         guard var state = viewModel.sequentialLoginState else {
             return
         }
-        state.isRunning = false
-        state.currentIndex = nil
-        state.finishedAt = Date()
+
+        if cancelled {
+            for index in state.items.indices where state.items[index].status == .pending || state.items[index].status == .inProgress {
+                state.items[index].status = .cancelled
+                if state.items[index].message == nil {
+                    state.items[index].message = "Cancelled."
+                }
+            }
+        }
+
         viewModel.sequentialLoginState = state
+        await cleanupIncompleteSequentialAccounts()
+
+        guard var latest = viewModel.sequentialLoginState else {
+            return
+        }
+        latest.isRunning = false
+        latest.cancellationRequested = false
+        latest.currentIndex = nil
+        latest.finishedAt = Date()
+        viewModel.sequentialLoginState = latest
 
         if cancelled {
             setAccountFeedback(
-                message: "Batch login cancelled. Completed \(state.attemptedCount)/\(state.totalCount).",
+                message: "Batch login cancelled. Completed \(latest.completedCount)/\(latest.totalCount). Cleaned up incomplete accounts.",
                 error: nil
             )
             return
         }
 
         setAccountFeedback(
-            message: "Batch login finished. \(state.successCount) succeeded, \(state.failedCount) failed.",
+            message: "Batch login finished. \(latest.successCount) succeeded, \(latest.failedCount) failed, \(latest.cancelledCount) cancelled.",
             error: nil
         )
+    }
+
+    private func cleanupIncompleteSequentialAccounts() async {
+        guard let state = viewModel.sequentialLoginState else {
+            return
+        }
+
+        for index in state.items.indices {
+            let item = state.items[index]
+            guard item.status != .success, !item.didCleanup else {
+                continue
+            }
+            await cleanupSequentialAccount(at: index, reason: "Removed incomplete account.")
+        }
+    }
+
+    private func cleanupSequentialAccount(at index: Int, reason: String) async {
+        guard var state = viewModel.sequentialLoginState,
+              index < state.items.count,
+              !state.items[index].didCleanup
+        else {
+            return
+        }
+
+        let accountName = state.items[index].accountName
+
+        do {
+            let payload = try await viewModel.accountService.removeAccount(name: accountName, deleteData: true)
+            viewModel.removeAccountLocally(named: accountName, currentAccountName: payload.currentAccount)
+            state = viewModel.sequentialLoginState ?? state
+            guard index < state.items.count else { return }
+            state.items[index].didCleanup = true
+            let existing = state.items[index].message?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let existing, !existing.isEmpty {
+                state.items[index].message = "\(existing) \(reason)"
+            } else {
+                state.items[index].message = reason
+            }
+            viewModel.sequentialLoginState = state
+        } catch {
+            state = viewModel.sequentialLoginState ?? state
+            guard index < state.items.count else { return }
+            let cleanupError = "Cleanup failed: \(error.localizedDescription)"
+            let existing = state.items[index].message?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let existing, !existing.isEmpty {
+                state.items[index].message = "\(existing) \(cleanupError)"
+            } else {
+                state.items[index].message = cleanupError
+            }
+            viewModel.sequentialLoginState = state
+        }
     }
 }

@@ -281,6 +281,7 @@ enum SequentialLoginItemStatus: String {
     case inProgress
     case success
     case failed
+    case cancelled
 }
 
 struct SequentialLoginItem: Identifiable {
@@ -289,19 +290,22 @@ struct SequentialLoginItem: Identifiable {
     var resolvedAccountName: String?
     var status: SequentialLoginItemStatus
     var message: String?
+    var didCleanup: Bool
 
     init(
         id: UUID = UUID(),
         accountName: String,
         resolvedAccountName: String? = nil,
         status: SequentialLoginItemStatus = .pending,
-        message: String? = nil
+        message: String? = nil,
+        didCleanup: Bool = false
     ) {
         self.id = id
         self.accountName = accountName
         self.resolvedAccountName = resolvedAccountName
         self.status = status
         self.message = message
+        self.didCleanup = didCleanup
     }
 }
 
@@ -310,6 +314,7 @@ struct SequentialLoginState {
 
     var items: [SequentialLoginItem]
     var isRunning: Bool
+    var cancellationRequested: Bool
     var currentIndex: Int?
     var startedAt: Date?
     var finishedAt: Date?
@@ -317,21 +322,25 @@ struct SequentialLoginState {
     init(
         items: [SequentialLoginItem],
         isRunning: Bool = false,
+        cancellationRequested: Bool = false,
         currentIndex: Int? = nil,
         startedAt: Date? = nil,
         finishedAt: Date? = nil
     ) {
         self.items = items
         self.isRunning = isRunning
+        self.cancellationRequested = cancellationRequested
         self.currentIndex = currentIndex
         self.startedAt = startedAt
         self.finishedAt = finishedAt
     }
 
     var totalCount: Int { items.count }
+    var completedCount: Int { items.filter { $0.status == .success || $0.status == .failed || $0.status == .cancelled }.count }
     var attemptedCount: Int { items.filter { $0.status != .pending }.count }
     var successCount: Int { items.filter { $0.status == .success }.count }
     var failedCount: Int { items.filter { $0.status == .failed }.count }
+    var cancelledCount: Int { items.filter { $0.status == .cancelled }.count }
     var pendingCount: Int { items.filter { $0.status == .pending }.count }
     var isFinished: Bool { !isRunning && finishedAt != nil }
     var hasFailures: Bool { failedCount > 0 }

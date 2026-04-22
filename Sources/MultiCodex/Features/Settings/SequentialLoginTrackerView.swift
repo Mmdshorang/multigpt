@@ -32,10 +32,17 @@ struct SequentialLoginTrackerView: View {
 
                     HStack(spacing: 8) {
                         trackerMetric(label: "Total", value: "\(state.totalCount)")
-                        trackerMetric(label: "Done", value: "\(state.successCount + state.failedCount)")
+                        trackerMetric(label: "Done", value: "\(state.completedCount)")
                         trackerMetric(label: "Success", value: "\(state.successCount)")
                         trackerMetric(label: "Failed", value: "\(state.failedCount)")
                     }
+
+                    ProgressView(value: Double(state.completedCount), total: Double(max(1, state.totalCount)))
+                        .tint(DashboardTokens.accent)
+
+                    Text(statusLine(state: state))
+                        .font(DashboardTokens.Font.metadata().weight(.semibold))
+                        .foregroundStyle(statusColor(state: state))
                 }
             }
 
@@ -63,7 +70,7 @@ struct SequentialLoginTrackerView: View {
 
             HStack(spacing: 8) {
                 ActionPillButton(
-                    title: "Start",
+                    title: state.isFinished ? "Run Again" : "Start",
                     symbol: "play.fill",
                     role: .primary,
                     isDisabled: !canStart(state)
@@ -72,10 +79,10 @@ struct SequentialLoginTrackerView: View {
                 }
 
                 ActionPillButton(
-                    title: "Cancel",
+                    title: state.cancellationRequested ? "Stopping..." : "Cancel",
                     symbol: "xmark",
                     role: .secondary,
-                    isDisabled: !state.isRunning
+                    isDisabled: !state.isRunning || state.cancellationRequested
                 ) {
                     viewModel.cancelSequentialNewAccountLogin()
                 }
@@ -140,6 +147,9 @@ struct SequentialLoginTrackerView: View {
         case .failed:
             color = DashboardTokens.statusRed
             symbol = "xmark.octagon.fill"
+        case .cancelled:
+            color = DashboardTokens.statusOrange
+            symbol = "stop.circle.fill"
         }
 
         return VStack(alignment: .leading, spacing: 4) {
@@ -201,7 +211,36 @@ struct SequentialLoginTrackerView: View {
     }
 
     private func canStart(_ state: SequentialLoginState) -> Bool {
-        !state.isRunning && state.pendingCount > 0
+        !state.isRunning && state.totalCount > 0
+    }
+
+    private func statusLine(state: SequentialLoginState) -> String {
+        if state.isRunning {
+            if state.cancellationRequested {
+                return "Stopping after current step and cleaning up unfinished accounts..."
+            }
+            if let currentIndex = state.currentIndex, currentIndex < state.items.count {
+                let current = state.items[currentIndex]
+                return "Logging in \(current.accountName) (\(currentIndex + 1)/\(state.totalCount))"
+            }
+            return "Running batch login..."
+        }
+
+        if state.isFinished {
+            return "Finished: \(state.successCount) succeeded, \(state.failedCount) failed, \(state.cancelledCount) cancelled."
+        }
+
+        return "Ready to start."
+    }
+
+    private func statusColor(state: SequentialLoginState) -> Color {
+        if state.isRunning {
+            return state.cancellationRequested ? DashboardTokens.statusOrange : DashboardTokens.accent
+        }
+        if state.isFinished {
+            return state.failedCount == 0 ? DashboardTokens.statusGreen : DashboardTokens.statusOrange
+        }
+        return DashboardTokens.textSecondary
     }
 
     private func settingsSectionIntro(title: String, description: String, symbol: String) -> some View {
