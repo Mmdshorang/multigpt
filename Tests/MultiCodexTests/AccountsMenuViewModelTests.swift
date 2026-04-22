@@ -979,6 +979,38 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertFalse(loginHome?.contains("/T/multicodex-login-") == true)
     }
 
+    func testStartLoginFlowCleansUpPersistentLoginSandboxAfterCompletion() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.startLoginFlow(accountName: "fresh", createIfNeeded: true)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !service.loginInAppCalls.isEmpty && service.importFromHomeCalls.contains(where: { $0.name == "fresh" })
+        }
+
+        let loginHome = service.loginInAppCalls.first?.loginHome
+        XCTAssertNotNil(loginHome)
+        if let loginHome {
+            await waitUntil(timeoutSeconds: 1.0) {
+                !FileManager.default.fileExists(atPath: loginHome)
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: loginHome))
+        }
+    }
+
     func testPrepareSequentialNewAccountLoginClampsRequestedCountToFive() {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
@@ -1046,6 +1078,30 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.sequentialLoginState?.successCount, 1)
         XCTAssertEqual(viewModel.sequentialLoginState?.failedCount, 0)
+    }
+
+    func testStartSequentialNewAccountLoginDoesNotStartWhileSwitchIsInProgress() {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.prepareSequentialNewAccountLogin(count: 2)
+        viewModel.switchingAccountName = "alpha"
+        viewModel.startSequentialNewAccountLogin()
+
+        XCTAssertEqual(viewModel.sequentialLoginState?.isRunning, false)
+        XCTAssertNil(viewModel.sequentialLoginTask)
     }
 
     func testCancelSequentialNewAccountLoginMarksRemainingAsCancelledAndCleansUp() async {

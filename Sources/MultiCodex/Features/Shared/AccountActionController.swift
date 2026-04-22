@@ -86,8 +86,10 @@ final class AccountActionController {
     }
 
     func launchTerminalLoginFallback(accountName: String, createIfNeeded: Bool, rootError: Error) {
+        var sessionHomeToCleanup: String?
         do {
             let session = try makeInteractiveLoginSession(accountName: accountName, createIfNeeded: createIfNeeded)
+            sessionHomeToCleanup = session.loginSandboxHome
             if createIfNeeded {
                 try viewModel.accountService.openNewAccountLoginInTerminal(
                     newAccountName: accountName,
@@ -102,6 +104,9 @@ final class AccountActionController {
                 error: nil
             )
         } catch {
+            if let sessionHomeToCleanup {
+                removeLoginSandboxIfPossible(sessionHomeToCleanup)
+            }
             setAccountFeedback(
                 message: nil,
                 error: "\(rootError.localizedDescription) (Fallback failed: \(error.localizedDescription))"
@@ -148,6 +153,7 @@ final class AccountActionController {
               !state.items.isEmpty,
               !state.isRunning,
               viewModel.accountActionInFlightName == nil,
+              viewModel.switchingAccountName == nil,
               viewModel.pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
         else {
             return
@@ -205,6 +211,13 @@ final class AccountActionController {
     }
 
     func completeInteractiveLogin(session: PendingInteractiveLoginSession, preserveFailedSession: Bool) async -> InteractiveLoginOutcome {
+        var retainSandboxHome = false
+        defer {
+            if !retainSandboxHome {
+                removeLoginSandboxIfPossible(session.loginSandboxHome)
+            }
+        }
+
         do {
             let status = try await viewModel.accountService.fetchStatusForLoginHome(
                 session.loginSandboxHome,
@@ -214,6 +227,7 @@ final class AccountActionController {
             guard status.exitCode == 0 else {
                 if preserveFailedSession {
                     viewModel.pendingInteractiveLoginSession = session.withPhase(.needsRetry)
+                    retainSandboxHome = true
                 } else {
                     viewModel.pendingInteractiveLoginSession = nil
                 }
@@ -319,6 +333,7 @@ final class AccountActionController {
         } catch {
             if preserveFailedSession {
                 viewModel.pendingInteractiveLoginSession = session.withPhase(.needsRetry)
+                retainSandboxHome = true
                 setAccountFeedback(
                     message: nil,
                     error: "\(error.localizedDescription) Return to Terminal/browser and retry the login flow."
@@ -509,19 +524,26 @@ final class AccountActionController {
         viewModel.feedbackAutoClearTask = nil
         viewModel.accountActionMessage = "Starting login for \(accountName)..."
         viewModel.accountActionError = nil
+        var transientSandboxHome: String?
         defer {
+            if let transientSandboxHome {
+                removeLoginSandboxIfPossible(transientSandboxHome)
+            }
             viewModel.accountActionInFlightName = nil
         }
 
         do {
             let session = try makeInteractiveLoginSession(accountName: accountName, createIfNeeded: true)
+            transientSandboxHome = session.loginSandboxHome
             viewModel.pendingInteractiveLoginSession = nil
             _ = try await viewModel.accountService.loginInApp(
                 account: accountName,
                 createIfNeeded: true,
                 loginHome: session.loginSandboxHome
             )
-            return await completeInteractiveLogin(session: session, preserveFailedSession: false)
+            let outcome = await completeInteractiveLogin(session: session, preserveFailedSession: false)
+            transientSandboxHome = nil
+            return outcome
         } catch {
             viewModel.pendingInteractiveLoginSession = nil
             if shouldFallbackToTerminal(error) {
@@ -635,6 +657,19 @@ final class AccountActionController {
                 state.items[index].message = cleanupError
             }
             viewModel.sequentialLoginState = state
+        }
+    }
+
+    private func removeLoginSandboxIfPossible(_ homePath: String) {
+        guard !homePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+        do {
+            if viewModel.fileManager.fileExists(atPath: homePath) {
+                try viewModel.fileManager.removeItem(atPath: homePath)
+            }
+        } catch {
+            // Best-effort cleanup only; login result should not be blocked by cleanup failure.
         }
     }
 }

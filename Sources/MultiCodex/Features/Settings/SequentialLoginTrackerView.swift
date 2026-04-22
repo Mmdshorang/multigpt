@@ -211,7 +211,11 @@ struct SequentialLoginTrackerView: View {
     }
 
     private func canStart(_ state: SequentialLoginState) -> Bool {
-        !state.isRunning && state.totalCount > 0
+        !state.isRunning
+            && state.totalCount > 0
+            && viewModel.accountActionInFlightName == nil
+            && viewModel.switchingAccountName == nil
+            && viewModel.pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
     }
 
     private func statusLine(state: SequentialLoginState) -> String {
