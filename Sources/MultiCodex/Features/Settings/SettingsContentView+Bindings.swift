@@ -82,7 +82,9 @@ extension SettingsContentView {
     }
 
     var isAccountActionRunning: Bool {
-        viewModel.accountActionInFlightName != nil || viewModel.switchingAccountName != nil
+        viewModel.accountActionInFlightName != nil
+            || viewModel.switchingAccountName != nil
+            || viewModel.sequentialLoginState?.isRunning == true
     }
 
     var runtimeStatus: RuntimeStatusPresentation {

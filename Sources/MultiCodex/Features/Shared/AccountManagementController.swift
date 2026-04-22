@@ -28,6 +28,24 @@ final class AccountManagementController {
         accountActions.startLoginFlow(accountName: generateRandomAccountName(), createIfNeeded: true)
     }
 
+    func prepareSequentialNewAccountLogin(count: Int) {
+        let normalizedCount = max(1, min(SequentialLoginState.maxAccountCount, count))
+        let names = generateRandomAccountNames(count: normalizedCount)
+        accountActions.prepareSequentialNewAccountLogin(accountNames: names)
+    }
+
+    func startSequentialNewAccountLogin() {
+        accountActions.startSequentialNewAccountLogin()
+    }
+
+    func cancelSequentialNewAccountLogin() {
+        accountActions.cancelSequentialNewAccountLogin()
+    }
+
+    func retryFailedSequentialNewAccountLogin() {
+        accountActions.retryFailedSequentialNewAccountLogin()
+    }
+
     func renameAccount(from oldName: String, to rawNewName: String) {
         let viewModel = viewModel
         let newName = rawNewName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -158,6 +176,23 @@ final class AccountManagementController {
 
     private func generateRandomAccountName() -> String {
         let existing = Set(viewModel.accounts.map(\.name))
+        return generateRandomAccountName(existingNames: existing)
+    }
+
+    private func generateRandomAccountNames(count: Int) -> [String] {
+        var existing = Set(viewModel.accounts.map(\.name))
+        var generated: [String] = []
+        generated.reserveCapacity(count)
+        for _ in 0..<count {
+            let next = generateRandomAccountName(existingNames: existing)
+            generated.append(next)
+            existing.insert(next)
+        }
+        return generated
+    }
+
+    private func generateRandomAccountName(existingNames: Set<String>) -> String {
+        let existing = existingNames
         for _ in 0..<20 {
             let random = UUID().uuidString
                 .replacingOccurrences(of: "-", with: "")

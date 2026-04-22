@@ -17,6 +17,7 @@ protocol CodexAccountServicing: AnyObject {
     func openLoginInTerminal(account name: String, loginHome: String?) throws
     func openNewAccountLoginInTerminal(newAccountName name: String, loginHome: String?) throws
     func loginInApp(account name: String, createIfNeeded: Bool, loginHome: String?) async throws -> String
+    func inferDefaultWorkspaceEmail(fromLoginHome homePath: String) -> String?
     func effectiveMulticodexHomePath() -> String
     func probeRuntime() -> RuntimeProbe
 }

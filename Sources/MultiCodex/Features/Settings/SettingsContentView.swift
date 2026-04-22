@@ -1,12 +1,15 @@
 import SwiftUI
 
 struct SettingsContentView: View {
+    @Environment(\.openWindow) var openWindow
+
     @ObservedObject var viewModel: AccountsMenuViewModel
 
     @State var codexPathDraft = ""
     @State var renameDrafts: [String: String] = [:]
     @State var removalDeleteDataChoice: [String: Bool] = [:]
     @State var expandedAccountNames: Set<String> = []
+    @State var sequentialLoginCountText = "1"
 
     var body: some View {
         NavigationSplitView {

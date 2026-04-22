@@ -29,3 +29,5 @@ node_modules/
 # Local auth/config state
 .codex/
 .config/
+
+.third_party/
