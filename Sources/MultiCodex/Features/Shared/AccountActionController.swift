@@ -437,8 +437,8 @@ final class AccountActionController {
     }
 
     private func prepareFreshLoginSandbox() throws -> String {
-        let rootURL = viewModel.fileManager.temporaryDirectory
-            .appendingPathComponent("multicodex-login-\(UUID().uuidString)", isDirectory: true)
+        let rootURL = try prepareLoginSandboxRootDirectory()
+            .appendingPathComponent("session-\(UUID().uuidString)", isDirectory: true)
         let homeURL = URL(fileURLWithPath: rootURL.path, isDirectory: true)
         let codexURL = homeURL.appendingPathComponent(".codex", isDirectory: true)
         let multicodexURL = homeURL.appendingPathComponent(".config/multicodex", isDirectory: true)
@@ -446,6 +446,14 @@ final class AccountActionController {
         try viewModel.fileManager.createDirectory(at: codexURL, withIntermediateDirectories: true)
         try viewModel.fileManager.createDirectory(at: multicodexURL, withIntermediateDirectories: true)
         return rootURL.path
+    }
+
+    private func prepareLoginSandboxRootDirectory() throws -> URL {
+        let root = viewModel.fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".multicodex", isDirectory: true)
+            .appendingPathComponent("login-sandboxes", isDirectory: true)
+        try viewModel.fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
     }
 
     private func runSequentialLogin() async {

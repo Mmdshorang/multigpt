@@ -951,6 +951,34 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "personal-fresh@example.com" && $0.hasAuth }))
     }
 
+    func testStartLoginFlowUsesPersistentLoginSandboxHomePath() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.startLoginFlow(accountName: "fresh", createIfNeeded: true)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            !service.loginInAppCalls.isEmpty
+        }
+
+        let loginHome = service.loginInAppCalls.first?.loginHome
+        XCTAssertNotNil(loginHome)
+        XCTAssertTrue(loginHome?.contains("/.multicodex/login-sandboxes/session-") == true)
+        XCTAssertFalse(loginHome?.contains("/T/multicodex-login-") == true)
+    }
+
     func testPrepareSequentialNewAccountLoginClampsRequestedCountToFive() {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
