@@ -63,7 +63,7 @@ extension AccountsMenuContentView {
                 menuSelectionLabel("Name", isSelected: viewModel.accountSortCriterion == .name)
             }
         } label: {
-            sortOptionPill(title: "Sort", value: viewModel.accountSortCriterion.title)
+            sortOptionPill(value: viewModel.accountSortCriterion.title)
         }
         .menuStyle(.borderlessButton)
         .help("Sort criterion")
@@ -82,7 +82,7 @@ extension AccountsMenuContentView {
                 menuSelectionLabel("Weekly", isSelected: viewModel.accountSortWindow == .weekly)
             }
         } label: {
-            sortOptionPill(title: "Window", value: viewModel.accountSortWindow.title)
+            sortOptionPill(value: viewModel.accountSortWindow.title)
         }
         .menuStyle(.borderlessButton)
         .help("Sort window")
@@ -101,7 +101,7 @@ extension AccountsMenuContentView {
                 menuSelectionLabel("High to low", isSelected: viewModel.accountSortDirection == .descending)
             }
         } label: {
-            sortOptionPill(title: "Order", value: viewModel.accountSortDirection.shortTitle)
+            sortOptionPill(value: viewModel.accountSortDirection.shortTitle)
         }
         .menuStyle(.borderlessButton)
         .help("Sort direction")
@@ -121,10 +121,8 @@ extension AccountsMenuContentView {
         }
     }
 
-    private func sortOptionPill(title: String, value: String) -> some View {
+    private func sortOptionPill(value: String) -> some View {
         HStack(spacing: 6) {
-            Text(title)
-                .foregroundColor(DashboardTokens.textTertiary)
             Text(value)
                 .foregroundColor(DashboardTokens.textPrimary)
                 .fontWeight(.semibold)
@@ -561,7 +559,7 @@ extension AccountsMenuContentView {
             return (error, DashboardTokens.statusRed)
         }
         if let message = viewModel.accountActionMessage {
-            return (message, DashboardTokens.statusGreen)
+            return (message, DashboardTokens.accentSoft)
         }
         return nil
     }

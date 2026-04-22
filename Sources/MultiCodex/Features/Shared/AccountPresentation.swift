@@ -10,7 +10,7 @@ enum AccountPresentation {
     static func statusColor(for state: AccountConnectionState) -> Color {
         switch state {
         case .connected:
-            return DashboardTokens.statusGreen
+            return DashboardTokens.accentSoft
         case .needsLogin:
             return DashboardTokens.statusOrange
         case .error:
@@ -45,7 +45,7 @@ enum AccountPresentation {
             return RuntimeStatusPresentation(
                 text: summary ?? "Codex runtime is available.",
                 symbol: "checkmark.circle.fill",
-                color: DashboardTokens.statusGreen
+                color: DashboardTokens.accentSoft
             )
         }
 
@@ -131,7 +131,7 @@ struct AccountUsageMetricCard: View {
         case .warning:
             return DashboardTokens.statusOrange
         case .normal:
-            return DashboardTokens.statusGreen
+            return DashboardTokens.accentSoft
         }
     }
 

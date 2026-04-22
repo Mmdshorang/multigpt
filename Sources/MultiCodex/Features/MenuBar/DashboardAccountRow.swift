@@ -127,7 +127,7 @@ struct DashboardAccountRow: View {
     private var statusColor: Color {
         switch row.account.connectionState {
         case .connected:
-            return DashboardTokens.statusGreen
+            return DashboardTokens.accentSoft
         case .needsLogin:
             return DashboardTokens.statusOrange
         case .error:
@@ -135,7 +135,7 @@ struct DashboardAccountRow: View {
         }
     }
 
-    private var connectionLabel: String {
+    private var connectionLabel: String? {
         if row.isCurrent {
             return "Current"
         }
@@ -144,7 +144,7 @@ struct DashboardAccountRow: View {
         case .relogin:
             return "Needs Login"
         case .switchAccount:
-            return "Available"
+            return nil
         case .none:
             return row.account.connectionState.label
         }
@@ -156,18 +156,20 @@ struct DashboardAccountRow: View {
                 activationCheckboxButton
 
                 HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
-                            Text(row.name)
-                                .font(DashboardTokens.Font.accountName())
-                                .foregroundStyle(DashboardTokens.textPrimary)
-                                .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                Text(row.name)
+                                    .font(DashboardTokens.Font.accountName())
+                                    .foregroundStyle(DashboardTokens.textPrimary)
+                                    .lineLimit(1)
 
-                            AccountStatusPill(
-                                text: connectionLabel,
-                                color: row.isCurrent ? DashboardTokens.accent : statusColor
-                            )
-                        }
+                                if let connectionLabel {
+                                    AccountStatusPill(
+                                        text: connectionLabel,
+                                        color: row.isCurrent ? DashboardTokens.accent : statusColor
+                                    )
+                                }
+                            }
 
                         Text(row.workspaceEmailHint ?? row.resetText)
                             .font(DashboardTokens.Font.metadata())

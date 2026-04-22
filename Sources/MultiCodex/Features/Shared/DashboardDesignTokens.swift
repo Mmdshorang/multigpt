@@ -7,43 +7,43 @@ enum DashboardTokens {
         value * uiScale
     }
 
-    static let background = Color(red: 0.075, green: 0.082, blue: 0.101)
-    static let backgroundElevated = Color(red: 0.104, green: 0.112, blue: 0.135)
-    static let backgroundTop = Color(red: 0.118, green: 0.127, blue: 0.154)
-    static let backgroundBottom = Color(red: 0.060, green: 0.067, blue: 0.084)
-    static let cardBackground = Color.white.opacity(0.055)
-    static let cardBackgroundElevated = Color.white.opacity(0.075)
-    static let cardBackgroundSubtle = Color.white.opacity(0.035)
-    static let cardBorder = Color.white.opacity(0.085)
-    static let cardBorderStrong = Color.white.opacity(0.15)
-    static let textPrimary = Color.white.opacity(0.96)
-    static let textSecondary = Color.white.opacity(0.72)
-    static let textTertiary = Color.white.opacity(0.48)
-    static let accent = Color(red: 0.42, green: 0.62, blue: 0.98)
-    static let accentSoft = Color(red: 0.63, green: 0.76, blue: 0.98)
-    static let accentBackground = accent.opacity(0.18)
-    static let statusGreen = Color(red: 0.36, green: 0.82, blue: 0.62)
-    static let statusOrange = Color(red: 0.96, green: 0.68, blue: 0.34)
-    static let statusRed = Color(red: 0.96, green: 0.42, blue: 0.40)
+    static let background = Color(red: 0.052, green: 0.056, blue: 0.072)
+    static let backgroundElevated = Color(red: 0.072, green: 0.078, blue: 0.098)
+    static let backgroundTop = Color(red: 0.086, green: 0.090, blue: 0.118)
+    static let backgroundBottom = Color(red: 0.041, green: 0.044, blue: 0.058)
+    static let cardBackground = Color.white.opacity(0.040)
+    static let cardBackgroundElevated = Color.white.opacity(0.058)
+    static let cardBackgroundSubtle = Color.white.opacity(0.026)
+    static let cardBorder = Color.white.opacity(0.072)
+    static let cardBorderStrong = Color.white.opacity(0.13)
+    static let textPrimary = Color.white.opacity(0.95)
+    static let textSecondary = Color.white.opacity(0.68)
+    static let textTertiary = Color.white.opacity(0.44)
+    static let accent = Color(red: 0.45, green: 0.42, blue: 0.95)
+    static let accentSoft = Color(red: 0.58, green: 0.55, blue: 0.98)
+    static let accentBackground = accent.opacity(0.16)
+    static let statusGreen = Color(red: 0.25, green: 0.82, blue: 0.58)
+    static let statusOrange = Color(red: 0.96, green: 0.58, blue: 0.28)
+    static let statusRed = Color(red: 0.92, green: 0.32, blue: 0.32)
     static let ringFiveHour = accent
-    static let ringWeekly = statusGreen
+    static let ringWeekly = accentSoft
     static let sparkDefault = accent.opacity(0.42)
     static let sparkHigh = statusOrange.opacity(0.48)
     static let sparkCritical = statusRed.opacity(0.5)
-    static let inputBackground = Color.white.opacity(0.06)
-    static let inputBorder = Color.white.opacity(0.09)
-    static let inputBorderFocused = accent.opacity(0.72)
-    static let toggleTrackOff = Color.white.opacity(0.18)
+    static let inputBackground = Color.white.opacity(0.048)
+    static let inputBorder = Color.white.opacity(0.082)
+    static let inputBorderFocused = accent.opacity(0.56)
+    static let toggleTrackOff = Color.white.opacity(0.14)
     static let toggleTrackOn = accent
     static let destructive = statusRed
     static let destructiveBackground = destructive.opacity(0.12)
     static let destructiveBorder = destructive.opacity(0.28)
-    static let segmentedActiveBackground = accent.opacity(0.2)
+    static let segmentedActiveBackground = accent.opacity(0.18)
     static let segmentedActiveBorder = accent.opacity(0.36)
-    static let segmentedInactiveBackground = Color.white.opacity(0.035)
-    static let segmentedTrackBackground = Color.white.opacity(0.028)
-    static let sidebarSelectedBackground = accent.opacity(0.14)
-    static let sidebarHoverBackground = Color.white.opacity(0.05)
+    static let segmentedInactiveBackground = Color.white.opacity(0.03)
+    static let segmentedTrackBackground = Color.white.opacity(0.022)
+    static let sidebarSelectedBackground = accent.opacity(0.11)
+    static let sidebarHoverBackground = Color.white.opacity(0.04)
     static let shadowColor = Color.black.opacity(0.32)
 
     static var backgroundGradient: LinearGradient {
@@ -56,7 +56,7 @@ enum DashboardTokens {
 
     static var cardHighlightGradient: LinearGradient {
         LinearGradient(
-            colors: [Color.white.opacity(0.09), Color.white.opacity(0.01)],
+            colors: [Color.white.opacity(0.075), Color.white.opacity(0.008)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )

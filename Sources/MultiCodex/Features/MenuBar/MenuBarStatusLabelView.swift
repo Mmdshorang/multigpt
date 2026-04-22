@@ -48,7 +48,7 @@ private struct TrayMinimalStatusIconView: View {
         case .warning:
             return DashboardTokens.statusOrange
         case .normal:
-            return DashboardTokens.statusGreen
+            return DashboardTokens.accentSoft
         }
     }
 
