@@ -931,7 +931,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         service.stubbedAccounts = [
             AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
         ]
-        service.stubbedDefaultWorkspaceEmailByAccount["fresh"] = "personal-fresh@example.com"
+        service.stubbedInferredEmailFromLoginHome = "personal-fresh@example.com"
 
         let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
@@ -949,6 +949,74 @@ final class AccountsMenuViewModelTests: XCTestCase {
         }
 
         XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "personal-fresh@example.com" && $0.hasAuth }))
+    }
+
+    func testPrepareSequentialNewAccountLoginClampsRequestedCountToFive() {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.prepareSequentialNewAccountLogin(count: 99)
+
+        XCTAssertEqual(viewModel.sequentialLoginState?.totalCount, SequentialLoginState.maxAccountCount)
+        XCTAssertEqual(viewModel.sequentialLoginState?.pendingCount, SequentialLoginState.maxAccountCount)
+    }
+
+    func testSequentialNewAccountLoginContinuesOnFailureAndRetriesFailedOnly() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.prepareSequentialNewAccountLogin(count: 3)
+        let preparedNames = viewModel.sequentialLoginState?.items.map(\.accountName) ?? []
+        XCTAssertEqual(preparedNames.count, 3)
+        service.loginInAppErrorByAccount[preparedNames[1]] = NSError(
+            domain: "test",
+            code: 99,
+            userInfo: [NSLocalizedDescriptionKey: "simulated failure"]
+        )
+
+        viewModel.startSequentialNewAccountLogin()
+
+        await waitUntil(timeoutSeconds: 1.5) {
+            viewModel.sequentialLoginState?.isFinished == true
+        }
+
+        XCTAssertEqual(viewModel.sequentialLoginState?.successCount, 2)
+        XCTAssertEqual(viewModel.sequentialLoginState?.failedCount, 1)
+
+        service.loginInAppErrorByAccount[preparedNames[1]] = nil
+        viewModel.retryFailedSequentialNewAccountLogin()
+
+        await waitUntil(timeoutSeconds: 1.5) {
+            viewModel.sequentialLoginState?.isFinished == true
+                && viewModel.sequentialLoginState?.totalCount == 1
+        }
+
+        XCTAssertEqual(viewModel.sequentialLoginState?.successCount, 1)
+        XCTAssertEqual(viewModel.sequentialLoginState?.failedCount, 0)
     }
 
     func testSwitchToAccountCompletesBeforeBackgroundRefreshFinishes() async throws {
@@ -1406,12 +1474,14 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var openLoginError: Error?
     var openNewLoginError: Error?
     var loginInAppError: Error?
+    var loginInAppErrorByAccount: [String: Error] = [:]
     var fetchLimitsDelayNanoseconds: UInt64 = 0
     var loginHomeStatusError: Error?
     var loginHomeStatusExitCode = 0
     var loginHomeStatusOutput = "ok"
     var probeRuntimeResult = RuntimeProbe(isAvailable: true, summary: "ok")
     var stubbedDefaultWorkspaceEmailByAccount: [String: String] = [:]
+    var stubbedInferredEmailFromLoginHome: String?
 
     private(set) var switchCalls: [String] = []
     private(set) var removeCalls: [RemoveCall] = []
@@ -1615,10 +1685,17 @@ private final class MockCodexAccountService: CodexAccountServicing {
 
     func loginInApp(account name: String, createIfNeeded: Bool, loginHome: String?) async throws -> String {
         loginInAppCalls.append(LoginCall(account: name, createIfNeeded: createIfNeeded, loginHome: loginHome))
+        if let accountSpecificError = loginInAppErrorByAccount[name] {
+            throw accountSpecificError
+        }
         if let loginInAppError {
             throw loginInAppError
         }
         return "ok"
+    }
+
+    func inferDefaultWorkspaceEmail(fromLoginHome _: String) -> String? {
+        stubbedInferredEmailFromLoginHome
     }
 
     func effectiveMulticodexHomePath() -> String {
