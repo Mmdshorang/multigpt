@@ -55,19 +55,19 @@ private struct TrayMinimalStatusIconView: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Image(systemName: symbolName)
-                .font(.system(size: DashboardTokens.scaled(12), weight: .semibold))
+                .font(DashboardTokens.Font.headline())
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.primary)
 
             Circle()
                 .fill(indicatorColor)
-                .frame(width: DashboardTokens.scaled(5), height: DashboardTokens.scaled(5))
+                .frame(width: 5, height: 5)
                 .overlay(
                     Circle()
-                        .stroke(DashboardTokens.background, lineWidth: DashboardTokens.scaled(1.2))
+                        .stroke(DashboardTokens.background, lineWidth: 1)
                 )
                 .offset(x: 1, y: 1)
         }
-        .frame(width: DashboardTokens.scaled(18), height: DashboardTokens.scaled(14))
+        .frame(width: 18, height: 16)
     }
 }

@@ -17,14 +17,13 @@ struct DashboardAccountRow: View {
     let onToggleExpanded: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // MARK: - Derived State
+
     private var isPrimaryActionInProgress: Bool {
         switch row.primaryAction {
-        case .switchAccount:
-            return isSwitching
-        case .relogin:
-            return isAuthRunning
-        case .none:
-            return false
+        case .switchAccount: return isSwitching
+        case .relogin: return isAuthRunning
+        case .none: return false
         }
     }
 
@@ -34,34 +33,25 @@ struct DashboardAccountRow: View {
 
     private var progressColor: Color {
         switch UsageLevel.from(usedPercent: compactUsedPercent) {
-        case .critical:
-            return DashboardTokens.statusRed
-        case .warning:
-            return DashboardTokens.statusOrange
-        case .normal:
-            return DashboardTokens.accent
+        case .critical: return DashboardTokens.statusRed
+        case .warning: return DashboardTokens.statusOrange
+        case .normal: return DashboardTokens.accent
         }
     }
 
     private var activationHelpText: String {
         switch row.primaryAction {
-        case .switchAccount:
-            return "Switch to this account"
-        case .relogin:
-            return "Re-login this account"
-        case .none:
-            return "Current account"
+        case .switchAccount: return "Switch to this account"
+        case .relogin: return "Re-login this account"
+        case .none: return "Current account"
         }
     }
 
     private var activationSymbol: String {
         switch row.primaryAction {
-        case .switchAccount:
-            return "arrow.left.arrow.right.circle.fill"
-        case .relogin:
-            return "arrow.triangle.2.circlepath.circle.fill"
-        case .none:
-            return "checkmark.circle.fill"
+        case .switchAccount: return "arrow.left.arrow.right.circle.fill"
+        case .relogin: return "arrow.triangle.2.circlepath.circle.fill"
+        case .none: return "checkmark.circle.fill"
         }
     }
 
@@ -71,103 +61,88 @@ struct DashboardAccountRow: View {
 
     private var activationForegroundColor: Color {
         switch row.primaryAction {
-        case .switchAccount:
-            return DashboardTokens.textSecondary
-        case .relogin:
-            return DashboardTokens.statusOrange
-        case .none:
-            return DashboardTokens.accent
+        case .switchAccount: return DashboardTokens.textSecondary
+        case .relogin: return DashboardTokens.statusOrange
+        case .none: return DashboardTokens.accent
         }
     }
 
     private var activationBackgroundColor: Color {
         switch row.primaryAction {
-        case .switchAccount:
-            return DashboardTokens.cardBackgroundSubtle
-        case .relogin:
-            return DashboardTokens.statusOrange.opacity(0.18)
-        case .none:
-            return DashboardTokens.accentBackground.opacity(0.9)
+        case .switchAccount: return DashboardTokens.cardBackgroundSubtle
+        case .relogin: return DashboardTokens.statusOrange.opacity(0.14)
+        case .none: return DashboardTokens.accentBackground.opacity(0.85)
         }
     }
 
     private var activationBorderColor: Color {
         switch row.primaryAction {
-        case .switchAccount:
-            return DashboardTokens.cardBorder
-        case .relogin:
-            return DashboardTokens.statusOrange.opacity(0.52)
-        case .none:
-            return DashboardTokens.accent.opacity(0.4)
+        case .switchAccount: return DashboardTokens.cardBorder
+        case .relogin: return DashboardTokens.statusOrange.opacity(0.48)
+        case .none: return DashboardTokens.accent.opacity(0.36)
         }
     }
 
     private var rowBackgroundColor: Color {
         if row.isCurrent {
-            return DashboardTokens.accentBackground.opacity(0.44)
+            return DashboardTokens.accentBackground.opacity(0.40)
         }
         if row.primaryAction == .relogin {
-            return DashboardTokens.statusOrange.opacity(0.10)
+            return DashboardTokens.statusOrange.opacity(0.08)
         }
         return DashboardTokens.cardBackgroundSubtle
     }
 
     private var rowBorderColor: Color {
         if row.isCurrent {
-            return DashboardTokens.accent.opacity(0.3)
+            return DashboardTokens.accent.opacity(0.26)
         }
         if row.primaryAction == .relogin {
-            return DashboardTokens.statusOrange.opacity(0.24)
+            return DashboardTokens.statusOrange.opacity(0.20)
         }
         return DashboardTokens.cardBorder
     }
 
     private var statusColor: Color {
         switch row.account.connectionState {
-        case .connected:
-            return DashboardTokens.accentSoft
-        case .needsLogin:
-            return DashboardTokens.statusOrange
-        case .error:
-            return DashboardTokens.statusRed
+        case .connected: return DashboardTokens.accentSoft
+        case .needsLogin: return DashboardTokens.statusOrange
+        case .error: return DashboardTokens.statusRed
         }
     }
 
     private var connectionLabel: String? {
-        if row.isCurrent {
-            return "Current"
-        }
-
+        if row.isCurrent { return "Current" }
         switch row.primaryAction {
-        case .relogin:
-            return "Needs Login"
-        case .switchAccount:
-            return nil
-        case .none:
-            return row.account.connectionState.label
+        case .relogin: return "Needs Login"
+        case .switchAccount: return nil
+        case .none: return row.account.connectionState.label
         }
     }
 
+    // MARK: - Body
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
+            // ── Collapsed Row ──
+            HStack(spacing: 10) {
                 activationCheckboxButton
 
-                HStack(spacing: 10) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 8) {
-                                Text(row.name)
-                                    .font(DashboardTokens.Font.accountName())
-                                    .foregroundStyle(DashboardTokens.textPrimary)
-                                    .lineLimit(1)
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text(row.name)
+                                .font(DashboardTokens.Font.accountName())
+                                .foregroundStyle(DashboardTokens.textPrimary)
+                                .lineLimit(1)
 
-                                if let connectionLabel {
-                                    AccountStatusPill(
-                                        text: connectionLabel,
-                                        color: row.isCurrent ? DashboardTokens.accent : statusColor
-                                    )
-                                }
+                            if let connectionLabel {
+                                AccountStatusPill(
+                                    text: connectionLabel,
+                                    color: row.isCurrent ? DashboardTokens.accent : statusColor
+                                )
                             }
+                        }
 
                         Text(row.workspaceEmailHint ?? row.resetText)
                             .font(DashboardTokens.Font.metadata())
@@ -177,29 +152,29 @@ struct DashboardAccountRow: View {
 
                     Spacer(minLength: 8)
 
-                    VStack(alignment: .trailing, spacing: 8) {
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text("5h \(fiveHourPercentText) • Week \(weeklyPercentText)")
-                                .font(DashboardTokens.Font.metadata().weight(.semibold))
-                                .foregroundStyle(DashboardTokens.textPrimary)
-                                .monospacedDigit()
+                    VStack(alignment: .trailing, spacing: 5) {
+                        Text("5h \(fiveHourPercentText) \u{2022} Wk \(weeklyPercentText)")
+                            .font(DashboardTokens.Font.metadata().weight(.semibold))
+                            .foregroundStyle(DashboardTokens.textPrimary)
+                            .monospacedDigit()
 
-                            inlineMicroBar
-                        }
-
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
-                            .foregroundStyle(DashboardTokens.textTertiary)
-                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        inlineMicroBar
                     }
+
+                    Image(systemName: "chevron.down")
+                        .font(DashboardTokens.Font.chevron())
+                        .foregroundStyle(DashboardTokens.textTertiary)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isExpanded)
                 }
                 .contentShape(Rectangle())
                 .help(primaryAreaHelpText)
             }
 
+            // ── Expanded Detail ──
             if isExpanded {
                 expandedContent
-                    .padding(.top, DashboardTokens.scaled(14))
+                    .padding(.top, 12)
                     .transition(
                         .asymmetric(
                             insertion: .opacity.combined(with: .move(edge: .top)),
@@ -233,14 +208,16 @@ struct DashboardAccountRow: View {
         }
     }
 
+    // MARK: - Activation Button
+
     private var primaryAreaHelpText: String {
         switch row.primaryAction {
         case .switchAccount:
-            return "Click row to expand details. Use the leading button to switch accounts quickly."
+            return "Tap to expand. Use the leading button to switch."
         case .relogin:
-            return "Click row to expand details. Use the leading button to start a fresh login."
+            return "Tap to expand. Use the leading button to re-login."
         case .none:
-            return "Current account. Click row to show usage details."
+            return "Current account. Tap to show usage details."
         }
     }
 
@@ -258,37 +235,41 @@ struct DashboardAccountRow: View {
                         .tint(DashboardTokens.accent)
                 } else {
                     Image(systemName: activationSymbol)
-                        .font(.system(size: DashboardTokens.scaled(12), weight: .semibold))
+                        .font(DashboardTokens.Font.caption())
                         .foregroundStyle(activationForegroundColor)
                 }
             }
-            .frame(width: DashboardTokens.scaled(28), height: DashboardTokens.scaled(28))
+            .frame(width: 24, height: 24)
         }
         .buttonStyle(.plain)
         .disabled(isActivationDisabled)
-        .opacity(isActivationDisabled ? 0.52 : 1)
+        .opacity(isActivationDisabled ? 0.48 : 1)
         .accessibilityLabel(activationHelpText)
         .accessibilityValue(isPrimaryActionInProgress ? "In progress" : "Ready")
         .help(activationHelpText)
         .contentShape(Circle())
     }
 
-    private var inlineMicroBar: some View {
-        let barWidth = DashboardTokens.scaled(70)
-        return ZStack(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(Color.white.opacity(0.08))
+    // MARK: - Inline Micro Bar
 
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
+    private var inlineMicroBar: some View {
+        let barWidth: CGFloat = 58
+        return ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Color.white.opacity(0.07))
+
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(progressColor)
                 .frame(width: barWidth * CGFloat(compactProgressFraction))
         }
-        .frame(width: barWidth, height: DashboardTokens.scaled(5))
+        .frame(width: barWidth, height: 3.5)
     }
+
+    // MARK: - Expanded Content
 
     private var expandedContent: some View {
         HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 expandedMetricBar(
                     label: "5H",
                     valueText: fiveHourPercentText,
@@ -305,7 +286,7 @@ struct DashboardAccountRow: View {
 
             Spacer(minLength: 8)
 
-            VStack(alignment: .trailing, spacing: 6) {
+            VStack(alignment: .trailing, spacing: 4) {
                 Text(row.resetText)
                     .font(DashboardTokens.Font.metadata())
                     .foregroundStyle(DashboardTokens.textSecondary)
@@ -327,11 +308,11 @@ struct DashboardAccountRow: View {
         progress: Double,
         color: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
                 Text(label)
-                    .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
-                    .tracking(0.8)
+                    .font(DashboardTokens.Font.caption())
+                    .tracking(0.5)
                     .foregroundStyle(DashboardTokens.textTertiary)
                 Text(valueText)
                     .font(DashboardTokens.Font.metadata().weight(.semibold))
@@ -339,16 +320,16 @@ struct DashboardAccountRow: View {
                     .monospacedDigit()
             }
 
-            let barWidth = DashboardTokens.scaled(144)
+            let barWidth: CGFloat = 118
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(Color.white.opacity(0.08))
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.white.opacity(0.07))
 
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(color)
                     .frame(width: barWidth * CGFloat(min(1, max(0, progress))))
             }
-            .frame(width: barWidth, height: DashboardTokens.scaled(5))
+            .frame(width: barWidth, height: 3.5)
         }
     }
 }
