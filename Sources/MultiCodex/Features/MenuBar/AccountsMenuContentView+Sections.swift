@@ -7,7 +7,7 @@ extension AccountsMenuContentView {
     var header: some View {
         HStack(alignment: .center, spacing: 0) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("MultiCodex")
+                Text(viewModel.currentAccount?.name ?? "MultiCodex")
                     .font(DashboardTokens.Font.cardHeading())
                     .foregroundStyle(DashboardTokens.textPrimary)
 
@@ -244,7 +244,6 @@ extension AccountsMenuContentView {
                             .font(DashboardTokens.Font.accountName())
                             .foregroundStyle(DashboardTokens.textPrimary)
                             .lineLimit(1)
-                        AccountStatusPill(text: account.connectionState.label, color: AccountPresentation.statusColor(for: account.connectionState))
                     }
 
                     if let email = account.workspaceEmailHint {
@@ -306,18 +305,6 @@ extension AccountsMenuContentView {
 
                 Spacer()
 
-                if canToggleShowAll {
-                    ActionPillButton(
-                        title: showAllAccounts ? "Show Less" : "Show All",
-                        symbol: showAllAccounts ? "rectangle.compress.vertical" : "rectangle.expand.vertical",
-                        role: .secondary,
-                        layout: .iconOnly
-                    ) {
-                        toggleShowAllAccounts()
-                    }
-                    .help(showAllAccounts ? "Show fewer accounts" : "Show all accounts")
-                }
-
                 ActionPillButton(
                     title: areAllAccountsExpanded ? "Collapse All" : "Expand All",
                     symbol: areAllAccountsExpanded ? "chevron.up" : "chevron.down",
@@ -340,8 +327,6 @@ extension AccountsMenuContentView {
                         weeklyProgressValue: viewModel.progressValue(for: row.account.usage.weekly),
                         fiveHourPercentText: viewModel.displayPercentText(for: row.account.usage.fiveHour),
                         weeklyPercentText: viewModel.displayPercentText(for: row.account.usage.weekly),
-                        compactProgressValue: viewModel.compactProgressValue(for: row.account.usage),
-                        compactUsedPercent: viewModel.compactUsedPercent(for: row.account.usage),
                         isBusy: isActionBusy,
                         isSwitching: viewModel.switchingAccountName == row.name,
                         isAuthRunning: viewModel.accountActionInFlightName == row.name,
@@ -479,7 +464,7 @@ extension AccountsMenuContentView {
 
             Spacer()
 
-            if hiddenAccountsCount > 0, !showAllAccounts {
+            if hiddenAccountsCount > 0, !viewModel.showAllAccountsInMenu {
                 Text("+\(hiddenAccountsCount) hidden")
                     .font(DashboardTokens.Font.metadata())
                     .foregroundStyle(DashboardTokens.textTertiary)
@@ -493,7 +478,7 @@ extension AccountsMenuContentView {
 
 extension AccountsMenuContentView {
     var visibleRows: [AccountRowState] {
-        if showAllAccounts {
+        if viewModel.showAllAccountsInMenu {
             return allRows
         }
         return Array(allRows.prefix(viewModel.preferredMenuAccountCount))
@@ -507,10 +492,6 @@ extension AccountsMenuContentView {
 
     var hiddenAccountsCount: Int {
         max(0, allRows.count - visibleRows.count)
-    }
-
-    var canToggleShowAll: Bool {
-        allRows.count > viewModel.preferredMenuAccountCount
     }
 
     var loginNewFooterRole: ActionPillRole {
@@ -543,7 +524,7 @@ extension AccountsMenuContentView {
     }
 
     var accountsSummaryText: String {
-        if hiddenAccountsCount > 0, !showAllAccounts {
+        if hiddenAccountsCount > 0, !viewModel.showAllAccountsInMenu {
             return "Showing \(visibleRows.count) of \(allRows.count)"
         }
         return "\(allRows.count) accounts"
@@ -683,9 +664,4 @@ extension AccountsMenuContentView {
         }
     }
 
-    func toggleShowAllAccounts() {
-        withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
-            showAllAccounts.toggle()
-        }
-    }
 }
