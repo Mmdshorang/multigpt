@@ -6,7 +6,7 @@ struct DashboardProgressRing: View {
     let label: String
     let valueText: String
     var size: CGFloat = DashboardTokens.Spacing.ringSize
-    var lineWidth: CGFloat = DashboardTokens.scaled(5)
+    var lineWidth: CGFloat = 4.5
     var expandHorizontally = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -18,18 +18,18 @@ struct DashboardProgressRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color.white.opacity(0.03))
+                .fill(Color.white.opacity(0.028))
                 .padding(lineWidth / 2)
 
             Circle()
-                .stroke(Color.white.opacity(0.09), lineWidth: lineWidth)
+                .stroke(Color.white.opacity(0.085), lineWidth: lineWidth)
                 .padding(lineWidth / 2)
 
             Circle()
                 .trim(from: 0, to: clampedProgress)
                 .stroke(
                     AngularGradient(
-                        colors: [color.opacity(0.72), color],
+                        colors: [color.opacity(0.70), color],
                         center: .center
                     ),
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
@@ -37,16 +37,15 @@ struct DashboardProgressRing: View {
                 .rotationEffect(.degrees(-90))
                 .padding(lineWidth / 2)
 
-            VStack(spacing: DashboardTokens.scaled(2)) {
+            VStack(spacing: 1) {
                 Text(valueText)
                     .font(DashboardTokens.Font.ringLabel())
                     .foregroundStyle(DashboardTokens.textPrimary)
                     .monospacedDigit()
                 Text(label)
-                    .font(.system(size: DashboardTokens.scaled(8), weight: .semibold))
+                    .font(DashboardTokens.Font.caption())
                     .foregroundStyle(DashboardTokens.textSecondary)
-                    .tracking(0.8)
-                    .textCase(.uppercase)
+                    .tracking(0.6)
             }
         }
         .frame(width: size, height: size)

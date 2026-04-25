@@ -65,33 +65,37 @@ enum AccountPresentation {
     }
 }
 
+// MARK: - Status Pill
+
 struct AccountStatusPill: View {
     let text: String
     let color: Color
 
     var body: some View {
         Text(text)
-            .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
-            .tracking(0.3)
-            .padding(.horizontal, DashboardTokens.scaled(7))
-            .padding(.vertical, DashboardTokens.scaled(3))
+            .font(DashboardTokens.Font.caption())
+            .tracking(0.2)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2.5)
             .background(
                 Capsule()
-                    .fill(color.opacity(0.14))
+                    .fill(color.opacity(0.12))
             )
             .overlay(
                 Capsule()
-                    .stroke(color.opacity(0.3), lineWidth: 1)
+                    .stroke(color.opacity(0.26), lineWidth: 1)
             )
             .foregroundStyle(color)
     }
 }
 
+// MARK: - Warning Row
+
 struct SubtleWarningRow: View {
     let text: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(DashboardTokens.statusOrange)
@@ -104,18 +108,20 @@ struct SubtleWarningRow: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, DashboardTokens.scaled(10))
-        .padding(.vertical, DashboardTokens.scaled(8))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(
-            DashboardTokens.statusOrange.opacity(0.1),
+            DashboardTokens.statusOrange.opacity(0.08),
             in: RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                .stroke(DashboardTokens.statusOrange.opacity(0.16), lineWidth: 1)
+                .stroke(DashboardTokens.statusOrange.opacity(0.14), lineWidth: 1)
         )
     }
 }
+
+// MARK: - Usage Metric Card
 
 struct AccountUsageMetricCard: View {
     let title: String
@@ -136,7 +142,7 @@ struct AccountUsageMetricCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 DashboardSectionHeader(title: title)
                 Spacer()
@@ -148,15 +154,15 @@ struct AccountUsageMetricCard: View {
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(Color.white.opacity(0.07))
 
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
                         .fill(tone)
                         .frame(width: geo.size.width * CGFloat(min(1, progressValue)))
                 }
             }
-            .frame(height: DashboardTokens.scaled(6))
+            .frame(height: 5)
 
             Text(metric.resetText(mode: resetDisplayMode))
                 .font(DashboardTokens.Font.metadata())

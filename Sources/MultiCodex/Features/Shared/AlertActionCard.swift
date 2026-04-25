@@ -4,10 +4,10 @@ struct AlertActionCard: View {
     let alert: MenuAlertState
     var isDisabled: Bool = false
     var horizontalPadding: CGFloat = DashboardTokens.Spacing.cardPadding
-    var verticalPadding: CGFloat = DashboardTokens.scaled(10)
+    var verticalPadding: CGFloat = 10
     var cornerRadius: CGFloat = DashboardTokens.Spacing.cardRadius
-    var fillOpacity: Double = 0.10
-    var borderOpacity: Double = 0.25
+    var fillOpacity: Double = 0.08
+    var borderOpacity: Double = 0.22
     let action: () -> Void
 
     private var tone: Color {
@@ -30,21 +30,21 @@ struct AlertActionCard: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: DashboardTokens.scaled(10)) {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(tone.opacity(0.16))
-                .frame(width: DashboardTokens.scaled(28), height: DashboardTokens.scaled(28))
+        HStack(alignment: .top, spacing: 10) {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(tone.opacity(0.14))
+                .frame(width: 28, height: 28)
                 .overlay(
                     Image(systemName: AccountPresentation.alertSymbol(for: alert.severity))
-                        .font(.system(size: DashboardTokens.scaled(12), weight: .semibold))
+                        .font(DashboardTokens.Font.bodySemibold())
                         .foregroundStyle(tone)
                 )
 
-            VStack(alignment: .leading, spacing: DashboardTokens.scaled(4)) {
-                HStack(spacing: DashboardTokens.scaled(6)) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
                     Text(severityLabel.uppercased())
-                        .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
-                        .tracking(0.9)
+                        .font(DashboardTokens.Font.caption())
+                        .tracking(0.6)
                         .foregroundStyle(tone)
                     Text(alert.title)
                         .font(DashboardTokens.Font.metadata().weight(.semibold))

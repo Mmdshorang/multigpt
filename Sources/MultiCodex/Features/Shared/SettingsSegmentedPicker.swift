@@ -6,7 +6,7 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
     @Binding var selection: T
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             ForEach(options, id: \.self) { option in
                 let isSelected = selection == option
 
@@ -21,8 +21,8 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
                         .minimumScaleFactor(0.85)
                         .allowsTightening(true)
                         .foregroundStyle(isSelected ? DashboardTokens.textPrimary : DashboardTokens.textSecondary)
-                        .padding(.horizontal, DashboardTokens.scaled(10))
-                        .padding(.vertical, DashboardTokens.scaled(6))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
                         .frame(maxWidth: .infinity)
                         .background(
                             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.smallRadius, style: .continuous)
@@ -40,7 +40,7 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
-        .padding(DashboardTokens.scaled(3))
+        .padding(3)
         .background(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                 .fill(DashboardTokens.segmentedTrackBackground)

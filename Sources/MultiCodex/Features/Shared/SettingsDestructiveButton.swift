@@ -10,8 +10,8 @@ struct SettingsDestructiveButton: View {
             Text(title)
                 .font(DashboardTokens.Font.button())
                 .foregroundStyle(isDisabled ? DashboardTokens.textTertiary : DashboardTokens.destructive)
-                .padding(.horizontal, DashboardTokens.scaled(10))
-                .padding(.vertical, DashboardTokens.scaled(7))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
                 .background(
                     RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                         .fill(isDisabled ? Color.clear : DashboardTokens.destructiveBackground.opacity(0.6))

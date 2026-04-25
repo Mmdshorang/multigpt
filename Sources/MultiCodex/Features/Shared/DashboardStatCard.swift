@@ -4,10 +4,11 @@ struct DashboardSectionHeader: View {
     let title: String
 
     var body: some View {
-        Text(title.uppercased())
+        Text(title)
             .font(DashboardTokens.Font.sectionLabel())
-            .tracking(1.1)
             .foregroundStyle(DashboardTokens.textTertiary)
+            .textCase(.uppercase)
+            .tracking(0.6)
     }
 }
 
@@ -17,7 +18,7 @@ struct DashboardStatCard: View {
     var sublabel: String? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+        VStack(alignment: .leading, spacing: 6) {
             DashboardSectionHeader(title: label)
 
             Text(value)
@@ -34,7 +35,7 @@ struct DashboardStatCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: DashboardTokens.scaled(92), alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
         .cardStyle(padding: DashboardTokens.Spacing.compactCardPadding, fill: DashboardTokens.cardBackgroundSubtle)
     }
 }

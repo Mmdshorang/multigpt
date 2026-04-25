@@ -22,27 +22,27 @@ private struct SettingsToggleStyle: ToggleStyle {
                 configuration.isOn.toggle()
             }
         } label: {
-            HStack(spacing: DashboardTokens.scaled(10)) {
+            HStack(spacing: 10) {
                 configuration.label
 
-                Spacer(minLength: DashboardTokens.scaled(10))
+                Spacer(minLength: 10)
 
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(configuration.isOn ? DashboardTokens.toggleTrackOn : DashboardTokens.toggleTrackOff)
-                    .frame(width: DashboardTokens.scaled(38), height: DashboardTokens.scaled(22))
+                    .frame(width: 36, height: 20)
                     .overlay(
                         Circle()
                             .fill(Color.white)
-                            .shadow(color: Color.black.opacity(0.22), radius: 3, y: 1)
+                            .shadow(color: Color.black.opacity(0.20), radius: 2, y: 1)
                             .padding(2)
-                            .offset(x: configuration.isOn ? DashboardTokens.scaled(8) : -DashboardTokens.scaled(8))
+                            .offset(x: configuration.isOn ? 8 : -8)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(configuration.isOn ? DashboardTokens.accent.opacity(0.45) : DashboardTokens.cardBorder, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(configuration.isOn ? DashboardTokens.accent.opacity(0.42) : DashboardTokens.cardBorder, lineWidth: 1)
                     )
             }
-            .frame(minHeight: DashboardTokens.scaled(28))
+            .frame(minHeight: 28)
         }
         .buttonStyle(.plain)
         .accessibilityValue(configuration.isOn ? "On" : "Off")

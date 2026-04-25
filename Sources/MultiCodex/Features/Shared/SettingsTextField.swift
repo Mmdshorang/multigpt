@@ -13,8 +13,8 @@ struct SettingsTextField: View {
             .textFieldStyle(.plain)
             .font(DashboardTokens.Font.metadata())
             .foregroundStyle(DashboardTokens.textPrimary)
-            .padding(.horizontal, DashboardTokens.scaled(10))
-            .padding(.vertical, DashboardTokens.scaled(8))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                     .fill(DashboardTokens.inputBackground)
@@ -24,9 +24,9 @@ struct SettingsTextField: View {
                     .stroke(isFocused ? DashboardTokens.inputBorderFocused : DashboardTokens.inputBorder, lineWidth: 1)
             )
             .shadow(
-                color: DashboardTokens.shadowColor.opacity(isFocused ? 0.18 : 0),
-                radius: DashboardTokens.scaled(8),
-                y: DashboardTokens.scaled(3)
+                color: DashboardTokens.shadowColor.opacity(isFocused ? 0.16 : 0),
+                radius: 6,
+                y: 2
             )
             .focused($isFocused)
             .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isFocused)

@@ -3,9 +3,9 @@ import SwiftUI
 struct DashboardSparkline: View {
     let values: [Double]
     var height: CGFloat = DashboardTokens.Spacing.sparkHeight
-    var barWidth: CGFloat = DashboardTokens.scaled(4)
-    var barSpacing: CGFloat = DashboardTokens.scaled(2)
-    var barRadius: CGFloat = DashboardTokens.scaled(1.5)
+    var barWidth: CGFloat = 3.5
+    var barSpacing: CGFloat = 2
+    var barRadius: CGFloat = 1.5
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -15,9 +15,9 @@ struct DashboardSparkline: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: barSpacing) {
-            ForEach(Array(values.enumerated()), id: \.offset) { index, value in
+            ForEach(Array(values.enumerated()), id: \.offset) { _, value in
                 let normalizedHeight = maxValue > 0 ? value / maxValue : 0
-                let barHeight = max(DashboardTokens.scaled(2), CGFloat(normalizedHeight) * height)
+                let barHeight = max(2, CGFloat(normalizedHeight) * height)
 
                 RoundedRectangle(cornerRadius: barRadius)
                     .fill(barColor(for: value))
