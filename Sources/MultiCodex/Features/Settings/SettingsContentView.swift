@@ -17,8 +17,8 @@ struct SettingsContentView: View {
         NavigationSplitView {
             sidebar
                 .frame(
-                    minWidth: DashboardTokens.scaled(220),
-                    idealWidth: DashboardTokens.scaled(236)
+                    minWidth: 200,
+                    idealWidth: 220
                 )
                 .background(sidebarBackground)
         } detail: {
@@ -53,21 +53,21 @@ struct SettingsContentView: View {
     }
 
     var sidebar: some View {
-        VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
-            VStack(alignment: .leading, spacing: DashboardTokens.scaled(14)) {
-                HStack(spacing: DashboardTokens.scaled(12)) {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(DashboardTokens.accentBackground)
-                        .frame(width: DashboardTokens.scaled(40), height: DashboardTokens.scaled(40))
+                        .frame(width: 36, height: 36)
                         .overlay(
                             Image(systemName: "terminal.fill")
-                                .font(.system(size: DashboardTokens.scaled(17), weight: .semibold))
+                                .font(DashboardTokens.Font.title())
                                 .foregroundStyle(DashboardTokens.accent)
                         )
 
-                    VStack(alignment: .leading, spacing: DashboardTokens.scaled(3)) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text("MultiCodex")
-                            .font(.system(size: DashboardTokens.scaled(16), weight: .semibold))
+                            .font(DashboardTokens.Font.title())
                             .foregroundStyle(DashboardTokens.textPrimary)
                         Text("Preferences")
                             .font(DashboardTokens.Font.metadata())
@@ -76,43 +76,45 @@ struct SettingsContentView: View {
                 }
 
                 settingsInsetPanel {
-                    VStack(alignment: .leading, spacing: DashboardTokens.scaled(10)) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: DashboardTokens.scaled(4)) {
-                                DashboardSectionHeader(title: "Runtime")
-                                Text(runtimeStatus.text)
-                                    .font(DashboardTokens.Font.metadata().weight(.semibold))
-                                    .foregroundStyle(DashboardTokens.textPrimary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            Spacer(minLength: DashboardTokens.scaled(8))
-
-                            settingsBadge(text: viewModel.isCodexRuntimeAvailable ? "Ready" : "Needs Attention", symbol: runtimeStatus.symbol, color: runtimeStatus.color)
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            DashboardSectionHeader(title: "Runtime")
+                            Text(runtimeStatus.text)
+                                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                                .foregroundStyle(DashboardTokens.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
+
+                        Spacer(minLength: 8)
+
+                        settingsBadge(
+                            text: viewModel.isCodexRuntimeAvailable ? "Ready" : "Attention",
+                            symbol: runtimeStatus.symbol,
+                            color: runtimeStatus.color
+                        )
                     }
                 }
             }
-            .padding(.horizontal, DashboardTokens.scaled(14))
+            .padding(.horizontal, 12)
 
-            VStack(alignment: .leading, spacing: DashboardTokens.scaled(6)) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Sections")
                     .font(DashboardTokens.Font.sectionLabel())
-                    .tracking(1.0)
+                    .tracking(0.5)
                     .foregroundStyle(DashboardTokens.textTertiary)
-                    .padding(.horizontal, DashboardTokens.scaled(14))
+                    .padding(.horizontal, 12)
 
-                VStack(spacing: DashboardTokens.scaled(4)) {
+                VStack(spacing: 3) {
                     ForEach(viewModel.settingsSections) { section in
                         sidebarRow(section)
                     }
                 }
-                .padding(.horizontal, DashboardTokens.scaled(8))
+                .padding(.horizontal, 6)
             }
 
             Spacer()
         }
-        .padding(.vertical, DashboardTokens.scaled(14))
+        .padding(.vertical, 12)
     }
 
     @ViewBuilder
@@ -123,38 +125,38 @@ struct SettingsContentView: View {
         Button {
             viewModel.selectSettingsSection(section)
         } label: {
-            HStack(spacing: DashboardTokens.scaled(12)) {
+            HStack(spacing: 10) {
                 Image(systemName: section.symbol)
-                    .font(.system(size: DashboardTokens.scaled(13), weight: .semibold))
+                    .font(DashboardTokens.Font.bodySemibold())
                     .foregroundStyle(isSelected ? DashboardTokens.accent : DashboardTokens.textSecondary)
-                    .frame(width: DashboardTokens.scaled(18))
+                    .frame(width: 16)
 
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(1)) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(section.title)
-                        .font(.system(size: DashboardTokens.scaled(13), weight: isSelected ? .semibold : .medium))
+                        .font(DashboardTokens.Font.bodySemibold())
                         .foregroundStyle(isSelected ? DashboardTokens.textPrimary : DashboardTokens.textSecondary)
 
                     if isSelected {
                         Text(selectedSectionSubtitle(for: section))
-                            .font(.system(size: DashboardTokens.scaled(10), weight: .regular))
+                            .font(DashboardTokens.Font.captionRegular())
                             .foregroundStyle(DashboardTokens.textTertiary)
                             .lineLimit(1)
                     }
                 }
 
-                Spacer(minLength: DashboardTokens.scaled(8))
+                Spacer(minLength: 8)
             }
-            .padding(.horizontal, DashboardTokens.scaled(12))
-            .padding(.vertical, DashboardTokens.scaled(10))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
             .background(
-                RoundedRectangle(cornerRadius: DashboardTokens.scaled(14), style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(isSelected ? DashboardTokens.sidebarSelectedBackground : (isHovered ? DashboardTokens.sidebarHoverBackground : Color.clear))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: DashboardTokens.scaled(14), style: .continuous)
-                    .stroke(isSelected ? DashboardTokens.accent.opacity(0.18) : Color.clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? DashboardTokens.accent.opacity(0.16) : Color.clear, lineWidth: 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.scaled(14), style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(section.title)
@@ -170,7 +172,7 @@ struct SettingsContentView: View {
     @ViewBuilder
     var detailContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
+            VStack(alignment: .leading, spacing: 16) {
                 switch viewModel.selectedSettingsSection {
                 case .general:
                     generalPage
@@ -184,7 +186,7 @@ struct SettingsContentView: View {
             }
             .frame(maxWidth: settingsContentMaxWidth, alignment: .leading)
             .padding(.horizontal, DashboardTokens.Spacing.contentPadding)
-            .padding(.vertical, DashboardTokens.scaled(22))
+            .padding(.vertical, 20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
@@ -192,14 +194,10 @@ struct SettingsContentView: View {
 
     private func selectedSectionSubtitle(for section: SettingsSection) -> String {
         switch section {
-        case .general:
-            return "Overview and behavior"
-        case .accounts:
-            return "Identity and usage"
-        case .system:
-            return "Runtime and diagnostics"
-        case .about:
-            return "Version and support"
+        case .general: return "Overview and behavior"
+        case .accounts: return "Identity and usage"
+        case .system: return "Runtime and diagnostics"
+        case .about: return "Version and support"
         }
     }
 }

@@ -2,13 +2,13 @@ import SwiftUI
 
 extension SettingsContentView {
     var accountsPage: some View {
-        VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
+        VStack(alignment: .leading, spacing: 16) {
             settingsHero(
                 title: "Accounts",
                 description: "Manage accounts, login, and sorting.",
                 symbol: "person.2.fill"
             ) {
-                VStack(alignment: .trailing, spacing: 8) {
+                VStack(alignment: .trailing, spacing: 6) {
                     settingsBadge(
                         text: "\(viewModel.accounts.count) Configured",
                         symbol: "person.2.fill",
@@ -23,15 +23,15 @@ extension SettingsContentView {
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
-                    HStack(alignment: .top, spacing: DashboardTokens.scaled(16)) {
-                    settingsSectionIntro(
-                        title: "Add Accounts",
-                        description: "Start a single or batch login.",
-                        symbol: "person.crop.circle.badge.plus"
-                    )
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 14) {
+                        settingsSectionIntro(
+                            title: "Add Accounts",
+                            description: "Start a single or batch login.",
+                            symbol: "person.crop.circle.badge.plus"
+                        )
 
-                        Spacer(minLength: DashboardTokens.scaled(12))
+                        Spacer(minLength: 10)
 
                         ActionPillButton(
                             title: "Login New Account",
@@ -47,12 +47,12 @@ extension SettingsContentView {
                         title: "BATCH LOGIN",
                         description: "Log in multiple accounts in sequence."
                     ) {
-                        HStack(spacing: 10) {
+                        HStack(spacing: 8) {
                             SettingsTextField(
                                 placeholder: "Count",
                                 text: sequentialLoginCountTextBinding
                             )
-                            .frame(width: DashboardTokens.scaled(86))
+                            .frame(width: 72)
 
                             ActionPillButton(
                                 title: "Start Batch Login",
@@ -79,10 +79,10 @@ extension SettingsContentView {
 
             if viewModel.accounts.isEmpty && viewModel.isRefreshing {
                 SettingsPanelCard {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
                         settingsSectionIntro(
                             title: "Loading accounts",
-                            description: "Fetching account and usage details from the runtime.",
+                            description: "Fetching account and usage details.",
                             symbol: "arrow.clockwise"
                         )
 
@@ -98,7 +98,7 @@ extension SettingsContentView {
                 }
             } else if viewModel.accounts.isEmpty {
                 SettingsPanelCard {
-                    VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 12) {
                         settingsSectionIntro(
                             title: "No Accounts Yet",
                             description: "Log in your first account.",
@@ -107,7 +107,7 @@ extension SettingsContentView {
 
                         settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
 
-                        HStack(spacing: 10) {
+                        HStack(spacing: 8) {
                             ActionPillButton(
                                 title: viewModel.isCodexRuntimeAvailable ? "Log In First Account" : "Open Runtime Settings",
                                 symbol: viewModel.isCodexRuntimeAvailable ? "person.crop.circle.badge.plus" : "terminal",
@@ -131,15 +131,15 @@ extension SettingsContentView {
                 }
             } else {
                 SettingsPanelCard {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 14) {
                         settingsSectionIntro(
                             title: "Organize the List",
                             description: "Search and sort accounts.",
                             symbol: "line.3.horizontal.decrease.circle"
                         )
 
-                        HStack(alignment: .top, spacing: DashboardTokens.scaled(12)) {
-                            VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .top, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 Text("Search")
                                     .font(DashboardTokens.Font.metadata().weight(.semibold))
                                     .foregroundStyle(DashboardTokens.textPrimary)
@@ -148,7 +148,7 @@ extension SettingsContentView {
                                     placeholder: "Filter accounts",
                                     text: accountSearchBinding
                                 )
-                                .frame(maxWidth: DashboardTokens.scaled(280))
+                                .frame(maxWidth: 260)
                             }
 
                             Spacer(minLength: 0)
@@ -160,7 +160,7 @@ extension SettingsContentView {
                             )
                         }
 
-                        HStack(alignment: .top, spacing: 12) {
+                        HStack(alignment: .top, spacing: 10) {
                             sortOptionColumn(title: "Sort by") {
                                 SettingsSegmentedPicker(
                                     options: AccountSortCriterion.allCases,
@@ -168,7 +168,7 @@ extension SettingsContentView {
                                     selection: accountSortCriterionBinding
                                 )
                             }
-                            .frame(minWidth: DashboardTokens.scaled(270), maxWidth: .infinity, alignment: .leading)
+                            .frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)
 
                             if viewModel.accountSortCriterion != .name {
                                 sortOptionColumn(title: "Window") {
@@ -178,7 +178,7 @@ extension SettingsContentView {
                                         selection: accountSortWindowBinding
                                     )
                                 }
-                                .frame(minWidth: DashboardTokens.scaled(170), maxWidth: DashboardTokens.scaled(190), alignment: .leading)
+                                .frame(minWidth: 150, maxWidth: 180, alignment: .leading)
                             }
 
                             sortOptionColumn(title: "Direction") {
@@ -188,7 +188,7 @@ extension SettingsContentView {
                                     selection: accountSortDirectionBinding
                                 )
                             }
-                            .frame(minWidth: DashboardTokens.scaled(170), maxWidth: DashboardTokens.scaled(190), alignment: .leading)
+                            .frame(minWidth: 150, maxWidth: 180, alignment: .leading)
                         }
 
                         settingsInfoRow(
@@ -201,7 +201,7 @@ extension SettingsContentView {
 
                 if viewModel.filteredAccounts.isEmpty {
                     SettingsPanelCard {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 10) {
                             settingsSectionIntro(
                                 title: "No Matching Accounts",
                                 description: "Nothing matches your current search. Clear the filter or try a shorter query.",
@@ -218,7 +218,7 @@ extension SettingsContentView {
                         }
                     }
                 } else {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 8) {
                         ForEach(viewModel.filteredAccounts) { account in
                             expandableAccountRow(account)
                         }
@@ -250,7 +250,7 @@ extension SettingsContentView {
         title: String,
         @ViewBuilder control: () -> Control
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(DashboardTokens.textSecondary)
@@ -266,16 +266,16 @@ extension SettingsContentView {
         let weeklyText = viewModel.displayPercentText(for: account.usage.weekly)
 
         return SettingsPanelCard(
-            fill: account.isCurrent ? DashboardTokens.accentBackground.opacity(0.5) : DashboardTokens.cardBackgroundElevated
+            fill: account.isCurrent ? DashboardTokens.accentBackground.opacity(0.45) : DashboardTokens.cardBackgroundElevated
         ) {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: DashboardTokens.scaled(14)) {
+                HStack(spacing: 12) {
                     Circle()
                         .fill(statusColor)
-                        .frame(width: DashboardTokens.scaled(10), height: DashboardTokens.scaled(10))
+                        .frame(width: 8, height: 8)
 
-                    VStack(alignment: .leading, spacing: DashboardTokens.scaled(5)) {
-                        HStack(spacing: DashboardTokens.scaled(8)) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
                             Text(account.name)
                                 .font(DashboardTokens.Font.accountName())
                                 .foregroundStyle(DashboardTokens.textPrimary)
@@ -293,38 +293,38 @@ extension SettingsContentView {
                             .lineLimit(1)
                     }
 
-                    Spacer(minLength: DashboardTokens.scaled(12))
+                    Spacer(minLength: 10)
 
-                    VStack(alignment: .trailing, spacing: DashboardTokens.scaled(5)) {
-                        Text("5h \(fiveHourText) • Week \(weeklyText)")
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text("5h \(fiveHourText) \u{2022} Wk \(weeklyText)")
                             .font(DashboardTokens.Font.metadata().weight(.semibold))
                             .foregroundStyle(DashboardTokens.textPrimary)
                             .monospacedDigit()
 
                         Text(account.usage.fiveHour.resetText(mode: viewModel.resetDisplayMode))
-                            .font(.system(size: DashboardTokens.scaled(11), weight: .regular))
+                            .font(DashboardTokens.Font.metadata())
                             .foregroundStyle(DashboardTokens.textTertiary)
                             .lineLimit(1)
                     }
 
                     Image(systemName: "chevron.down")
-                        .font(.system(size: DashboardTokens.scaled(11), weight: .semibold))
+                        .font(DashboardTokens.Font.caption())
                         .foregroundStyle(DashboardTokens.textTertiary)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        .frame(width: DashboardTokens.scaled(14), height: DashboardTokens.scaled(14))
+                        .frame(width: 12, height: 12)
                         .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isExpanded)
                 }
                 .contentShape(Rectangle())
 
                 if isExpanded {
                     expandedAccountContent(account)
-                        .padding(.top, DashboardTokens.scaled(16))
+                        .padding(.top, 14)
                         .transition(
                             .asymmetric(
                                 insertion: .opacity.combined(with: .scale(scale: 0.985, anchor: .top)),
                                 removal: .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
                             )
-                    )
+                        )
                 }
             }
             .contentShape(Rectangle())
@@ -337,12 +337,12 @@ extension SettingsContentView {
     }
 
     func expandedAccountContent(_ account: AccountUsage) -> some View {
-        VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
+        VStack(alignment: .leading, spacing: 14) {
             Rectangle()
                 .fill(DashboardTokens.cardBorder)
                 .frame(height: 1)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 if !account.isCurrent {
                     ActionPillButton(
                         title: "Switch to Account",
@@ -373,7 +373,7 @@ extension SettingsContentView {
 
             if account.usage.fiveHour.usedPercent != nil || account.usage.weekly.usedPercent != nil {
                 expandedDetailSection(title: "USAGE", description: "Compare 5h and weekly usage.") {
-                    VStack(spacing: DashboardTokens.scaled(10)) {
+                    VStack(spacing: 8) {
                         inlineUsageMetricRow(
                             title: "5h",
                             metric: account.usage.fiveHour,
@@ -394,7 +394,7 @@ extension SettingsContentView {
             sectionDivider
 
             expandedDetailSection(title: "RENAME", description: "Rename this account.") {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     SettingsTextField(
                         placeholder: "New name",
                         text: renameBinding(for: account.name)
@@ -430,7 +430,7 @@ extension SettingsContentView {
 
     private var sectionDivider: some View {
         Rectangle()
-            .fill(DashboardTokens.cardBorder.opacity(0.9))
+            .fill(DashboardTokens.cardBorder.opacity(0.8))
             .frame(height: 1)
     }
 
@@ -439,7 +439,7 @@ extension SettingsContentView {
         description: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+        VStack(alignment: .leading, spacing: 6) {
             DashboardSectionHeader(title: title)
 
             Text(description)
@@ -460,23 +460,20 @@ extension SettingsContentView {
     ) -> some View {
         let tone: Color = {
             switch UsageLevel.from(usedPercent: metric.usedPercent) {
-            case .critical:
-                return DashboardTokens.statusRed
-            case .warning:
-                return DashboardTokens.statusOrange
-            case .normal:
-                return DashboardTokens.accentSoft
+            case .critical: return DashboardTokens.statusRed
+            case .warning: return DashboardTokens.statusOrange
+            case .normal: return DashboardTokens.accentSoft
             }
         }()
 
-        return VStack(alignment: .leading, spacing: DashboardTokens.scaled(6)) {
+        return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title.uppercased())
                     .font(DashboardTokens.Font.sectionLabel())
-                    .tracking(1.0)
+                    .tracking(0.5)
                     .foregroundStyle(DashboardTokens.textTertiary)
 
-                Spacer(minLength: DashboardTokens.scaled(8))
+                Spacer(minLength: 8)
 
                 Text(valueText)
                     .font(DashboardTokens.Font.metadata().weight(.semibold))
@@ -486,15 +483,15 @@ extension SettingsContentView {
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: DashboardTokens.scaled(3), style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(Color.white.opacity(0.07))
 
-                    RoundedRectangle(cornerRadius: DashboardTokens.scaled(3), style: .continuous)
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
                         .fill(tone)
                         .frame(width: geo.size.width * CGFloat(min(1, max(0, progressValue))))
                 }
             }
-            .frame(height: DashboardTokens.scaled(5))
+            .frame(height: 4)
 
             Text(metric.resetText(mode: viewModel.resetDisplayMode))
                 .font(DashboardTokens.Font.metadata())

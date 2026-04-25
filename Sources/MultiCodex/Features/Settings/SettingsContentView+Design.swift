@@ -1,12 +1,14 @@
 import SwiftUI
 
 extension SettingsContentView {
-    var settingsContentMaxWidth: CGFloat { DashboardTokens.scaled(760) }
+    var settingsContentMaxWidth: CGFloat { 720 }
 
     var settingsBackground: some View {
         DashboardTokens.backgroundGradient
             .ignoresSafeArea()
     }
+
+    // MARK: - Hero
 
     func settingsHero(
         title: String,
@@ -25,49 +27,51 @@ extension SettingsContentView {
         @ViewBuilder accessory: () -> Accessory
     ) -> some View {
         SettingsPanelCard(padding: DashboardTokens.Spacing.heroPadding, fill: DashboardTokens.cardBackground) {
-            HStack(alignment: .top, spacing: DashboardTokens.scaled(16)) {
-                RoundedRectangle(cornerRadius: DashboardTokens.scaled(18), style: .continuous)
+            HStack(alignment: .top, spacing: 14) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(DashboardTokens.accentBackground)
-                    .frame(width: DashboardTokens.scaled(48), height: DashboardTokens.scaled(48))
+                    .frame(width: 42, height: 42)
                     .overlay(
                         Image(systemName: symbol)
-                            .font(.system(size: DashboardTokens.scaled(20), weight: .semibold))
+                            .font(DashboardTokens.Font.detailTitle())
                             .foregroundStyle(DashboardTokens.accent)
                     )
 
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(DashboardTokens.Font.detailTitle())
                         .foregroundStyle(DashboardTokens.textPrimary)
 
                     Text(description)
-                        .font(.system(size: DashboardTokens.scaled(12), weight: .regular))
+                        .font(DashboardTokens.Font.metadata())
                         .foregroundStyle(DashboardTokens.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer(minLength: DashboardTokens.scaled(12))
+                Spacer(minLength: 12)
 
                 accessory()
             }
         }
     }
 
+    // MARK: - Section Intro
+
     func settingsSectionIntro(
         title: String,
         description: String,
         symbol: String? = nil
     ) -> some View {
-        HStack(alignment: .top, spacing: DashboardTokens.scaled(10)) {
+        HStack(alignment: .top, spacing: 8) {
             if let symbol {
                 Image(systemName: symbol)
                     .font(DashboardTokens.Font.cardHeading())
                     .foregroundStyle(DashboardTokens.accent)
-                    .frame(width: DashboardTokens.scaled(18))
-                    .padding(.top, DashboardTokens.scaled(1))
+                    .frame(width: 16)
+                    .padding(.top, 1)
             }
 
-            VStack(alignment: .leading, spacing: DashboardTokens.scaled(5)) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(DashboardTokens.Font.cardHeading())
                     .foregroundStyle(DashboardTokens.textPrimary)
@@ -80,23 +84,25 @@ extension SettingsContentView {
         }
     }
 
+    // MARK: - Form Row
+
     func settingsFormRow<Control: View>(
         _ label: String,
         detail: String? = nil,
         icon: String? = nil,
         @ViewBuilder control: () -> Control
     ) -> some View {
-        HStack(alignment: .center, spacing: DashboardTokens.scaled(16)) {
-            HStack(alignment: .top, spacing: DashboardTokens.scaled(10)) {
+        HStack(alignment: .center, spacing: 14) {
+            HStack(alignment: .top, spacing: 8) {
                 if let icon {
                     Image(systemName: icon)
-                        .font(.system(size: DashboardTokens.scaled(11), weight: .medium))
+                        .font(DashboardTokens.Font.formLabel())
                         .foregroundStyle(DashboardTokens.textTertiary)
-                        .frame(width: DashboardTokens.scaled(18))
-                        .padding(.top, DashboardTokens.scaled(1))
+                        .frame(width: 16)
+                        .padding(.top, 1)
                 }
 
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(4)) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(label)
                         .font(DashboardTokens.Font.metadata().weight(.semibold))
                         .foregroundStyle(DashboardTokens.textPrimary)
@@ -110,19 +116,21 @@ extension SettingsContentView {
                 }
             }
 
-            Spacer(minLength: DashboardTokens.scaled(16))
+            Spacer(minLength: 14)
 
             control()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // MARK: - Inset Panel
+
     func settingsInsetPanel<Content: View>(
         title: String? = nil,
         description: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: DashboardTokens.scaled(10)) {
+        VStack(alignment: .leading, spacing: 8) {
             if let title {
                 DashboardSectionHeader(title: title)
             }
@@ -137,7 +145,7 @@ extension SettingsContentView {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(DashboardTokens.Spacing.cardPadding)
+        .padding(DashboardTokens.Spacing.compactCardPadding)
         .background(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
                 .fill(DashboardTokens.cardBackgroundSubtle)
@@ -148,13 +156,15 @@ extension SettingsContentView {
         )
     }
 
+    // MARK: - Info Row
+
     func settingsInfoRow(symbol: String, text: String, color: Color = DashboardTokens.textSecondary) -> some View {
-        HStack(alignment: .top, spacing: DashboardTokens.scaled(8)) {
+        HStack(alignment: .top, spacing: 7) {
             Image(systemName: symbol)
                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(color)
-                .frame(width: DashboardTokens.scaled(16))
-                .padding(.top, DashboardTokens.scaled(1))
+                .frame(width: 14)
+                .padding(.top, 1)
             Text(text)
                 .font(DashboardTokens.Font.metadata())
                 .foregroundStyle(DashboardTokens.textSecondary)
@@ -163,42 +173,46 @@ extension SettingsContentView {
         }
     }
 
+    // MARK: - Badge
+
     func settingsBadge(text: String, symbol: String? = nil, color: Color) -> some View {
-        HStack(spacing: DashboardTokens.scaled(6)) {
+        HStack(spacing: 5) {
             if let symbol {
                 Image(systemName: symbol)
-                    .font(.system(size: DashboardTokens.scaled(9), weight: .semibold))
+                    .font(DashboardTokens.Font.microLabel())
             }
 
             Text(text)
-                .font(.system(size: DashboardTokens.scaled(10), weight: .semibold))
+                .font(DashboardTokens.Font.caption())
         }
         .foregroundStyle(color)
-        .padding(.horizontal, DashboardTokens.scaled(10))
-        .padding(.vertical, DashboardTokens.scaled(7))
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
         .background(
             Capsule()
-                .fill(color.opacity(0.12))
+                .fill(color.opacity(0.10))
         )
         .overlay(
             Capsule()
-                .stroke(color.opacity(0.24), lineWidth: 1)
+                .stroke(color.opacity(0.20), lineWidth: 1)
         )
     }
 
+    // MARK: - Feedback Row
+
     func feedbackRow(_ text: String, color: Color) -> some View {
-        HStack(alignment: .top, spacing: DashboardTokens.scaled(10)) {
+        HStack(alignment: .top, spacing: 8) {
             Circle()
                 .fill(color)
-                .frame(width: DashboardTokens.scaled(8), height: DashboardTokens.scaled(8))
-                .padding(.top, DashboardTokens.scaled(4))
+                .frame(width: 7, height: 7)
+                .padding(.top, 3)
 
             Text(text)
                 .font(DashboardTokens.Font.metadata())
                 .foregroundStyle(DashboardTokens.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: DashboardTokens.scaled(12))
+            Spacer(minLength: 10)
 
             Button("Dismiss") {
                 viewModel.clearAccountActionFeedback()
@@ -207,15 +221,15 @@ extension SettingsContentView {
             .font(DashboardTokens.Font.metadata().weight(.semibold))
             .foregroundStyle(DashboardTokens.textSecondary)
         }
-        .padding(.horizontal, DashboardTokens.scaled(12))
-        .padding(.vertical, DashboardTokens.scaled(10))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(
-            color.opacity(0.10),
+            color.opacity(0.08),
             in: RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                .stroke(color.opacity(0.18), lineWidth: 1)
+                .stroke(color.opacity(0.16), lineWidth: 1)
         )
     }
 }

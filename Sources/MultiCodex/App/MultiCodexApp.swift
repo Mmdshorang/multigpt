@@ -9,8 +9,8 @@ struct MultiCodexApp: App {
         MenuBarExtra {
             AccountsMenuContentView(viewModel: viewModel)
                 .frame(
-                    minWidth: DashboardTokens.scaled(420),
-                    idealWidth: DashboardTokens.scaled(440)
+                    minWidth: 380,
+                    idealWidth: 400
                 )
         } label: {
             MenuBarStatusLabelView(
@@ -26,20 +26,20 @@ struct MultiCodexApp: App {
         WindowGroup("Settings", id: "settings") {
             SettingsContentView(viewModel: viewModel)
                 .frame(
-                    minWidth: DashboardTokens.scaled(600),
-                    idealWidth: DashboardTokens.scaled(620),
-                    minHeight: DashboardTokens.scaled(420),
-                    idealHeight: DashboardTokens.scaled(440)
+                    minWidth: 560,
+                    idealWidth: 600,
+                    minHeight: 400,
+                    idealHeight: 440
                 )
         }
 
         WindowGroup("Batch Login Tracker", id: "batch-login") {
             SequentialLoginTrackerView(viewModel: viewModel)
                 .frame(
-                    minWidth: DashboardTokens.scaled(560),
-                    idealWidth: DashboardTokens.scaled(620),
-                    minHeight: DashboardTokens.scaled(420),
-                    idealHeight: DashboardTokens.scaled(520)
+                    minWidth: 520,
+                    idealWidth: 580,
+                    minHeight: 400,
+                    idealHeight: 480
                 )
         }
     }

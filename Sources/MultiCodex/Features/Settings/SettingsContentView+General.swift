@@ -2,13 +2,13 @@ import SwiftUI
 
 extension SettingsContentView {
     var generalPage: some View {
-        VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
+        VStack(alignment: .leading, spacing: 16) {
             settingsHero(
                 title: "General",
-                description: "General behavior and menu display settings.",
+                description: "Behavior and menu display settings.",
                 symbol: "slider.horizontal.3"
             ) {
-                VStack(alignment: .trailing, spacing: 8) {
+                VStack(alignment: .trailing, spacing: 6) {
                     if viewModel.isRefreshing {
                         settingsBadge(
                             text: "Refreshing",
@@ -22,7 +22,7 @@ extension SettingsContentView {
                         color: viewModel.currentAccount == nil ? DashboardTokens.statusOrange : DashboardTokens.statusGreen
                     )
                     settingsBadge(
-                        text: viewModel.accountsNeedingLogin.isEmpty ? "All Accounts Healthy" : "\(viewModel.accountsNeedingLogin.count) Need Login",
+                        text: viewModel.accountsNeedingLogin.isEmpty ? "All Healthy" : "\(viewModel.accountsNeedingLogin.count) Need Login",
                         symbol: viewModel.accountsNeedingLogin.isEmpty ? "shield.fill" : "exclamationmark.triangle.fill",
                         color: viewModel.accountsNeedingLogin.isEmpty ? DashboardTokens.statusGreen : DashboardTokens.statusOrange
                     )
@@ -30,17 +30,17 @@ extension SettingsContentView {
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
-                    HStack(alignment: .top, spacing: DashboardTokens.scaled(16)) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 14) {
                         settingsSectionIntro(
                             title: "Overview",
                             description: "Account and runtime status.",
                             symbol: "chart.bar.fill"
                         )
 
-                        Spacer(minLength: DashboardTokens.scaled(12))
+                        Spacer(minLength: 10)
 
-                        HStack(spacing: DashboardTokens.scaled(8)) {
+                        HStack(spacing: 6) {
                             ActionPillButton(
                                 title: "Refresh",
                                 symbol: "arrow.clockwise",
@@ -61,7 +61,7 @@ extension SettingsContentView {
                         }
                     }
 
-                    HStack(spacing: DashboardTokens.scaled(12)) {
+                    HStack(spacing: 10) {
                         DashboardStatCard(
                             label: "Accounts",
                             value: "\(viewModel.accounts.count)",
@@ -88,30 +88,30 @@ extension SettingsContentView {
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
+                VStack(alignment: .leading, spacing: 14) {
                     settingsSectionIntro(
                         title: "Menu Appearance",
                         description: "Control density and display format.",
                         symbol: "paintbrush.fill"
                     )
 
-                    VStack(spacing: DashboardTokens.scaled(16)) {
-                        settingsFormRow("Menu density", detail: "Control how many accounts the menu shows before collapsing overflow.", icon: "rectangle.compress.vertical") {
+                    VStack(spacing: 14) {
+                        settingsFormRow("Menu density", detail: "How many accounts the menu shows before collapsing overflow.", icon: "rectangle.compress.vertical") {
                             SettingsSegmentedPicker(
                                 options: MenuDensity.allCases,
                                 titleForOption: { $0.title },
                                 selection: menuDensityBinding
                             )
-                            .frame(maxWidth: DashboardTokens.scaled(320))
+                            .frame(maxWidth: 300)
                         }
 
-                        settingsFormRow("Reset time display", detail: "Choose the format that is easiest to scan during quick status checks.", icon: "clock") {
+                        settingsFormRow("Reset time display", detail: "Format that is easiest to scan during quick status checks.", icon: "clock") {
                             SettingsSegmentedPicker(
                                 options: ResetDisplayMode.allCases,
                                 titleForOption: { $0.title },
                                 selection: resetDisplayModeBinding
                             )
-                            .frame(maxWidth: DashboardTokens.scaled(320))
+                            .frame(maxWidth: 300)
                         }
 
                         settingsFormRow("Usage bar style", detail: viewModel.usageBarStyle.descriptionText, icon: "chart.bar") {
@@ -120,44 +120,44 @@ extension SettingsContentView {
                                 titleForOption: { $0.title },
                                 selection: usageBarStyleBinding
                             )
-                            .frame(maxWidth: DashboardTokens.scaled(320))
+                            .frame(maxWidth: 300)
                         }
                     }
                 }
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
+                VStack(alignment: .leading, spacing: 14) {
                     settingsSectionIntro(
                         title: "Auto-Switching",
                         description: "Automatic account switching behavior.",
                         symbol: "arrow.triangle.swap"
                     )
 
-                    VStack(spacing: DashboardTokens.scaled(16)) {
+                    VStack(spacing: 14) {
                         settingsFormRow("Strategy", detail: viewModel.accountSwitchingStrategy.descriptionText, icon: "arrow.2.circlepath") {
                             SettingsSegmentedPicker(
                                 options: AccountSwitchingStrategy.allCases,
                                 titleForOption: { $0.title },
                                 selection: accountSwitchingStrategyBinding
                             )
-                            .frame(maxWidth: DashboardTokens.scaled(360))
+                            .frame(maxWidth: 340)
                         }
 
                         Rectangle()
                             .fill(DashboardTokens.cardBorder)
                             .frame(height: 1)
 
-                        VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+                        VStack(alignment: .leading, spacing: 6) {
                             DashboardSectionHeader(title: "Notifications")
                             Text("Enable notifications and send a test alert.")
                                 .font(DashboardTokens.Font.metadata())
                                 .foregroundStyle(DashboardTokens.textSecondary)
 
-                            HStack(spacing: DashboardTokens.scaled(12)) {
+                            HStack(spacing: 10) {
                                 SettingsToggle(label: "Show notifications", isOn: autoSwitchNotificationsBinding)
 
-                                Spacer(minLength: DashboardTokens.scaled(12))
+                                Spacer(minLength: 10)
 
                                 ActionPillButton(
                                     title: "Send Test",

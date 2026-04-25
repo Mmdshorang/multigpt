@@ -2,28 +2,28 @@ import SwiftUI
 
 extension SettingsContentView {
     var systemPage: some View {
-        VStack(alignment: .leading, spacing: DashboardTokens.scaled(18)) {
+        VStack(alignment: .leading, spacing: 16) {
             settingsHero(
                 title: "System",
                 description: "Runtime path, diagnostics, and refresh settings.",
                 symbol: "terminal.fill"
             ) {
                 settingsBadge(
-                    text: viewModel.isCodexRuntimeAvailable ? "Runtime Ready" : "Runtime Needs Attention",
+                    text: viewModel.isCodexRuntimeAvailable ? "Runtime Ready" : "Needs Attention",
                     symbol: runtimeStatus.symbol,
                     color: runtimeStatus.color
                 )
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
+                VStack(alignment: .leading, spacing: 14) {
                     settingsSectionIntro(
                         title: "Runtime",
                         description: "Configure Codex executable resolution.",
                         symbol: "terminal"
                     )
 
-                    HStack(alignment: .top, spacing: DashboardTokens.scaled(12)) {
+                    HStack(alignment: .top, spacing: 10) {
                         settingsBadge(text: runtimeStatus.text, symbol: runtimeStatus.symbol, color: runtimeStatus.color)
                         Spacer(minLength: 0)
                     }
@@ -32,13 +32,13 @@ extension SettingsContentView {
                         .fill(DashboardTokens.cardBorder)
                         .frame(height: 1)
 
-                    VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+                    VStack(alignment: .leading, spacing: 6) {
                         DashboardSectionHeader(title: "Executable")
                         Text("Set a custom `codex` path when auto-detection fails.")
                             .font(DashboardTokens.Font.metadata())
                             .foregroundStyle(DashboardTokens.textSecondary)
 
-                        HStack(spacing: DashboardTokens.scaled(10)) {
+                        HStack(spacing: 8) {
                             SettingsTextField(
                                 placeholder: "/opt/homebrew/bin/codex",
                                 text: $codexPathDraft
@@ -49,7 +49,7 @@ extension SettingsContentView {
                             }
                         }
 
-                        HStack(spacing: DashboardTokens.scaled(8)) {
+                        HStack(spacing: 6) {
                             ActionPillButton(title: "Save Path", symbol: "checkmark", role: .primary) {
                                 viewModel.updateCustomCodexPath(codexPathDraft)
                             }
@@ -70,14 +70,14 @@ extension SettingsContentView {
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
+                VStack(alignment: .leading, spacing: 14) {
                     settingsSectionIntro(
                         title: "Diagnostics",
                         description: "Open config and inspect runtime resolution.",
                         symbol: "stethoscope"
                     )
 
-                    HStack(spacing: DashboardTokens.scaled(8)) {
+                    HStack(spacing: 6) {
                         ActionPillButton(title: "Open Config Folder", symbol: "folder.fill") {
                             viewModel.openMulticodexConfigDirectory()
                         }
@@ -92,7 +92,7 @@ extension SettingsContentView {
                             .fill(DashboardTokens.cardBorder)
                             .frame(height: 1)
 
-                        VStack(alignment: .leading, spacing: DashboardTokens.scaled(8)) {
+                        VStack(alignment: .leading, spacing: 6) {
                             DashboardSectionHeader(title: "Resolution Notes")
                             Text(hint)
                                 .font(DashboardTokens.Font.metadata())
@@ -110,15 +110,15 @@ extension SettingsContentView {
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: DashboardTokens.scaled(16)) {
+                VStack(alignment: .leading, spacing: 14) {
                     settingsSectionIntro(
                         title: "Refresh Cache",
                         description: "Background refresh interval.",
                         symbol: "timer"
                     )
 
-                    settingsFormRow("Refresh interval", detail: "Choose how often background usage data is refreshed.", icon: "arrow.triangle.2.circlepath") {
-                        HStack(spacing: DashboardTokens.scaled(12)) {
+                    settingsFormRow("Refresh interval", detail: "How often background usage data is refreshed.", icon: "arrow.triangle.2.circlepath") {
+                        HStack(spacing: 10) {
                             Text("\(viewModel.limitsCacheTTLMinutes) min")
                                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                                 .foregroundStyle(DashboardTokens.textPrimary)
