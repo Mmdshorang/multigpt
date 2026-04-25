@@ -32,12 +32,14 @@ final class AppPreferencesStoreTests: XCTestCase {
         XCTAssertEqual(store.resetDisplayMode, .relative)
         XCTAssertEqual(store.menuDensity, .compact)
         XCTAssertEqual(store.usageBarStyle, .depleting)
+        XCTAssertTrue(store.showAllAccountsInMenu)
         XCTAssertEqual(store.accountSwitchingStrategy, .manual)
         XCTAssertFalse(store.autoSwitchNotificationsEnabled)
 
         store.resetDisplayMode = .absolute
         store.menuDensity = .comfortable
         store.usageBarStyle = .filling
+        store.showAllAccountsInMenu = false
         store.accountSwitchingStrategy = .expiryAware
         store.autoSwitchNotificationsEnabled = true
 
@@ -45,6 +47,7 @@ final class AppPreferencesStoreTests: XCTestCase {
         XCTAssertEqual(persisted.resetDisplayMode, .absolute)
         XCTAssertEqual(persisted.menuDensity, .comfortable)
         XCTAssertEqual(persisted.usageBarStyle, .filling)
+        XCTAssertFalse(persisted.showAllAccountsInMenu)
         XCTAssertEqual(persisted.accountSwitchingStrategy, .expiryAware)
         XCTAssertTrue(persisted.autoSwitchNotificationsEnabled)
     }

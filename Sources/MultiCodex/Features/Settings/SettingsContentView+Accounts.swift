@@ -218,9 +218,11 @@ extension SettingsContentView {
                         }
                     }
                 } else {
-                    LazyVStack(spacing: 8) {
-                        ForEach(viewModel.filteredAccounts) { account in
-                            expandableAccountRow(account)
+                    SettingsPanelCard(padding: 8) {
+                        VStack(spacing: 8) {
+                            ForEach(viewModel.filteredAccounts) { account in
+                                expandableAccountRow(account)
+                            }
                         }
                     }
                 }
@@ -262,8 +264,6 @@ extension SettingsContentView {
     func expandableAccountRow(_ account: AccountUsage) -> some View {
         let isExpanded = expandedAccountNames.contains(account.name)
         let statusColor = AccountPresentation.statusColor(for: account.connectionState)
-        let fiveHourText = viewModel.displayPercentText(for: account.usage.fiveHour)
-        let weeklyText = viewModel.displayPercentText(for: account.usage.weekly)
 
         return SettingsPanelCard(
             fill: account.isCurrent ? DashboardTokens.accentBackground.opacity(0.45) : DashboardTokens.cardBackgroundElevated
@@ -295,18 +295,6 @@ extension SettingsContentView {
 
                     Spacer(minLength: 10)
 
-                    VStack(alignment: .trailing, spacing: 3) {
-                        Text("5h \(fiveHourText) \u{2022} Wk \(weeklyText)")
-                            .font(DashboardTokens.Font.metadata().weight(.semibold))
-                            .foregroundStyle(DashboardTokens.textPrimary)
-                            .monospacedDigit()
-
-                        Text(account.usage.fiveHour.resetText(mode: viewModel.resetDisplayMode))
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textTertiary)
-                            .lineLimit(1)
-                    }
-
                     Image(systemName: "chevron.down")
                         .font(DashboardTokens.Font.caption())
                         .foregroundStyle(DashboardTokens.textTertiary)
@@ -321,8 +309,8 @@ extension SettingsContentView {
                         .padding(.top, 14)
                         .transition(
                             .asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.985, anchor: .top)),
-                                removal: .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
+                                insertion: .opacity.combined(with: .move(edge: .top)),
+                                removal: .move(edge: .top)
                             )
                         )
                 }

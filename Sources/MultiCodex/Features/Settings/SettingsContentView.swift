@@ -189,7 +189,7 @@ struct SettingsContentView: View {
             .padding(.vertical, 20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .scrollIndicators(.hidden)
+        .scrollIndicators(.never)
     }
 
     private func selectedSectionSubtitle(for section: SettingsSection) -> String {

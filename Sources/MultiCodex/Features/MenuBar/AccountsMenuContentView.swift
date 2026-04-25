@@ -7,7 +7,6 @@ struct AccountsMenuContentView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State var keyboardMonitor: Any?
     @State var expandedAccountNames: Set<String> = []
-    @State var showAllAccounts = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -58,9 +57,6 @@ struct AccountsMenuContentView: View {
         .onChange(of: viewModel.accounts.map(\.name)) { _ in
             let activeNames = Set(viewModel.accounts.map(\.name))
             expandedAccountNames = expandedAccountNames.intersection(activeNames)
-            if !canToggleShowAll {
-                showAllAccounts = false
-            }
         }
     }
 }

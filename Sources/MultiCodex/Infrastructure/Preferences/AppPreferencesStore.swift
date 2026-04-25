@@ -105,6 +105,18 @@ struct AppPreferencesStore {
         }
     }
 
+    var showAllAccountsInMenu: Bool {
+        get {
+            if defaults.object(forKey: Keys.showAllAccountsInMenu) == nil {
+                return true
+            }
+            return defaults.bool(forKey: Keys.showAllAccountsInMenu)
+        }
+        set {
+            defaults.set(newValue, forKey: Keys.showAllAccountsInMenu)
+        }
+    }
+
     var accountSwitchingStrategy: AccountSwitchingStrategy {
         get {
             let raw = defaults.string(forKey: Keys.accountSwitchingStrategy) ?? ""
@@ -139,6 +151,7 @@ struct AppPreferencesStore {
         static let accountSortCriterion = "multicodexMenu.accountSortCriterion"
         static let accountSortWindow = "multicodexMenu.accountSortWindow"
         static let accountSortDirection = "multicodexMenu.accountSortDirection"
+        static let showAllAccountsInMenu = "multicodexMenu.showAllAccountsInMenu"
         static let accountSwitchingStrategy = "multicodexMenu.accountSwitchingStrategy"
         static let autoSwitchNotificationsEnabled = "multicodexMenu.autoSwitchNotificationsEnabled"
         static let limitsCacheTTLSeconds = "multicodexMenu.limitsCacheTTLSeconds"

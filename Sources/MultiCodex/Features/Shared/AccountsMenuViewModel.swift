@@ -27,6 +27,7 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var accountSortCriterion: AccountSortCriterion
     @Published var accountSortWindow: AccountSortWindow
     @Published var accountSortDirection: SortDirection
+    @Published var showAllAccountsInMenu: Bool
     @Published var accountSwitchingStrategy: AccountSwitchingStrategy
     @Published var autoSwitchNotificationsEnabled: Bool
     @Published var limitsCacheTTLSeconds: Int
@@ -69,6 +70,7 @@ final class AccountsMenuViewModel: ObservableObject {
         accountSortCriterion = preferences.accountSortCriterion
         accountSortWindow = preferences.accountSortWindow
         accountSortDirection = preferences.accountSortDirection
+        showAllAccountsInMenu = preferences.showAllAccountsInMenu
         accountSwitchingStrategy = preferences.accountSwitchingStrategy
         autoSwitchNotificationsEnabled = preferences.autoSwitchNotificationsEnabled
         let persistedTTL = preferences.limitsCacheTTLSeconds
@@ -317,6 +319,8 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     func setAccountSwitchingStrategy(_ strategy: AccountSwitchingStrategy) { settingsController.setAccountSwitchingStrategy(strategy) }
+
+    func setShowAllAccountsInMenu(_ isEnabled: Bool) { settingsController.setShowAllAccountsInMenu(isEnabled) }
 
     func setAutoSwitchNotificationsEnabled(_ isEnabled: Bool) { settingsController.setAutoSwitchNotificationsEnabled(isEnabled) }
 

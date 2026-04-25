@@ -60,6 +60,13 @@ extension SettingsContentView {
         )
     }
 
+    var showAllAccountsInMenuBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.showAllAccountsInMenu },
+            set: { viewModel.setShowAllAccountsInMenu($0) }
+        )
+    }
+
     var autoSwitchNotificationsBinding: Binding<Bool> {
         Binding(
             get: { viewModel.autoSwitchNotificationsEnabled },

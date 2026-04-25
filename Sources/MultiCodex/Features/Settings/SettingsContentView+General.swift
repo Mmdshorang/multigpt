@@ -122,6 +122,19 @@ extension SettingsContentView {
                             )
                             .frame(maxWidth: 300)
                         }
+
+                        settingsFormRow(
+                            "Menu account visibility",
+                            detail: "Show every account in the menu or limit by selected density.",
+                            icon: "rectangle.expand.vertical"
+                        ) {
+                            SettingsSegmentedPicker(
+                                options: [true, false],
+                                titleForOption: { $0 ? "All" : "By Density" },
+                                selection: showAllAccountsInMenuBinding
+                            )
+                            .frame(maxWidth: 300)
+                        }
                     }
                 }
             }

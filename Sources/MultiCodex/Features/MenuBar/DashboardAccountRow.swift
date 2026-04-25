@@ -7,8 +7,6 @@ struct DashboardAccountRow: View {
     let weeklyProgressValue: Double
     let fiveHourPercentText: String
     let weeklyPercentText: String
-    let compactProgressValue: Double
-    let compactUsedPercent: Double?
     let isBusy: Bool
     let isSwitching: Bool
     let isAuthRunning: Bool
@@ -24,18 +22,6 @@ struct DashboardAccountRow: View {
         case .switchAccount: return isSwitching
         case .relogin: return isAuthRunning
         case .none: return false
-        }
-    }
-
-    private var compactProgressFraction: Double {
-        min(1, max(0, compactProgressValue))
-    }
-
-    private var progressColor: Color {
-        switch UsageLevel.from(usedPercent: compactUsedPercent) {
-        case .critical: return DashboardTokens.statusRed
-        case .warning: return DashboardTokens.statusOrange
-        case .normal: return DashboardTokens.accent
         }
     }
 
@@ -152,15 +138,6 @@ struct DashboardAccountRow: View {
 
                     Spacer(minLength: 8)
 
-                    VStack(alignment: .trailing, spacing: 5) {
-                        Text("5h \(fiveHourPercentText) \u{2022} Wk \(weeklyPercentText)")
-                            .font(DashboardTokens.Font.metadata().weight(.semibold))
-                            .foregroundStyle(DashboardTokens.textPrimary)
-                            .monospacedDigit()
-
-                        inlineMicroBar
-                    }
-
                     Image(systemName: "chevron.down")
                         .font(DashboardTokens.Font.chevron())
                         .foregroundStyle(DashboardTokens.textTertiary)
@@ -178,7 +155,7 @@ struct DashboardAccountRow: View {
                     .transition(
                         .asymmetric(
                             insertion: .opacity.combined(with: .move(edge: .top)),
-                            removal: .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
+                            removal: .move(edge: .top)
                         )
                     )
             }
@@ -248,21 +225,6 @@ struct DashboardAccountRow: View {
         .accessibilityValue(isPrimaryActionInProgress ? "In progress" : "Ready")
         .help(activationHelpText)
         .contentShape(Circle())
-    }
-
-    // MARK: - Inline Micro Bar
-
-    private var inlineMicroBar: some View {
-        let barWidth: CGFloat = 58
-        return ZStack(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(Color.white.opacity(0.07))
-
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(progressColor)
-                .frame(width: barWidth * CGFloat(compactProgressFraction))
-        }
-        .frame(width: barWidth, height: 3.5)
     }
 
     // MARK: - Expanded Content
