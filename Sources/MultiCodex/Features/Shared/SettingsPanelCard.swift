@@ -2,13 +2,16 @@ import SwiftUI
 
 struct SettingsPanelCard<Content: View>: View {
     @ViewBuilder let content: Content
-    var padding: CGFloat = 13
+    var padding: CGFloat = DashboardTokens.Spacing.cardPadding
+    var fill: Color = DashboardTokens.cardBackgroundElevated
 
     init(
-        padding: CGFloat = 13,
+        padding: CGFloat = DashboardTokens.Spacing.cardPadding,
+        fill: Color = DashboardTokens.cardBackgroundElevated,
         @ViewBuilder content: () -> Content
     ) {
         self.padding = padding
+        self.fill = fill
         self.content = content()
     }
 
@@ -17,14 +20,6 @@ struct SettingsPanelCard<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(padding)
-        .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(DashboardTokens.cardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
-        )
+        .cardStyle(padding: padding, fill: fill, border: DashboardTokens.cardBorder)
     }
 }

@@ -6,8 +6,10 @@ struct DashboardProgressRing: View {
     let label: String
     let valueText: String
     var size: CGFloat = DashboardTokens.Spacing.ringSize
-    var lineWidth: CGFloat = 4
+    var lineWidth: CGFloat = 4.5
     var expandHorizontally = true
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var clampedProgress: Double {
         min(1, max(0, progress))
@@ -16,13 +18,20 @@ struct DashboardProgressRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.08), lineWidth: lineWidth)
+                .fill(Color.white.opacity(0.028))
+                .padding(lineWidth / 2)
+
+            Circle()
+                .stroke(Color.white.opacity(0.085), lineWidth: lineWidth)
                 .padding(lineWidth / 2)
 
             Circle()
                 .trim(from: 0, to: clampedProgress)
                 .stroke(
-                    color,
+                    AngularGradient(
+                        colors: [color.opacity(0.70), color],
+                        center: .center
+                    ),
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
@@ -32,14 +41,18 @@ struct DashboardProgressRing: View {
                 Text(valueText)
                     .font(DashboardTokens.Font.ringLabel())
                     .foregroundStyle(DashboardTokens.textPrimary)
+                    .monospacedDigit()
                 Text(label)
-                    .font(.system(size: 7, weight: .medium))
+                    .font(DashboardTokens.Font.caption())
                     .foregroundStyle(DashboardTokens.textSecondary)
-                    .textCase(.uppercase)
+                    .tracking(0.6)
             }
         }
         .frame(width: size, height: size)
         .frame(maxWidth: expandHorizontally ? .infinity : nil, alignment: .center)
-        .animation(.easeInOut(duration: 0.4), value: clampedProgress)
+        .animation(DashboardTokens.Motion.progress(reduceMotion: reduceMotion), value: clampedProgress)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(valueText)
     }
 }

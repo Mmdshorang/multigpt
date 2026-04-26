@@ -3,19 +3,38 @@ import SwiftUI
 extension SettingsContentView {
     var accountsPage: some View {
         VStack(alignment: .leading, spacing: 16) {
+            settingsHero(
+                title: "Accounts",
+                description: "Manage accounts, login, and sorting.",
+                symbol: "person.2.fill"
+            ) {
+                VStack(alignment: .trailing, spacing: 6) {
+                    settingsBadge(
+                        text: "\(viewModel.accounts.count) Configured",
+                        symbol: "person.2.fill",
+                        color: DashboardTokens.accent
+                    )
+                    settingsBadge(
+                        text: viewModel.accountsNeedingLogin.isEmpty ? "No Recovery Needed" : "\(viewModel.accountsNeedingLogin.count) Need Login",
+                        symbol: viewModel.accountsNeedingLogin.isEmpty ? "checkmark.circle.fill" : "person.crop.circle.badge.exclamationmark",
+                        color: viewModel.accountsNeedingLogin.isEmpty ? DashboardTokens.statusGreen : DashboardTokens.statusOrange
+                    )
+                }
+            }
+
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 14) {
                         settingsSectionIntro(
-                            title: "Accounts",
-                            description: "Manage your coding agent accounts",
-                            symbol: "person.2.fill"
+                            title: "Add Accounts",
+                            description: "Start a single or batch login.",
+                            symbol: "person.crop.circle.badge.plus"
                         )
 
-                        Spacer()
+                        Spacer(minLength: 10)
 
                         ActionPillButton(
-                            title: "Login New",
+                            title: "Login New Account",
                             symbol: "person.crop.circle.badge.plus",
                             role: .primary,
                             isDisabled: isAccountActionRunning
@@ -26,19 +45,19 @@ extension SettingsContentView {
 
                     settingsInsetPanel(
                         title: "BATCH LOGIN",
-                        description: "Create and login multiple new accounts sequentially. Max \(SequentialLoginState.maxAccountCount) accounts per batch."
+                        description: "Log in multiple accounts in sequence."
                     ) {
                         HStack(spacing: 8) {
                             SettingsTextField(
                                 placeholder: "Count",
                                 text: sequentialLoginCountTextBinding
                             )
-                            .frame(width: 78)
+                            .frame(width: 72)
 
                             ActionPillButton(
                                 title: "Start Batch Login",
                                 symbol: "list.number",
-                                role: .primary,
+                                role: .secondary,
                                 isDisabled: isAccountActionRunning
                             ) {
                                 openSequentialLoginTracker()
@@ -49,59 +68,96 @@ extension SettingsContentView {
                     }
 
                     if let message = viewModel.accountActionMessage {
-                        feedbackRow(message, color: .green)
+                        feedbackRow(message, color: DashboardTokens.statusGreen)
                     }
 
                     if let error = viewModel.accountActionError {
-                        feedbackRow(error, color: .red)
+                        feedbackRow(error, color: DashboardTokens.statusRed)
                     }
                 }
             }
 
-            if viewModel.accounts.isEmpty {
+            if viewModel.accounts.isEmpty && viewModel.isRefreshing {
                 SettingsPanelCard {
-                    VStack(spacing: 12) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.2.slash")
-                                .font(.system(size: 24))
-                                .foregroundStyle(DashboardTokens.textSecondary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        settingsSectionIntro(
+                            title: "Loading accounts",
+                            description: "Fetching account and usage details.",
+                            symbol: "arrow.clockwise"
+                        )
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("No accounts yet")
-                                    .font(DashboardTokens.Font.cardHeading())
-                                    .foregroundStyle(DashboardTokens.textPrimary)
+                        ProgressView()
+                            .tint(DashboardTokens.accent)
 
-                                Text("Log in your first account to get started")
-                                    .font(DashboardTokens.Font.metadata())
-                                    .foregroundStyle(DashboardTokens.textSecondary)
-                            }
-                        }
+                        settingsInfoRow(
+                            symbol: "clock",
+                            text: "Loading account and usage data.",
+                            color: DashboardTokens.textTertiary
+                        )
+                    }
+                }
+            } else if viewModel.accounts.isEmpty {
+                SettingsPanelCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        settingsSectionIntro(
+                            title: "No Accounts Yet",
+                            description: "Log in your first account.",
+                            symbol: "person.2.slash"
+                        )
 
                         settingsInfoRow(symbol: runtimeStatus.symbol, text: runtimeStatus.text, color: runtimeStatus.color)
+
+                        HStack(spacing: 8) {
+                            ActionPillButton(
+                                title: viewModel.isCodexRuntimeAvailable ? "Log In First Account" : "Open Runtime Settings",
+                                symbol: viewModel.isCodexRuntimeAvailable ? "person.crop.circle.badge.plus" : "terminal",
+                                role: .primary,
+                                isDisabled: isAccountActionRunning
+                            ) {
+                                if viewModel.isCodexRuntimeAvailable {
+                                    viewModel.startNewAccountLogin()
+                                } else {
+                                    viewModel.selectSettingsSection(.system)
+                                }
+                            }
+
+                            if !viewModel.isCodexRuntimeAvailable {
+                                ActionPillButton(title: "Refresh Runtime", symbol: "arrow.clockwise") {
+                                    viewModel.refreshLive()
+                                }
+                            }
+                        }
                     }
                 }
             } else {
-                SettingsPanelCard(padding: 12) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(alignment: .center, spacing: 10) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "line.3.horizontal.decrease.circle")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(DashboardTokens.textTertiary)
-                                    .frame(width: 16)
+                SettingsPanelCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        settingsSectionIntro(
+                            title: "Organize the List",
+                            description: "Search and sort accounts.",
+                            symbol: "line.3.horizontal.decrease.circle"
+                        )
 
-                                Text("List options")
+                        HStack(alignment: .top, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Search")
                                     .font(DashboardTokens.Font.metadata().weight(.semibold))
                                     .foregroundStyle(DashboardTokens.textPrimary)
+
+                                SettingsTextField(
+                                    placeholder: "Filter accounts",
+                                    text: accountSearchBinding
+                                )
+                                .frame(maxWidth: 260)
                             }
 
-                            Spacer(minLength: 12)
+                            Spacer(minLength: 0)
 
-                            SettingsTextField(
-                                placeholder: "Filter accounts",
-                                text: accountSearchBinding
+                            settingsBadge(
+                                text: "\(viewModel.filteredAccounts.count) Visible",
+                                symbol: "eye",
+                                color: DashboardTokens.accent
                             )
-                            .frame(width: 230)
                         }
 
                         HStack(alignment: .top, spacing: 10) {
@@ -112,7 +168,7 @@ extension SettingsContentView {
                                     selection: accountSortCriterionBinding
                                 )
                             }
-                            .frame(minWidth: 250, maxWidth: .infinity, alignment: .leading)
+                            .frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)
 
                             if viewModel.accountSortCriterion != .name {
                                 sortOptionColumn(title: "Window") {
@@ -122,7 +178,7 @@ extension SettingsContentView {
                                         selection: accountSortWindowBinding
                                     )
                                 }
-                                .frame(minWidth: 150, maxWidth: 170, alignment: .leading)
+                                .frame(minWidth: 150, maxWidth: 180, alignment: .leading)
                             }
 
                             sortOptionColumn(title: "Direction") {
@@ -132,20 +188,14 @@ extension SettingsContentView {
                                     selection: accountSortDirectionBinding
                                 )
                             }
-                            .frame(minWidth: 160, maxWidth: 190, alignment: .leading)
+                            .frame(minWidth: 150, maxWidth: 180, alignment: .leading)
                         }
 
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "info.circle")
-                                .font(.system(size: 12))
-                                .foregroundStyle(DashboardTokens.textTertiary)
-                                .frame(width: 16)
-
-                            Text("Settings sorts all accounts (including the active account) by these options, and accounts without usage data are pushed to the bottom.")
-                                .font(DashboardTokens.Font.metadata())
-                                .foregroundStyle(DashboardTokens.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        settingsInfoRow(
+                            symbol: "info.circle",
+                            text: "Menu view pins current account first. Accounts without usage stay at the bottom.",
+                            color: DashboardTokens.textTertiary
+                        )
                     }
                 }
 
@@ -154,30 +204,47 @@ extension SettingsContentView {
                         VStack(alignment: .leading, spacing: 10) {
                             settingsSectionIntro(
                                 title: "No Matching Accounts",
-                                description: "Try a different filter query to see matching accounts.",
-                                symbol: "line.3.horizontal.decrease.circle"
+                                description: "Nothing matches your current search. Clear the filter or try a shorter query.",
+                                symbol: "magnifyingglass"
                             )
 
-                            HStack {
-                                ActionPillButton(
-                                    title: "Clear Filter",
-                                    symbol: "xmark.circle",
-                                    role: .secondary
-                                ) {
-                                    viewModel.setAccountSearchQuery("")
-                                }
-                                Spacer()
+                            ActionPillButton(
+                                title: "Clear Filter",
+                                symbol: "xmark.circle",
+                                role: .secondary
+                            ) {
+                                viewModel.setAccountSearchQuery("")
                             }
                         }
                     }
                 } else {
-                    VStack(spacing: 8) {
-                        ForEach(viewModel.filteredAccounts) { account in
-                            expandableAccountRow(account)
+                    SettingsPanelCard(padding: 8) {
+                        VStack(spacing: 8) {
+                            ForEach(viewModel.filteredAccounts) { account in
+                                expandableAccountRow(account)
+                            }
                         }
                     }
                 }
             }
+        }
+        .alert(
+            "Delete Account?",
+            isPresented: Binding(
+                get: { pendingRemovalAccountName != nil },
+                set: { if !$0 { pendingRemovalAccountName = nil } }
+            ),
+            presenting: pendingRemovalAccountName
+        ) { accountName in
+            Button("Cancel", role: .cancel) {
+                pendingRemovalAccountName = nil
+            }
+            Button("Delete", role: .destructive) {
+                viewModel.removeAccount(named: accountName, deleteData: true)
+                pendingRemovalAccountName = nil
+            }
+        } message: { accountName in
+            Text("This will remove \(accountName) and delete its local account data.")
         }
     }
 
@@ -187,7 +254,7 @@ extension SettingsContentView {
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(DashboardTokens.Font.metadata().weight(.medium))
+                .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(DashboardTokens.textSecondary)
 
             control()
@@ -196,76 +263,77 @@ extension SettingsContentView {
 
     func expandableAccountRow(_ account: AccountUsage) -> some View {
         let isExpanded = expandedAccountNames.contains(account.name)
+        let statusColor = AccountPresentation.statusColor(for: account.connectionState)
 
-        return SettingsPanelCard(padding: 12) {
+        return SettingsPanelCard(
+            fill: account.isCurrent ? DashboardTokens.accentBackground.opacity(0.45) : DashboardTokens.cardBackgroundElevated
+        ) {
             VStack(alignment: .leading, spacing: 0) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.22)) {
-                        toggleExpanded(account.name)
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(AccountPresentation.statusColor(for: account.connectionState))
-                            .frame(width: 8, height: 8)
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 8, height: 8)
 
-                        VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
                             Text(account.name)
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(DashboardTokens.Font.accountName())
                                 .foregroundStyle(DashboardTokens.textPrimary)
 
-                            if let workspaceHint = account.workspaceEmailHint {
-                                Text(workspaceHint)
-                                    .font(DashboardTokens.Font.metadata())
-                                    .foregroundStyle(DashboardTokens.textSecondary)
-                            } else {
-                                Text(account.connectionState.label)
-                                    .font(DashboardTokens.Font.metadata())
-                                    .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
+                            if account.isCurrent {
+                                AccountStatusPill(text: "Active", color: DashboardTokens.accent)
+                            } else if account.connectionState != .connected {
+                                AccountStatusPill(text: account.connectionState.label, color: statusColor)
                             }
                         }
 
-                        Spacer()
-
-                        if account.isCurrent {
-                            AccountStatusPill(text: "Active", color: DashboardTokens.accent)
-                        }
-
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(DashboardTokens.textTertiary)
-                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                            .frame(width: 14, height: 14)
-                            .animation(.easeInOut(duration: 0.16), value: isExpanded)
+                        Text(account.workspaceEmailHint ?? account.connectionState.label)
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                            .lineLimit(1)
                     }
-                    .contentShape(Rectangle())
+
+                    Spacer(minLength: 10)
+
+                    Image(systemName: "chevron.down")
+                        .font(DashboardTokens.Font.caption())
+                        .foregroundStyle(DashboardTokens.textTertiary)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .frame(width: 12, height: 12)
+                        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isExpanded)
                 }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle())
 
                 if isExpanded {
                     expandedAccountContent(account)
-                        .padding(.top, 10)
+                        .padding(.top, 14)
                         .transition(
                             .asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .top)),
-                                removal: .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
+                                insertion: .opacity.combined(with: .move(edge: .top)),
+                                removal: .move(edge: .top)
                             )
                         )
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+                    toggleExpanded(account.name)
                 }
             }
         }
     }
 
     func expandedAccountContent(_ account: AccountUsage) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Divider()
-                .background(Color.white.opacity(0.1))
-                .padding(.vertical, 4)
+        VStack(alignment: .leading, spacing: 14) {
+            Rectangle()
+                .fill(DashboardTokens.cardBorder)
+                .frame(height: 1)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 if !account.isCurrent {
                     ActionPillButton(
-                        title: "Switch",
+                        title: "Switch to Account",
                         symbol: "checkmark.circle.fill",
                         role: .primary
                     ) {
@@ -275,7 +343,7 @@ extension SettingsContentView {
                 }
 
                 ActionPillButton(
-                    title: account.connectionState == .needsLogin ? "Re-login" : "Login",
+                    title: account.connectionState == .needsLogin ? "Re-Login" : "Open Login",
                     symbol: "person.crop.circle.badge.plus"
                 ) {
                     viewModel.openLoginInTerminal(for: account.name)
@@ -283,7 +351,7 @@ extension SettingsContentView {
                 .disabled(isAccountActionRunning)
 
                 ActionPillButton(
-                    title: "Status",
+                    title: "Check Status",
                     symbol: "person.crop.circle.badge.checkmark"
                 ) {
                     viewModel.checkLoginStatus(for: account.name)
@@ -292,20 +360,18 @@ extension SettingsContentView {
             }
 
             if account.usage.fiveHour.usedPercent != nil || account.usage.weekly.usedPercent != nil {
-                settingsInsetPanel(title: "USAGE") {
-                    HStack(spacing: 8) {
-                        AccountUsageMetricCard(
+                expandedDetailSection(title: "USAGE", description: "Compare 5h and weekly usage.") {
+                    VStack(spacing: 8) {
+                        inlineUsageMetricRow(
                             title: "5h",
                             metric: account.usage.fiveHour,
-                            resetDisplayMode: viewModel.resetDisplayMode,
                             progressValue: viewModel.progressValue(for: account.usage.fiveHour),
                             valueText: viewModel.displayPercentText(for: account.usage.fiveHour)
                         )
 
-                        AccountUsageMetricCard(
+                        inlineUsageMetricRow(
                             title: "Weekly",
                             metric: account.usage.weekly,
-                            resetDisplayMode: viewModel.resetDisplayMode,
                             progressValue: viewModel.progressValue(for: account.usage.weekly),
                             valueText: viewModel.displayPercentText(for: account.usage.weekly)
                         )
@@ -313,48 +379,32 @@ extension SettingsContentView {
                 }
             }
 
-            settingsInsetPanel(title: "RENAME") {
+            sectionDivider
+
+            expandedDetailSection(title: "RENAME", description: "Rename this account.") {
                 HStack(spacing: 8) {
                     SettingsTextField(
                         placeholder: "New name",
                         text: renameBinding(for: account.name)
                     )
 
-                    ActionPillButton(title: "Rename", symbol: "pencil") {
+                    ActionPillButton(title: "Rename", symbol: "pencil", role: .secondary) {
                         viewModel.renameAccount(from: account.name, to: renameDrafts[account.name] ?? account.name)
                     }
                     .disabled(cannotRename(account.name) || isAccountActionRunning)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                SettingsToggle(
-                    label: "Delete local account data on removal",
-                    isOn: removeStoredDataBinding(for: account.name)
-                )
+            sectionDivider
 
+            expandedDetailSection(title: "REMOVE", description: "Delete this account and its local data.") {
                 SettingsDestructiveButton(
-                    title: removeStoredDataBinding(for: account.name).wrappedValue
-                        ? "Remove and Delete Data"
-                        : "Remove from MultiCodex",
+                    title: "Delete Account",
                     isDisabled: isAccountActionRunning
                 ) {
-                    viewModel.removeAccount(
-                        named: account.name,
-                        deleteData: removeStoredDataBinding(for: account.name).wrappedValue
-                    )
-                    removalDeleteDataChoice[account.name] = false
+                    pendingRemovalAccountName = account.name
                 }
             }
-            .padding(10)
-            .background(
-                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                    .fill(DashboardTokens.destructiveBackground)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                    .stroke(DashboardTokens.destructiveBorder, lineWidth: 1)
-            )
         }
     }
 
@@ -364,6 +414,79 @@ extension SettingsContentView {
         } else {
             expandedAccountNames.insert(accountName)
         }
+    }
+
+    private var sectionDivider: some View {
+        Rectangle()
+            .fill(DashboardTokens.cardBorder.opacity(0.8))
+            .frame(height: 1)
+    }
+
+    private func expandedDetailSection<Content: View>(
+        title: String,
+        description: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            DashboardSectionHeader(title: title)
+
+            Text(description)
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func inlineUsageMetricRow(
+        title: String,
+        metric: UsageMetric,
+        progressValue: Double,
+        valueText: String
+    ) -> some View {
+        let tone: Color = {
+            switch UsageLevel.from(usedPercent: metric.usedPercent) {
+            case .critical: return DashboardTokens.statusRed
+            case .warning: return DashboardTokens.statusOrange
+            case .normal: return DashboardTokens.accentSoft
+            }
+        }()
+
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title.uppercased())
+                    .font(DashboardTokens.Font.sectionLabel())
+                    .tracking(0.5)
+                    .foregroundStyle(DashboardTokens.textTertiary)
+
+                Spacer(minLength: 8)
+
+                Text(valueText)
+                    .font(DashboardTokens.Font.metadata().weight(.semibold))
+                    .foregroundStyle(DashboardTokens.textPrimary)
+                    .monospacedDigit()
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(Color.white.opacity(0.07))
+
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(tone)
+                        .frame(width: geo.size.width * CGFloat(min(1, max(0, progressValue))))
+                }
+            }
+            .frame(height: 4)
+
+            Text(metric.resetText(mode: viewModel.resetDisplayMode))
+                .font(DashboardTokens.Font.metadata())
+                .foregroundStyle(DashboardTokens.textTertiary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     func syncExpandedAccounts() {

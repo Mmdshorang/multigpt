@@ -2,19 +2,24 @@ import SwiftUI
 
 struct SettingsContentView: View {
     @Environment(\.openWindow) var openWindow
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
 
     @ObservedObject var viewModel: AccountsMenuViewModel
 
     @State var codexPathDraft = ""
     @State var renameDrafts: [String: String] = [:]
-    @State var removalDeleteDataChoice: [String: Bool] = [:]
     @State var expandedAccountNames: Set<String> = []
     @State var sequentialLoginCountText = "1"
+    @State private var hoveredSidebarSection: SettingsSection?
+    @State var pendingRemovalAccountName: String?
 
     var body: some View {
         NavigationSplitView {
             sidebar
-                .frame(minWidth: 160, idealWidth: 170)
+                .frame(
+                    minWidth: 200,
+                    idealWidth: 220
+                )
                 .background(sidebarBackground)
         } detail: {
             ZStack {
@@ -29,40 +34,83 @@ struct SettingsContentView: View {
         .onAppear {
             codexPathDraft = viewModel.customCodexPath
             syncRenameDrafts()
-            syncRemovalChoices()
             syncExpandedAccounts()
         }
         .onChange(of: viewModel.customCodexPath) { codexPathDraft = $0 }
         .onChange(of: viewModel.accounts.map(\.name)) { _ in
             syncRenameDrafts()
-            syncRemovalChoices()
             syncExpandedAccounts()
         }
     }
 
     var sidebarBackground: some View {
-        Color(red: 0.06, green: 0.07, blue: 0.10)
+        LinearGradient(
+            colors: [DashboardTokens.backgroundTop, DashboardTokens.background],
+            startPoint: .top,
+            endPoint: .bottom
+        )
         .ignoresSafeArea()
     }
 
     var sidebar: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("SETTINGS")
-                    .font(DashboardTokens.Font.sectionLabel())
-                    .tracking(1.5)
-                    .foregroundStyle(DashboardTokens.textTertiary)
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(DashboardTokens.accentBackground)
+                        .frame(width: 36, height: 36)
+                        .overlay(
+                            Image(systemName: "terminal.fill")
+                                .font(DashboardTokens.Font.title())
+                                .foregroundStyle(DashboardTokens.accent)
+                        )
 
-                AccountStatusPill(text: runtimeStatus.text, color: runtimeStatus.color)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("MultiCodex")
+                            .font(DashboardTokens.Font.title())
+                            .foregroundStyle(DashboardTokens.textPrimary)
+                        Text("Preferences")
+                            .font(DashboardTokens.Font.metadata())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                    }
+                }
+
+                settingsInsetPanel {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            DashboardSectionHeader(title: "Runtime")
+                            Text(runtimeStatus.text)
+                                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                                .foregroundStyle(DashboardTokens.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        settingsBadge(
+                            text: viewModel.isCodexRuntimeAvailable ? "Ready" : "Attention",
+                            symbol: runtimeStatus.symbol,
+                            color: runtimeStatus.color
+                        )
+                    }
+                }
             }
             .padding(.horizontal, 12)
 
-            VStack(spacing: 2) {
-                ForEach(viewModel.settingsSections) { section in
-                    sidebarRow(section)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Sections")
+                    .font(DashboardTokens.Font.sectionLabel())
+                    .tracking(0.5)
+                    .foregroundStyle(DashboardTokens.textTertiary)
+                    .padding(.horizontal, 12)
+
+                VStack(spacing: 3) {
+                    ForEach(viewModel.settingsSections) { section in
+                        sidebarRow(section)
+                    }
                 }
+                .padding(.horizontal, 6)
             }
-            .padding(.horizontal, 6)
 
             Spacer()
         }
@@ -72,31 +120,53 @@ struct SettingsContentView: View {
     @ViewBuilder
     private func sidebarRow(_ section: SettingsSection) -> some View {
         let isSelected = viewModel.selectedSettingsSection == section
+        let isHovered = hoveredSidebarSection == section
 
         Button {
             viewModel.selectSettingsSection(section)
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: section.symbol)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(DashboardTokens.Font.bodySemibold())
                     .foregroundStyle(isSelected ? DashboardTokens.accent : DashboardTokens.textSecondary)
                     .frame(width: 16)
 
-                Text(section.title)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? DashboardTokens.textPrimary : DashboardTokens.textSecondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(section.title)
+                        .font(DashboardTokens.Font.bodySemibold())
+                        .foregroundStyle(isSelected ? DashboardTokens.textPrimary : DashboardTokens.textSecondary)
 
-                Spacer()
+                    if isSelected {
+                        Text(selectedSectionSubtitle(for: section))
+                            .font(DashboardTokens.Font.captionRegular())
+                            .foregroundStyle(DashboardTokens.textTertiary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 8)
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.vertical, 9)
             .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isSelected ? DashboardTokens.sidebarSelectedBackground : Color.clear)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? DashboardTokens.sidebarSelectedBackground : (isHovered ? DashboardTokens.sidebarHoverBackground : Color.clear))
             )
-            .contentShape(Rectangle())
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? DashboardTokens.accent.opacity(0.16) : Color.clear, lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(section.title)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .onHover { hovering in
+            hoveredSidebarSection = hovering ? section : nil
+        }
+        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isHovered)
+        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isSelected)
     }
 
     @ViewBuilder
@@ -115,10 +185,19 @@ struct SettingsContentView: View {
                 }
             }
             .frame(maxWidth: settingsContentMaxWidth, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
+            .padding(.horizontal, DashboardTokens.Spacing.contentPadding)
+            .padding(.vertical, 20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .scrollIndicators(.hidden)
+        .scrollIndicators(.never)
+    }
+
+    private func selectedSectionSubtitle(for section: SettingsSection) -> String {
+        switch section {
+        case .general: return "Overview and behavior"
+        case .accounts: return "Identity and usage"
+        case .system: return "Runtime and diagnostics"
+        case .about: return "Version and support"
+        }
     }
 }

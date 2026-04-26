@@ -83,6 +83,14 @@ final class AccountsSettingsController {
         viewModel.setAccountSortDirection(direction)
     }
 
+    func setShowAllAccountsInMenu(_ isEnabled: Bool) {
+        guard isEnabled != viewModel.showAllAccountsInMenu else {
+            return
+        }
+        viewModel.showAllAccountsInMenu = isEnabled
+        viewModel.preferences.showAllAccountsInMenu = isEnabled
+    }
+
     func setAccountSwitchingStrategy(_ strategy: AccountSwitchingStrategy) {
         guard strategy != viewModel.accountSwitchingStrategy else {
             return

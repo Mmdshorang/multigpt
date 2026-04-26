@@ -8,7 +8,10 @@ struct MultiCodexApp: App {
     var body: some Scene {
         MenuBarExtra {
             AccountsMenuContentView(viewModel: viewModel)
-                .frame(minWidth: 420, idealWidth: 440)
+                .frame(
+                    minWidth: 380,
+                    idealWidth: 400
+                )
         } label: {
             MenuBarStatusLabelView(
                 title: viewModel.menuBarTitle,
@@ -22,12 +25,22 @@ struct MultiCodexApp: App {
 
         WindowGroup("Settings", id: "settings") {
             SettingsContentView(viewModel: viewModel)
-                .frame(minWidth: 600, idealWidth: 620, minHeight: 420, idealHeight: 440)
+                .frame(
+                    minWidth: 560,
+                    idealWidth: 600,
+                    minHeight: 400,
+                    idealHeight: 440
+                )
         }
 
         WindowGroup("Batch Login Tracker", id: "batch-login") {
             SequentialLoginTrackerView(viewModel: viewModel)
-                .frame(minWidth: 560, idealWidth: 620, minHeight: 420, idealHeight: 520)
+                .frame(
+                    minWidth: 520,
+                    idealWidth: 580,
+                    minHeight: 400,
+                    idealHeight: 480
+                )
         }
     }
 }

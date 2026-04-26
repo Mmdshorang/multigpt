@@ -15,6 +15,16 @@ struct MenuBarStatusLabelView: View {
             hasError: hasError
         )
         .accessibilityLabel(title)
+        .accessibilityValue(accessibilityValue)
+    }
+
+    private var accessibilityValue: String {
+        let fiveHour = Int((max(0, min(1, fiveHourFraction)) * 100).rounded())
+        let weekly = Int((max(0, min(1, weeklyFraction)) * 100).rounded())
+        if hasError {
+            return "Runtime issue detected. Five hour usage \(fiveHour) percent. Weekly usage \(weekly) percent."
+        }
+        return "Five hour usage \(fiveHour) percent. Weekly usage \(weekly) percent."
     }
 }
 
@@ -38,14 +48,14 @@ private struct TrayMinimalStatusIconView: View {
         case .warning:
             return DashboardTokens.statusOrange
         case .normal:
-            return DashboardTokens.textSecondary
+            return DashboardTokens.accentSoft
         }
     }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Image(systemName: symbolName)
-                .font(.system(size: 12, weight: .semibold))
+                .font(DashboardTokens.Font.headline())
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.primary)
 
@@ -58,6 +68,6 @@ private struct TrayMinimalStatusIconView: View {
                 )
                 .offset(x: 1, y: 1)
         }
-        .frame(width: 18, height: 14)
+        .frame(width: 18, height: 16)
     }
 }

@@ -4,13 +4,13 @@ import SwiftUI
 struct AccountsMenuContentView: View {
     @ObservedObject var viewModel: AccountsMenuViewModel
     @Environment(\.openWindow) var openWindow
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State var keyboardMonitor: Any?
     @State var expandedAccountNames: Set<String> = []
-    @State var showAllAccounts = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            DashboardTokens.background
+            DashboardTokens.backgroundGradient
                 .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: DashboardTokens.Spacing.sectionSpacing) {
@@ -25,7 +25,11 @@ struct AccountsMenuContentView: View {
                 }
 
                 if viewModel.accounts.isEmpty {
-                    emptyStateCard
+                    if viewModel.isRefreshing {
+                        loadingStateCard
+                    } else {
+                        emptyStateCard
+                    }
                 } else {
                     bentoUsageSection
 
@@ -41,7 +45,7 @@ struct AccountsMenuContentView: View {
             if let toast = activeToast {
                 toastView(text: toast.text, color: toast.color)
                     .padding(DashboardTokens.Spacing.sectionSpacing)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
         .onAppear {
@@ -53,13 +57,6 @@ struct AccountsMenuContentView: View {
         .onChange(of: viewModel.accounts.map(\.name)) { _ in
             let activeNames = Set(viewModel.accounts.map(\.name))
             expandedAccountNames = expandedAccountNames.intersection(activeNames)
-            if !canToggleShowAll {
-                showAllAccounts = false
-            }
         }
-        .animation(.easeInOut(duration: 0.18), value: viewModel.accounts.map(\.name))
-        .animation(.easeInOut(duration: 0.18), value: viewModel.switchingAccountName)
-        .animation(.easeInOut(duration: 0.18), value: viewModel.accountActionInFlightName)
-        .animation(.easeInOut(duration: 0.18), value: showAllAccounts)
     }
 }

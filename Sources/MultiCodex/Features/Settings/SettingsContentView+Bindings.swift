@@ -60,6 +60,13 @@ extension SettingsContentView {
         )
     }
 
+    var showAllAccountsInMenuBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.showAllAccountsInMenu },
+            set: { viewModel.setShowAllAccountsInMenu($0) }
+        )
+    }
+
     var autoSwitchNotificationsBinding: Binding<Bool> {
         Binding(
             get: { viewModel.autoSwitchNotificationsEnabled },
@@ -116,21 +123,6 @@ extension SettingsContentView {
         renameDrafts = renameDrafts.filter { names.contains($0.key) }
         for account in viewModel.accounts where renameDrafts[account.name] == nil {
             renameDrafts[account.name] = account.name
-        }
-    }
-
-    func removeStoredDataBinding(for accountName: String) -> Binding<Bool> {
-        Binding(
-            get: { removalDeleteDataChoice[accountName] ?? false },
-            set: { removalDeleteDataChoice[accountName] = $0 }
-        )
-    }
-
-    func syncRemovalChoices() {
-        let names = Set(viewModel.accounts.map(\.name))
-        removalDeleteDataChoice = removalDeleteDataChoice.filter { names.contains($0.key) }
-        for account in viewModel.accounts where removalDeleteDataChoice[account.name] == nil {
-            removalDeleteDataChoice[account.name] = false
         }
     }
 

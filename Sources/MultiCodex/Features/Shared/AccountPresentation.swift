@@ -10,7 +10,7 @@ enum AccountPresentation {
     static func statusColor(for state: AccountConnectionState) -> Color {
         switch state {
         case .connected:
-            return DashboardTokens.statusGreen
+            return DashboardTokens.accentSoft
         case .needsLogin:
             return DashboardTokens.statusOrange
         case .error:
@@ -43,9 +43,9 @@ enum AccountPresentation {
     static func runtimeStatus(summary: String?, isAvailable: Bool) -> RuntimeStatusPresentation {
         if isAvailable {
             return RuntimeStatusPresentation(
-                text: summary ?? "codex runtime is available.",
+                text: summary ?? "Codex runtime is available.",
                 symbol: "checkmark.circle.fill",
-                color: DashboardTokens.statusGreen
+                color: DashboardTokens.accentSoft
             )
         }
 
@@ -58,53 +58,70 @@ enum AccountPresentation {
         }
 
         return RuntimeStatusPresentation(
-            text: "Checking codex runtime...",
+            text: "Checking Codex runtime...",
             symbol: "clock",
             color: DashboardTokens.textSecondary
         )
     }
 }
 
+// MARK: - Status Pill
+
 struct AccountStatusPill: View {
     let text: String
     let color: Color
 
     var body: some View {
-        Text(text.lowercased())
-            .font(.system(size: 9, weight: .medium))
-            .tracking(0.3)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
+        Text(text)
+            .font(DashboardTokens.Font.caption())
+            .tracking(0.2)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2.5)
             .background(
                 Capsule()
-                    .stroke(color.opacity(0.35), lineWidth: 1)
+                    .fill(color.opacity(0.12))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(color.opacity(0.26), lineWidth: 1)
             )
             .foregroundStyle(color)
     }
 }
 
+// MARK: - Warning Row
+
 struct SubtleWarningRow: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(DashboardTokens.statusOrange)
+                .padding(.top, 1)
+
             Text(text)
                 .font(DashboardTokens.Font.metadata())
                 .foregroundStyle(DashboardTokens.textSecondary)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(
-            DashboardTokens.statusOrange.opacity(0.1),
-            in: RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+            DashboardTokens.statusOrange.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .stroke(DashboardTokens.statusOrange.opacity(0.14), lineWidth: 1)
         )
     }
 }
+
+// MARK: - Usage Metric Card
 
 struct AccountUsageMetricCard: View {
     let title: String
@@ -120,49 +137,40 @@ struct AccountUsageMetricCard: View {
         case .warning:
             return DashboardTokens.statusOrange
         case .normal:
-            return DashboardTokens.statusGreen
+            return DashboardTokens.accentSoft
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(title.uppercased())
-                    .font(DashboardTokens.Font.sectionLabel())
-                    .tracking(1.5)
-                    .foregroundStyle(DashboardTokens.textTertiary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                DashboardSectionHeader(title: title)
                 Spacer()
                 Text(valueText)
                     .font(DashboardTokens.Font.cardHeading())
                     .foregroundStyle(DashboardTokens.textPrimary)
+                    .monospacedDigit()
             }
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(Color.white.opacity(0.06))
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(Color.white.opacity(0.07))
 
-                    RoundedRectangle(cornerRadius: 1.5)
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
                         .fill(tone)
                         .frame(width: geo.size.width * CGFloat(min(1, progressValue)))
                 }
             }
-            .frame(height: 3)
+            .frame(height: 5)
 
             Text(metric.resetText(mode: resetDisplayMode))
                 .font(DashboardTokens.Font.metadata())
                 .foregroundStyle(DashboardTokens.textSecondary)
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(DashboardTokens.Spacing.cardPadding)
-        .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(DashboardTokens.cardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
-        )
+        .cardStyle(fill: DashboardTokens.cardBackgroundSubtle)
     }
 }

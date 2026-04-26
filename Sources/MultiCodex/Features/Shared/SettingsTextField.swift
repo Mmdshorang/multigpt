@@ -2,8 +2,10 @@ import SwiftUI
 
 struct SettingsTextField: View {
     let placeholder: String
+    var accessibilityLabel: String? = nil
     @Binding var text: String
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -12,16 +14,22 @@ struct SettingsTextField: View {
             .font(DashboardTokens.Font.metadata())
             .foregroundStyle(DashboardTokens.textPrimary)
             .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                     .fill(DashboardTokens.inputBackground)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
                     .stroke(isFocused ? DashboardTokens.inputBorderFocused : DashboardTokens.inputBorder, lineWidth: 1)
             )
+            .shadow(
+                color: DashboardTokens.shadowColor.opacity(isFocused ? 0.16 : 0),
+                radius: 6,
+                y: 2
+            )
             .focused($isFocused)
-            .animation(.easeInOut(duration: 0.15), value: isFocused)
+            .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isFocused)
+            .accessibilityLabel(accessibilityLabel ?? placeholder)
     }
 }

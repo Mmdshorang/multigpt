@@ -3,56 +3,81 @@ import SwiftUI
 extension SettingsContentView {
     var generalPage: some View {
         VStack(alignment: .leading, spacing: 16) {
+            settingsHero(
+                title: "General",
+                description: "Behavior and menu display settings.",
+                symbol: "slider.horizontal.3"
+            ) {
+                VStack(alignment: .trailing, spacing: 6) {
+                    if viewModel.isRefreshing {
+                        settingsBadge(
+                            text: "Refreshing",
+                            symbol: "arrow.clockwise",
+                            color: DashboardTokens.accent
+                        )
+                    }
+                    settingsBadge(
+                        text: viewModel.currentAccount == nil ? "No Active Account" : "\(viewModel.currentAccount?.name ?? "") Active",
+                        symbol: viewModel.currentAccount == nil ? "person.crop.circle.badge.questionmark" : "checkmark.circle.fill",
+                        color: viewModel.currentAccount == nil ? DashboardTokens.statusOrange : DashboardTokens.statusGreen
+                    )
+                    settingsBadge(
+                        text: viewModel.accountsNeedingLogin.isEmpty ? "All Healthy" : "\(viewModel.accountsNeedingLogin.count) Need Login",
+                        symbol: viewModel.accountsNeedingLogin.isEmpty ? "shield.fill" : "exclamationmark.triangle.fill",
+                        color: viewModel.accountsNeedingLogin.isEmpty ? DashboardTokens.statusGreen : DashboardTokens.statusOrange
+                    )
+                }
+            }
+
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 14) {
                         settingsSectionIntro(
-                            title: "Status",
-                            description: "Current system overview",
+                            title: "Overview",
+                            description: "Account and runtime status.",
                             symbol: "chart.bar.fill"
                         )
 
-                        Spacer()
+                        Spacer(minLength: 10)
 
-                        HStack(spacing: 8) {
+                        HStack(spacing: 6) {
                             ActionPillButton(
                                 title: "Refresh",
                                 symbol: "arrow.clockwise",
                                 role: .secondary,
-                                layout: .iconOnly
+                                isDisabled: viewModel.isRefreshing
                             ) {
                                 viewModel.refresh()
                             }
 
                             ActionPillButton(
-                                title: "Live",
+                                title: "Live Refresh",
                                 symbol: "bolt.horizontal.fill",
-                                role: .primary
+                                role: .primary,
+                                isDisabled: viewModel.isRefreshing
                             ) {
                                 viewModel.refreshLive()
                             }
                         }
                     }
 
-                    Divider()
-                        .background(Color.white.opacity(0.1))
-
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         DashboardStatCard(
                             label: "Accounts",
-                            value: "\(viewModel.accounts.count)"
+                            value: "\(viewModel.accounts.count)",
+                            sublabel: viewModel.accounts.isEmpty ? "No accounts" : "Configured"
                         )
 
                         DashboardStatCard(
-                            label: "Current",
+                            label: "Active",
                             value: viewModel.currentAccount?.name ?? "None",
-                            sublabel: viewModel.currentAccount != nil ? "Active" : nil
+                            sublabel: viewModel.currentAccount?.workspaceEmailHint ?? (viewModel.currentAccount == nil ? "No active account" : "Ready")
                         )
 
                         DashboardStatCard(
                             label: "Need Login",
                             value: "\(viewModel.accountsNeedingLogin.count)",
-                            sublabel: viewModel.accountsNeedingLogin.isEmpty ? "All good" : "Action needed"
+                            sublabel: viewModel.accountsNeedingLogin.isEmpty ? "No action needed" : "Accounts need attention"
                         )
                     }
 
@@ -63,30 +88,30 @@ extension SettingsContentView {
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     settingsSectionIntro(
-                        title: "Appearance",
-                        description: "Customize menu bar display",
+                        title: "Menu Appearance",
+                        description: "Control density and display format.",
                         symbol: "paintbrush.fill"
                     )
 
                     VStack(spacing: 14) {
-                        settingsFormRow("Menu density", icon: "rectangle.compress.vertical") {
+                        settingsFormRow("Menu density", detail: "How many accounts the menu shows before collapsing overflow.", icon: "rectangle.compress.vertical") {
                             SettingsSegmentedPicker(
                                 options: MenuDensity.allCases,
                                 titleForOption: { $0.title },
                                 selection: menuDensityBinding
                             )
-                            .frame(maxWidth: 260)
+                            .frame(maxWidth: 300)
                         }
 
-                        settingsFormRow("Reset time display", icon: "clock") {
+                        settingsFormRow("Reset time display", detail: "Format that is easiest to scan during quick status checks.", icon: "clock") {
                             SettingsSegmentedPicker(
                                 options: ResetDisplayMode.allCases,
                                 titleForOption: { $0.title },
                                 selection: resetDisplayModeBinding
                             )
-                            .frame(maxWidth: 260)
+                            .frame(maxWidth: 300)
                         }
 
                         settingsFormRow("Usage bar style", detail: viewModel.usageBarStyle.descriptionText, icon: "chart.bar") {
@@ -95,18 +120,30 @@ extension SettingsContentView {
                                 titleForOption: { $0.title },
                                 selection: usageBarStyleBinding
                             )
-                            .frame(maxWidth: 260)
+                            .frame(maxWidth: 300)
                         }
 
+                        settingsFormRow(
+                            "Menu account visibility",
+                            detail: "Show every account in the menu or limit by selected density.",
+                            icon: "rectangle.expand.vertical"
+                        ) {
+                            SettingsSegmentedPicker(
+                                options: [true, false],
+                                titleForOption: { $0 ? "All" : "By Density" },
+                                selection: showAllAccountsInMenuBinding
+                            )
+                            .frame(maxWidth: 300)
+                        }
                     }
                 }
             }
 
             SettingsPanelCard {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     settingsSectionIntro(
                         title: "Auto-Switching",
-                        description: "Automatically switch between accounts",
+                        description: "Automatic account switching behavior.",
                         symbol: "arrow.triangle.swap"
                     )
 
@@ -117,29 +154,41 @@ extension SettingsContentView {
                                 titleForOption: { $0.title },
                                 selection: accountSwitchingStrategyBinding
                             )
-                            .frame(maxWidth: 300)
+                            .frame(maxWidth: 340)
                         }
 
-                        HStack(spacing: 10) {
-                            SettingsToggle(label: "Show notifications", isOn: autoSwitchNotificationsBinding)
+                        Rectangle()
+                            .fill(DashboardTokens.cardBorder)
+                            .frame(height: 1)
 
-                            Spacer()
+                        VStack(alignment: .leading, spacing: 6) {
+                            DashboardSectionHeader(title: "Notifications")
+                            Text("Enable notifications and send a test alert.")
+                                .font(DashboardTokens.Font.metadata())
+                                .foregroundStyle(DashboardTokens.textSecondary)
 
-                            ActionPillButton(
-                                title: "Test",
-                                symbol: "bell.badge",
-                                isDisabled: !viewModel.autoSwitchNotificationsEnabled
-                            ) {
-                                viewModel.sendTestAutoSwitchNotification()
+                            HStack(spacing: 10) {
+                                SettingsToggle(label: "Show notifications", isOn: autoSwitchNotificationsBinding)
+
+                                Spacer(minLength: 10)
+
+                                ActionPillButton(
+                                    title: "Send Test",
+                                    symbol: "bell.badge",
+                                    role: .secondary,
+                                    isDisabled: !viewModel.autoSwitchNotificationsEnabled
+                                ) {
+                                    viewModel.sendTestAutoSwitchNotification()
+                                }
                             }
                         }
 
                         if let message = viewModel.accountActionMessage {
-                            feedbackRow(message, color: .green)
+                            feedbackRow(message, color: DashboardTokens.statusGreen)
                         }
 
                         if let error = viewModel.accountActionError {
-                            feedbackRow(error, color: .red)
+                            feedbackRow(error, color: DashboardTokens.statusRed)
                         }
                     }
                 }
