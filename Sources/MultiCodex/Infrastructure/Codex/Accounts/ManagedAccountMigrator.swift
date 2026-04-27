@@ -22,7 +22,7 @@ enum ManagedAccountMigrator {
             let legacyAuthPath = paths.accountAuthPath(accountName)
             guard FileManager.default.fileExists(atPath: legacyAuthPath) else { continue }
 
-            let managedHome = try ManagedCodexHomeFactory.createHome(for: accountName)
+            let managedHome = try ManagedCodexHomeFactory.createHome(for: accountName, multicodexHome: paths.multicodexHome)
             let authData = try Data(contentsOf: URL(fileURLWithPath: legacyAuthPath))
             try ManagedCodexHomeFactory.writeAuthData(authData, to: managedHome)
 

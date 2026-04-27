@@ -312,7 +312,7 @@ extension CodexAccountService {
             )
 
             do {
-                if let refreshed = try refreshAccessToken(authPayload: &payload, authPath: authPath) {
+                if try refreshAccessToken(authPayload: &payload, authPath: authPath) != nil {
                     MultiCodexLog.log(
                         .auth,
                         level: .info,

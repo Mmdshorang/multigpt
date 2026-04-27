@@ -81,7 +81,7 @@ extension CodexAccountService {
         let legacyAccounts: [String]
         if migrationCompleted {
             managedAccounts = needsLive.filter { account in
-                guard let homeURL = ManagedCodexHomeFactory.homeURL(for: account) else { return false }
+                guard let homeURL = ManagedCodexHomeFactory.homeURL(for: account, multicodexHome: paths.multicodexHome) else { return false }
                 return (try? ManagedCodexHomeFactory.readAuthData(from: homeURL)) != nil
             }
             legacyAccounts = needsLive.filter { !managedAccounts.contains($0) }
@@ -143,7 +143,7 @@ extension CodexAccountService {
     /// Fetch limits for a single managed-home account in isolation.
     /// Does NOT touch global auth. Uses the managed home's auth.json directly.
     private func fetchManagedAccountLimits(_ account: String, paths: PathContext) -> (LimitsResult?, LimitsErrorEntry?) {
-        guard let homeURL = ManagedCodexHomeFactory.homeURL(for: account) else {
+        guard let homeURL = ManagedCodexHomeFactory.homeURL(for: account, multicodexHome: paths.multicodexHome) else {
             return (nil, LimitsErrorEntry(account: account, message: "No managed home found"))
         }
 

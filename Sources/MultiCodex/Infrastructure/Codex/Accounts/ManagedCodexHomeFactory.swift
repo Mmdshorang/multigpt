@@ -13,6 +13,13 @@ enum ManagedCodexHomeFactory {
         return base.appendingPathComponent(homesRootName, isDirectory: true)
     }
 
+    /// Root URL scoped to a specific multicodex home directory.
+    /// Use this when managed homes should be owned by a particular config.
+    static func scopedRootURL(multicodexHome: String) -> URL {
+        URL(fileURLWithPath: multicodexHome)
+            .appendingPathComponent("managed-homes", isDirectory: true)
+    }
+
     static func createHome(for accountName: String, fileManager: FileManager = .default) throws -> URL {
         let sanitized = sanitize(accountName)
         let homeURL = defaultRootURL(fileManager: fileManager)
@@ -31,6 +38,28 @@ enum ManagedCodexHomeFactory {
         let homeURL = defaultRootURL(fileManager: fileManager)
             .appendingPathComponent(sanitized, isDirectory: true)
         return fileManager.fileExists(atPath: homeURL.path) ? homeURL : nil
+    }
+
+    /// Scoped variant: get the managed home URL under a specific multicodex home.
+    static func homeURL(for accountName: String, multicodexHome: String) -> URL? {
+        let sanitized = sanitize(accountName)
+        let homeURL = scopedRootURL(multicodexHome: multicodexHome)
+            .appendingPathComponent(sanitized, isDirectory: true)
+        return FileManager.default.fileExists(atPath: homeURL.path) ? homeURL : nil
+    }
+
+    /// Scoped variant: create a managed home under a specific multicodex home.
+    static func createHome(for accountName: String, multicodexHome: String) throws -> URL {
+        let sanitized = sanitize(accountName)
+        let homeURL = scopedRootURL(multicodexHome: multicodexHome)
+            .appendingPathComponent(sanitized, isDirectory: true)
+
+        try FileManager.default.createDirectory(at: homeURL, withIntermediateDirectories: true)
+
+        let sessionsURL = homeURL.appendingPathComponent("sessions", isDirectory: true)
+        try FileManager.default.createDirectory(at: sessionsURL, withIntermediateDirectories: true)
+
+        return homeURL
     }
 
     static func scopedEnvironment(
