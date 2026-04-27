@@ -69,16 +69,26 @@ extension CodexAccountService {
             return LimitsPayload(results: results, errors: [])
         }
 
-        // Split accounts into managed-home (parallel-safe) and legacy (must be serial)
-        // Only treat accounts as managed if they have a home under our MULTICODEX_HOME,
-        // not the global Application Support directory (which may have stale test data).
-        let managedRoot = ManagedCodexHomeFactory.defaultRootURL().path
-        let managedAccounts = needsLive.filter { account in
-            guard let homeURL = ManagedCodexHomeFactory.homeURL(for: account) else { return false }
-            // Verify the managed home has valid auth data
-            return (try? ManagedCodexHomeFactory.readAuthData(from: homeURL)) != nil
+        // Split accounts into managed-home (parallel-safe) and legacy (must be serial).
+        // Only treat accounts as managed if the managed-home migration has been completed
+        // for THIS config directory. This prevents stale global managed homes from
+        // interfering with sandbox/legacy service instances.
+        let migrationMarker = URL(fileURLWithPath: paths.multicodexHome)
+            .appendingPathComponent(".managed-migration-complete")
+        let migrationCompleted = FileManager.default.fileExists(atPath: migrationMarker.path)
+
+        let managedAccounts: [String]
+        let legacyAccounts: [String]
+        if migrationCompleted {
+            managedAccounts = needsLive.filter { account in
+                guard let homeURL = ManagedCodexHomeFactory.homeURL(for: account) else { return false }
+                return (try? ManagedCodexHomeFactory.readAuthData(from: homeURL)) != nil
+            }
+            legacyAccounts = needsLive.filter { !managedAccounts.contains($0) }
+        } else {
+            managedAccounts = []
+            legacyAccounts = needsLive
         }
-        let legacyAccounts = needsLive.filter { !managedAccounts.contains($0) }
 
         // Parallel fetch for isolated managed-home accounts only
         if !managedAccounts.isEmpty {
