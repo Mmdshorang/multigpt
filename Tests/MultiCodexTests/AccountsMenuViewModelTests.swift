@@ -1840,6 +1840,18 @@ private final class MockCodexAccountService: CodexAccountServicing {
     func probeRuntime() -> RuntimeProbe {
         probeRuntimeResult
     }
+
+    func refreshStaleTokens() -> [String: Error] {
+        [:]
+    }
+
+    func resolveFromAuthPayload(_ authPayload: [String: Any]) -> ResolvedAccountIdentity? {
+        nil
+    }
+
+    func currentPaths(loginHome: String?) -> CodexAccountService.PathContext {
+        CodexAccountService.PathContext(homeDir: "/tmp", multicodexHome: "/tmp/multicodex")
+    }
 }
 
 private final class MockAutoSwitchNotifier: AutoSwitchNotificationSending {

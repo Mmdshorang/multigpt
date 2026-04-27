@@ -20,6 +20,15 @@ protocol CodexAccountServicing: AnyObject {
     func inferDefaultWorkspaceEmail(fromLoginHome homePath: String) -> String?
     func effectiveMulticodexHomePath() -> String
     func probeRuntime() -> RuntimeProbe
+    func refreshStaleTokens() -> [String: Error]
+    func resolveFromAuthPayload(_ authPayload: [String: Any]) -> ResolvedAccountIdentity?
+    func currentPaths(loginHome: String?) -> CodexAccountService.PathContext
 }
 
 extension CodexAccountService: CodexAccountServicing {}
+
+extension CodexAccountServicing {
+    func currentPaths() -> CodexAccountService.PathContext {
+        currentPaths(loginHome: nil)
+    }
+}

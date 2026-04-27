@@ -287,6 +287,51 @@ extension CodexAccountService {
         nowFormatter.string(from: Date())
     }
 
+    /// Proactively refresh tokens for all accounts with aging auth.
+    /// Called during background refresh cycles, before fetching usage.
+    func refreshStaleTokens() -> [String: Error] {
+        let paths = currentPaths()
+        guard let config = try? loadConfig(paths: paths) else {
+            return [:]
+        }
+
+        var errors: [String: Error] = [:]
+        for account in config.accounts {
+            let authPath = paths.accountAuthPath(account)
+            guard var payload = try? loadAuthPayload(from: authPath) else {
+                continue
+            }
+            guard shouldRefreshToken(payload) else {
+                continue
+            }
+
+            MultiCodexLog.log(
+                .auth,
+                level: .debug,
+                "Proactively refreshing token for \(account)"
+            )
+
+            do {
+                if let refreshed = try refreshAccessToken(authPayload: &payload, authPath: authPath) {
+                    MultiCodexLog.log(
+                        .auth,
+                        level: .info,
+                        "Token refreshed for \(account)",
+                        metadata: ["refreshed": "yes"]
+                    )
+                }
+            } catch {
+                errors[account] = error
+                MultiCodexLog.log(
+                    .auth,
+                    level: .error,
+                    "Token refresh failed for \(account): \(error.localizedDescription)"
+                )
+            }
+        }
+        return errors
+    }
+
     func validatedAccountName(_ name: String) throws -> String {
         let account = normalizeAccountName(name)
         guard isValidAccountName(account) else {
