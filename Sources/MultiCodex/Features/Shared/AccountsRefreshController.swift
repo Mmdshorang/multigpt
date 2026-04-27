@@ -11,15 +11,31 @@ final class AccountsRefreshController {
     func performRefresh(refreshLive: Bool, allowAutoSwitch: Bool = true) async {
         let viewModel = viewModel
         if viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion {
+            MultiCodexLog.log(.refresh, level: .debug, "Skipped refresh while interactive login is pending")
             return
         }
 
         if viewModel.isRefreshing {
+            MultiCodexLog.log(.refresh, level: .debug, "Skipped refresh because another refresh is already running")
             return
         }
 
+        MultiCodexLog.log(.refresh, level: .info, "Starting refresh", metadata: ["live": refreshLive ? "yes" : "no"])
         viewModel.isRefreshing = true
         let previousAccounts = viewModel.accounts
+
+        // Proactively refresh aging tokens before fetching usage
+        if refreshLive {
+            let tokenErrors = viewModel.accountService.refreshStaleTokens()
+            if !tokenErrors.isEmpty {
+                MultiCodexLog.log(
+                    .auth,
+                    level: .info,
+                    "Some token refreshes failed",
+                    metadata: ["failedAccounts": tokenErrors.keys.sorted().joined(separator: ",")]
+                )
+            }
+        }
         var fetchedAccounts: AccountsListPayload?
         var switchRecommendation: AccountSwitchRecommendation?
         defer {
@@ -45,6 +61,14 @@ final class AccountsRefreshController {
                 limits: limits,
                 previousAccounts: previousAccounts
             )
+            let quotaTransitions = QuotaTransitionDetector.detectTransitions(
+                previous: previousAccounts,
+                current: viewModel.accounts
+            )
+            if !quotaTransitions.isEmpty, viewModel.autoSwitchNotificationsEnabled {
+                QuotaTransitionNotificationCenter.shared.post(transitions: quotaTransitions)
+            }
+
             viewModel.lastUpdatedAt = Date()
             viewModel.cliResolutionHint = viewModel.accountService.resolutionHint
             if allowAutoSwitch, viewModel.switchingAccountName == nil {
@@ -61,7 +85,19 @@ final class AccountsRefreshController {
                 viewModel.lastRefreshError = nil
                 viewModel.refreshWarningMessage = formatRefreshWarning(from: limits.errors)
             }
+            MultiCodexLog.log(
+                .refresh,
+                level: limits.errors.isEmpty ? .info : .error,
+                "Refresh completed",
+                metadata: [
+                    "accounts": "\(viewModel.accounts.count)",
+                    "limitErrors": "\(limits.errors.count)",
+                ]
+            )
+
+            performReconciliation(accountsPayload: accountsPayload)
         } catch {
+            MultiCodexLog.log(.refresh, level: .error, "Refresh failed: \(error.localizedDescription)")
             viewModel.cliResolutionHint = viewModel.accountService.resolutionHint
             if let fetchedAccounts {
                 applyMergedAccounts(
@@ -159,5 +195,61 @@ final class AccountsRefreshController {
         )
         viewModel.clearFocusedAccountIfMissing()
         viewModel.syncSelectedSettingsAccount()
+    }
+
+    private func performReconciliation(accountsPayload: AccountsListPayload) {
+        let service = viewModel.accountService
+        let paths = service.currentPaths()
+        let systemAuthPath = paths.defaultCodexAuthPath
+
+        let systemModified = try? FileManager.default
+            .attributesOfItem(atPath: systemAuthPath)[.modificationDate] as? Date
+
+        let systemIdentity: ResolvedAccountIdentity?
+        if let authData = try? Data(contentsOf: URL(fileURLWithPath: systemAuthPath)),
+           let payload = try? JSONSerialization.jsonObject(with: authData) as? [String: Any]
+        {
+            systemIdentity = service.resolveFromAuthPayload(payload)
+        } else {
+            systemIdentity = nil
+        }
+
+        var accountIdentities: [String: AccountIdentity] = [:]
+        for account in viewModel.accounts {
+            let email = account.defaultWorkspaceEmail
+            accountIdentities[account.name] = AccountIdentityResolver.resolve(
+                accountId: nil,
+                email: email
+            )
+        }
+
+        let currentAccount = accountsPayload.currentAccount
+        let result = AccountReconciliation.reconcile(
+            configCurrentAccount: currentAccount,
+            systemAuthLastModified: systemModified,
+            knownAccountLastModified: nil,
+            systemIdentity: systemIdentity,
+            accountIdentities: accountIdentities
+        )
+
+        if !result.isInSync {
+            MultiCodexLog.log(
+                .auth,
+                level: .info,
+                "Account out of sync with system auth",
+                metadata: [
+                    "configAccount": result.configCurrentAccount ?? "none",
+                    "detectedAccount": result.detectedAccountName ?? "unknown",
+                    "detectedEmail": result.detectedEmail ?? "none",
+                    "externallyModified": result.systemAuthChangedExternally ? "yes" : "unknown",
+                ]
+            )
+
+            if let detectedName = result.detectedAccountName {
+                viewModel.applyCurrentAccountLocally(named: detectedName)
+            } else if let email = result.detectedEmail {
+                viewModel.refreshWarningMessage = "Detected external login for \(email). This account is not in MultiCodex."
+            }
+        }
     }
 }
