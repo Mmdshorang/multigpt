@@ -244,6 +244,31 @@ struct DashboardAccountRow: View {
                     progress: weeklyProgressValue,
                     color: DashboardTokens.ringWeekly
                 )
+
+                // Pace indicator
+                if let paceText = row.account.paceSummary {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(paceColor(row.account.fiveHourPace?.stage))
+                            .frame(width: 6, height: 6)
+                        Text(paceText)
+                            .font(DashboardTokens.Font.caption())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                            .lineLimit(1)
+                    }
+                    .padding(.top, 2)
+                }
+
+                // Cost indicator
+                if let cost = row.account.costReport, cost.totalCostUSD > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "dollarsign.circle")
+                            .font(DashboardTokens.Font.caption())
+                        Text("\(cost.formattedToday) today")
+                            .font(DashboardTokens.Font.caption())
+                            .foregroundStyle(DashboardTokens.textSecondary)
+                    }
+                }
             }
 
             Spacer(minLength: 8)
@@ -292,6 +317,18 @@ struct DashboardAccountRow: View {
                     .frame(width: barWidth * CGFloat(min(1, max(0, progress))))
             }
             .frame(width: barWidth, height: 3.5)
+        }
+    }
+
+    private func paceColor(_ stage: UsagePace.Stage?) -> Color {
+        guard let stage else { return DashboardTokens.textTertiary }
+        switch stage {
+        case .onTrack, .slightlyBehind, .behind, .farBehind:
+            return DashboardTokens.accent
+        case .slightlyAhead:
+            return DashboardTokens.statusOrange
+        case .ahead, .farAhead:
+            return DashboardTokens.statusRed
         }
     }
 }

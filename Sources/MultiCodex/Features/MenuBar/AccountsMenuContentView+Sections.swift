@@ -316,6 +316,8 @@ extension AccountsMenuContentView {
                 .help(areAllAccountsExpanded ? "Collapse all" : "Expand all")
             }
 
+            healthSummaryRow
+
             sortOptionsRow
 
             VStack(spacing: 5) {
@@ -528,6 +530,38 @@ extension AccountsMenuContentView {
             return "Showing \(visibleRows.count) of \(allRows.count)"
         }
         return "\(allRows.count) accounts"
+    }
+
+    private var healthSummaryRow: some View {
+        let health = AccountsHealthSummary.from(viewModel.accounts)
+        guard viewModel.accounts.count > 1 else { return AnyView(EmptyView()) }
+        return AnyView(
+            HStack(spacing: 8) {
+                Text(health.summaryText)
+                    .font(DashboardTokens.Font.caption())
+                    .foregroundStyle(DashboardTokens.textSecondary)
+
+                if health.atRiskAccounts > 0 {
+                    Text("\(health.atRiskAccounts) at risk")
+                        .font(DashboardTokens.Font.caption())
+                        .foregroundStyle(DashboardTokens.statusOrange)
+                }
+
+                Spacer()
+
+                if let nextReset = health.nextResetAt {
+                    Text("Next reset: \(UsageFormatter.resetText(for: nextReset, mode: .relative))")
+                        .font(DashboardTokens.Font.caption())
+                        .foregroundStyle(DashboardTokens.textTertiary)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(DashboardTokens.cardBackgroundSubtle)
+            )
+        )
     }
 }
 
