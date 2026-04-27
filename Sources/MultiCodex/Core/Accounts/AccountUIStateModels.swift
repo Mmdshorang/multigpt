@@ -4,6 +4,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case accounts
     case system
+    case data
     case about
 
     var id: String { rawValue }
@@ -16,6 +17,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return "Accounts"
         case .system:
             return "System"
+        case .data:
+            return "Data"
         case .about:
             return "About"
         }
@@ -29,6 +32,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return "person.2"
         case .system:
             return "cpu"
+        case .data:
+            return "externaldrive"
         case .about:
             return "info.circle"
         }
