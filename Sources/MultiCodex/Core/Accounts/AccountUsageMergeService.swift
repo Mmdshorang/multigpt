@@ -20,6 +20,29 @@ enum AccountUsageMergeService {
             let source = preservedUsage?.source ?? UsageFormatter.sourceLabel(from: result)
             let effectiveUsageError = usageError
 
+            let fiveHourPace = UsagePace.compute(
+                usedPercent: usage.fiveHour.usedPercent,
+                periodMinutes: usage.fiveHour.periodMinutes,
+                resetsAt: usage.fiveHour.resetsAt
+            )
+            let weeklyPace = UsagePace.compute(
+                usedPercent: usage.weekly.usedPercent,
+                periodMinutes: usage.weekly.periodMinutes,
+                resetsAt: usage.weekly.resetsAt
+            )
+
+            // Record historical snapshots for pace analysis
+            if usage.fiveHour.usedPercent != nil {
+                let store = UsagePaceStore()
+                Task {
+                    await store.record(
+                        accountName: account.name,
+                        fiveHour: usage.fiveHour,
+                        weekly: usage.weekly
+                    )
+                }
+            }
+
             return AccountUsage(
                 name: account.name,
                 isCurrent: account.isCurrent || account.name == accounts.currentAccount,
@@ -29,7 +52,9 @@ enum AccountUsageMergeService {
                 defaultWorkspaceEmail: account.defaultWorkspaceEmail,
                 usage: usage,
                 source: source,
-                usageError: effectiveUsageError
+                usageError: effectiveUsageError,
+                fiveHourPace: fiveHourPace,
+                weeklyPace: weeklyPace
             )
         }
 
