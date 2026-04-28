@@ -22,6 +22,7 @@ protocol CodexAccountServicing: AnyObject {
     func probeRuntime() -> RuntimeProbe
     func refreshStaleTokens() -> [String: Error]
     func resolveFromAuthPayload(_ authPayload: [String: Any]) -> ResolvedAccountIdentity?
+    func resolvedIdentityForAccount(name: String) -> ResolvedAccountIdentity?
     func currentPaths(loginHome: String?) -> CodexAccountService.PathContext
 }
 

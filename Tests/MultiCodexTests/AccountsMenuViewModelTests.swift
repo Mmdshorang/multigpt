@@ -478,6 +478,36 @@ final class AccountsMenuViewModelTests: XCTestCase {
         }
     }
 
+    func testRefreshDoesNotWarnForStoredMultiCodexAccountWithoutRowEmailHint() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [LimitsResult(account: "alpha", source: "live-api", snapshot: nil, ageSec: nil)],
+            errors: []
+        )
+        service.stubbedResolvedIdentityByAccount["alpha"] = ResolvedAccountIdentity(
+            email: "judevelin@atomicmail.io",
+            plan: nil,
+            accountId: nil,
+            authMethod: .oauth
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { MockAutoSwitchNotifier() },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        await viewModel.refreshController.performRefresh(refreshLive: true)
+
+        XCTAssertNil(viewModel.refreshWarningMessage)
+    }
+
     func testManualStrategyDoesNotAutoSwitch() async {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
@@ -1613,6 +1643,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var loginHomeStatusOutput = "ok"
     var probeRuntimeResult = RuntimeProbe(isAvailable: true, summary: "ok")
     var stubbedDefaultWorkspaceEmailByAccount: [String: String] = [:]
+    var stubbedResolvedIdentityByAccount: [String: ResolvedAccountIdentity] = [:]
     var stubbedInferredEmailFromLoginHome: String?
 
     private(set) var switchCalls: [String] = []
@@ -1847,6 +1878,10 @@ private final class MockCodexAccountService: CodexAccountServicing {
 
     func resolveFromAuthPayload(_ authPayload: [String: Any]) -> ResolvedAccountIdentity? {
         nil
+    }
+
+    func resolvedIdentityForAccount(name: String) -> ResolvedAccountIdentity? {
+        stubbedResolvedIdentityByAccount[name]
     }
 
     func currentPaths(loginHome: String?) -> CodexAccountService.PathContext {

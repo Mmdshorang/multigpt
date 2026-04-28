@@ -216,9 +216,11 @@ final class AccountsRefreshController {
 
         var accountIdentities: [String: AccountIdentity] = [:]
         for account in viewModel.accounts {
-            let email = account.defaultWorkspaceEmail
+            let resolvedIdentity = service.resolvedIdentityForAccount(name: account.name)
+            let accountId = resolvedIdentity?.accountId
+            let email = resolvedIdentity?.email ?? account.defaultWorkspaceEmail
             accountIdentities[account.name] = AccountIdentityResolver.resolve(
-                accountId: nil,
+                accountId: accountId,
                 email: email
             )
         }

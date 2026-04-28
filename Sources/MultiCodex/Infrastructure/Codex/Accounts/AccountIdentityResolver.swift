@@ -13,6 +13,16 @@ struct ResolvedAccountIdentity: Equatable {
 }
 
 extension CodexAccountService {
+    func resolvedIdentityForAccount(name: String) -> ResolvedAccountIdentity? {
+        let account = normalizeAccountName(name)
+        let paths = currentPaths()
+        let authPath = managedAuthPath(for: account, paths: paths) ?? paths.accountAuthPath(account)
+        guard let authPayload = try? loadAuthPayload(from: authPath) else {
+            return nil
+        }
+        return resolveFromAuthPayload(authPayload)
+    }
+
     func inferDefaultWorkspaceEmail(fromAuthPath authPath: String) -> String? {
         guard let authPayload = try? loadAuthPayload(from: authPath) else {
             return nil
