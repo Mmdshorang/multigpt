@@ -230,72 +230,36 @@ struct DashboardAccountRow: View {
     // MARK: - Expanded Content
 
     private var expandedContent: some View {
-        HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 8) {
                 expandedMetricBar(
                     label: "5H",
                     valueText: fiveHourPercentText,
+                    resetText: row.resetText,
                     progress: fiveHourProgressValue,
                     color: DashboardTokens.ringFiveHour
                 )
                 expandedMetricBar(
                     label: "WEEK",
                     valueText: weeklyPercentText,
+                    resetText: row.account.usage.weekly.resetText(mode: row.resetDisplayMode),
                     progress: weeklyProgressValue,
                     color: DashboardTokens.ringWeekly
                 )
-
-                // Pace indicator
-                if let paceText = row.account.paceSummary {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(paceColor(row.account.fiveHourPace?.stage))
-                            .frame(width: 6, height: 6)
-                        Text(paceText)
-                            .font(DashboardTokens.Font.caption())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                            .lineLimit(1)
-                    }
-                    .padding(.top, 2)
-                }
-
-                // Cost indicator
-                if let cost = row.account.costReport, cost.totalCostUSD > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "dollarsign.circle")
-                            .font(DashboardTokens.Font.caption())
-                        Text("\(cost.formattedToday) today")
-                            .font(DashboardTokens.Font.caption())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                    }
-                }
             }
 
-            Spacer(minLength: 8)
-
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(row.resetText)
-                    .font(DashboardTokens.Font.metadata())
-                    .foregroundStyle(DashboardTokens.textSecondary)
-                    .multilineTextAlignment(.trailing)
-
-                if let email = row.workspaceEmailHint {
-                    Text(email)
-                        .font(DashboardTokens.Font.metadata())
-                        .foregroundStyle(DashboardTokens.textTertiary)
-                        .lineLimit(1)
-                }
-            }
+            expandedDetailFooter
         }
     }
 
     private func expandedMetricBar(
         label: String,
         valueText: String,
+        resetText: String,
         progress: Double,
         color: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 Text(label)
                     .font(DashboardTokens.Font.caption())
@@ -305,18 +269,63 @@ struct DashboardAccountRow: View {
                     .font(DashboardTokens.Font.metadata().weight(.semibold))
                     .foregroundStyle(DashboardTokens.textPrimary)
                     .monospacedDigit()
+
+                Spacer(minLength: 8)
+
+                Text(resetText)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
 
-            let barWidth: CGFloat = 118
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Color.white.opacity(0.07))
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
 
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(color)
-                    .frame(width: barWidth * CGFloat(min(1, max(0, progress))))
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(color)
+                        .frame(width: proxy.size.width * CGFloat(min(1, max(0, progress))))
+                }
             }
-            .frame(width: barWidth, height: 3.5)
+            .frame(height: 4)
+        }
+    }
+
+    private var expandedDetailFooter: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let paceText = row.account.paceSummary {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Circle()
+                        .fill(paceColor(row.account.fiveHourPace?.stage))
+                        .frame(width: 6, height: 6)
+                    Text(paceText)
+                        .font(DashboardTokens.Font.caption())
+                        .foregroundStyle(DashboardTokens.textSecondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if let email = row.workspaceEmailHint {
+                    Label(email, systemImage: "person.crop.circle")
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer(minLength: 6)
+
+                if let cost = row.account.costReport, cost.totalCostUSD > 0 {
+                    Label("\(cost.formattedToday) today", systemImage: "dollarsign.circle")
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textSecondary)
+                        .lineLimit(1)
+                }
+            }
         }
     }
 

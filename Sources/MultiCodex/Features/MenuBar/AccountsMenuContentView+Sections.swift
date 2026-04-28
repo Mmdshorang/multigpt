@@ -182,8 +182,6 @@ extension AccountsMenuContentView {
                         resetText: current.usage.weekly.resetText(mode: viewModel.resetDisplayMode)
                     )
                 }
-
-                currentAccountCard(current)
             }
         }
     }
@@ -226,39 +224,6 @@ extension AccountsMenuContentView {
         .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
     }
 
-    private func currentAccountCard(_ account: AccountUsage) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AccountPresentation.statusColor(for: account.connectionState).opacity(0.14))
-                    .frame(width: 28, height: 28)
-                    .overlay(
-                        Image(systemName: account.connectionState == .connected ? "person.crop.circle.fill" : "person.crop.circle.badge.exclamationmark")
-                            .font(DashboardTokens.Font.bodySemibold())
-                            .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
-                    )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(account.name)
-                            .font(DashboardTokens.Font.accountName())
-                            .foregroundStyle(DashboardTokens.textPrimary)
-                            .lineLimit(1)
-                    }
-
-                    if let email = account.workspaceEmailHint {
-                        Text(email)
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer()
-            }
-        }
-        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
-    }
 }
 
 // MARK: - Runtime Status Panel
@@ -320,26 +285,61 @@ extension AccountsMenuContentView {
 
             sortOptionsRow
 
-            VStack(spacing: 5) {
-                ForEach(visibleRows) { row in
-                    DashboardAccountRow(
-                        row: row,
-                        isExpanded: expandedAccountNames.contains(row.name),
-                        fiveHourProgressValue: viewModel.progressValue(for: row.account.usage.fiveHour),
-                        weeklyProgressValue: viewModel.progressValue(for: row.account.usage.weekly),
-                        fiveHourPercentText: viewModel.displayPercentText(for: row.account.usage.fiveHour),
-                        weeklyPercentText: viewModel.displayPercentText(for: row.account.usage.weekly),
-                        isBusy: isActionBusy,
-                        isSwitching: viewModel.switchingAccountName == row.name,
-                        isAuthRunning: viewModel.accountActionInFlightName == row.name,
-                        onActivate: { performPrimaryAction(for: row) },
-                        onRowTap: { toggleExpanded(row.name) },
-                        onToggleExpanded: { toggleExpanded(row.name) }
-                    )
+            if shouldScrollAccountsList {
+                ScrollView(.vertical, showsIndicators: false) {
+                    accountsRowsList
                 }
+                .frame(height: accountsListScrollHeight)
+            } else {
+                accountsRowsList
             }
         }
         .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
+    }
+
+    private var accountsRowsList: some View {
+        VStack(spacing: 5) {
+            ForEach(visibleRows) { row in
+                DashboardAccountRow(
+                    row: row,
+                    isExpanded: expandedAccountNames.contains(row.name),
+                    fiveHourProgressValue: viewModel.progressValue(for: row.account.usage.fiveHour),
+                    weeklyProgressValue: viewModel.progressValue(for: row.account.usage.weekly),
+                    fiveHourPercentText: viewModel.displayPercentText(for: row.account.usage.fiveHour),
+                    weeklyPercentText: viewModel.displayPercentText(for: row.account.usage.weekly),
+                    isBusy: isActionBusy,
+                    isSwitching: viewModel.switchingAccountName == row.name,
+                    isAuthRunning: viewModel.accountActionInFlightName == row.name,
+                    onActivate: { performPrimaryAction(for: row) },
+                    onRowTap: { toggleExpanded(row.name) },
+                    onToggleExpanded: { toggleExpanded(row.name) }
+                )
+            }
+        }
+    }
+
+    private var accountsListMaxHeight: CGFloat {
+        let screenHeight = NSScreen.main?.visibleFrame.height ?? 820
+        return min(680, max(480, screenHeight - 180))
+    }
+
+    private var accountsListScrollHeight: CGFloat {
+        min(accountsListMaxHeight, max(320, estimatedAccountsListHeight))
+    }
+
+    private var shouldScrollAccountsList: Bool {
+        estimatedAccountsListHeight > accountsListMaxHeight
+    }
+
+    private var estimatedAccountsListHeight: CGFloat {
+        let rows = visibleRows
+        guard !rows.isEmpty else { return 0 }
+
+        let rowHeights = rows.reduce(CGFloat(0)) { total, row in
+            total + (expandedAccountNames.contains(row.name) ? 118 : 58)
+        }
+        let gaps = CGFloat(max(0, rows.count - 1)) * 5
+        return rowHeights + gaps
     }
 }
 
