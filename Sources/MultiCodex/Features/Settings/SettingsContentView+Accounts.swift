@@ -300,7 +300,7 @@ extension SettingsContentView {
                         .foregroundStyle(DashboardTokens.textTertiary)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                         .frame(width: 12, height: 12)
-                        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isExpanded)
+                        .animation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion), value: isExpanded)
                 }
                 .contentShape(Rectangle())
 
@@ -309,15 +309,15 @@ extension SettingsContentView {
                         .padding(.top, 14)
                         .transition(
                             .asymmetric(
-                                insertion: .opacity.combined(with: .move(edge: .top)),
-                                removal: .move(edge: .top)
+                                insertion: .opacity.combined(with: .scale(scale: 0.985, anchor: .top)),
+                                removal: .opacity.combined(with: .scale(scale: 0.985, anchor: .top))
                             )
                         )
                 }
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+                withAnimation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion)) {
                     toggleExpanded(account.name)
                 }
             }

@@ -13,6 +13,7 @@ struct DashboardAccountRow: View {
     let onActivate: () -> Void
     let onRowTap: () -> Void
     let onToggleExpanded: () -> Void
+    @State private var disclosureProgress: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - Derived State
@@ -141,24 +142,13 @@ struct DashboardAccountRow: View {
                     Image(systemName: "chevron.down")
                         .font(DashboardTokens.Font.chevron())
                         .foregroundStyle(DashboardTokens.textTertiary)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isExpanded)
+                        .rotationEffect(.degrees(180 * disclosureProgress))
                 }
                 .contentShape(Rectangle())
                 .help(primaryAreaHelpText)
             }
 
-            // ── Expanded Detail ──
-            if isExpanded {
-                expandedContent
-                    .padding(.top, 12)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .top)),
-                            removal: .move(edge: .top)
-                        )
-                    )
-            }
+            expandedDisclosure
         }
         .padding(.horizontal, DashboardTokens.Spacing.rowHPadding)
         .padding(.vertical, DashboardTokens.Spacing.rowVPadding)
@@ -172,15 +162,19 @@ struct DashboardAccountRow: View {
         )
         .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous))
         .onTapGesture {
-            withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
-                onRowTap()
-            }
+            onRowTap()
         }
         .accessibilityElement(children: .contain)
         .accessibilityHint("Use the primary action button to switch or re-login. Use row action to expand details.")
         .accessibilityAction(named: Text(isExpanded ? "Collapse details" : "Expand details")) {
-            withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
-                onToggleExpanded()
+            onToggleExpanded()
+        }
+        .onAppear {
+            disclosureProgress = isExpanded ? 1 : 0
+        }
+        .onChange(of: isExpanded) { expanded in
+            withAnimation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion)) {
+                disclosureProgress = expanded ? 1 : 0
             }
         }
     }
@@ -228,6 +222,34 @@ struct DashboardAccountRow: View {
     }
 
     // MARK: - Expanded Content
+
+    private var expandedDisclosure: some View {
+        expandedContent
+            .padding(.top, 12)
+            .opacity(Double(disclosureProgress))
+            .scaleEffect(x: 1, y: 0.96 + (0.04 * disclosureProgress), anchor: .top)
+            .frame(height: expandedDisclosureHeight * disclosureProgress, alignment: .top)
+            .clipped()
+            .allowsHitTesting(disclosureProgress > 0.98)
+            .accessibilityHidden(disclosureProgress < 0.5)
+    }
+
+    private var expandedDisclosureHeight: CGFloat {
+        let metricsHeight: CGFloat = 46
+        let topPadding: CGFloat = 12
+        let contentSpacing: CGFloat = 10
+        var footerHeight: CGFloat = 0
+
+        if row.account.paceSummary != nil {
+            footerHeight += 14
+        }
+
+        if row.workspaceEmailHint != nil || ((row.account.costReport?.totalCostUSD ?? 0) > 0) {
+            footerHeight += footerHeight > 0 ? 19 : 13
+        }
+
+        return topPadding + metricsHeight + (footerHeight > 0 ? contentSpacing + footerHeight : 0)
+    }
 
     private var expandedContent: some View {
         VStack(alignment: .leading, spacing: 10) {

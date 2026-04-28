@@ -290,6 +290,7 @@ extension AccountsMenuContentView {
                     accountsRowsList
                 }
                 .frame(height: accountsListScrollHeight)
+                .animation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion), value: accountsListScrollHeight)
             } else {
                 accountsRowsList
             }
@@ -311,8 +312,8 @@ extension AccountsMenuContentView {
                     isSwitching: viewModel.switchingAccountName == row.name,
                     isAuthRunning: viewModel.accountActionInFlightName == row.name,
                     onActivate: { performPrimaryAction(for: row) },
-                    onRowTap: { toggleExpanded(row.name) },
-                    onToggleExpanded: { toggleExpanded(row.name) }
+                    onRowTap: { toggleAccountDisclosure(row.name) },
+                    onToggleExpanded: { toggleAccountDisclosure(row.name) }
                 )
             }
         }
@@ -587,9 +588,7 @@ extension AccountsMenuContentView {
             guard !isActionBusy else { return }
             viewModel.openLoginInTerminal(for: row.name)
         case .none:
-            withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
-                toggleExpanded(row.name)
-            }
+            toggleExpanded(row.name)
         }
     }
 
@@ -681,6 +680,10 @@ extension AccountsMenuContentView {
         }
     }
 
+    func toggleAccountDisclosure(_ accountName: String) {
+        toggleExpanded(accountName)
+    }
+
     var areAllAccountsExpanded: Bool {
         let visibleNames = Set(visibleRows.map(\.name))
         guard !visibleNames.isEmpty else { return false }
@@ -689,7 +692,7 @@ extension AccountsMenuContentView {
 
     func toggleAllAccountsExpanded() {
         let visibleNames = Set(visibleRows.map(\.name))
-        withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+        withAnimation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion)) {
             if areAllAccountsExpanded {
                 expandedAccountNames.subtract(visibleNames)
             } else {
