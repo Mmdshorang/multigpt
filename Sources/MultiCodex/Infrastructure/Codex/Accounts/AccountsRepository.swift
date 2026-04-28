@@ -11,13 +11,14 @@ extension CodexAccountService {
         let accounts: [AccountEntry] = names.map { name in
             let meta = readAccountMeta(account: name, paths: paths)
             let hasAuth = fileManager.fileExists(atPath: paths.accountAuthPath(name))
+                || managedAuthPath(for: name, paths: paths) != nil
             return AccountEntry(
                 name: name,
                 isCurrent: name == config.currentAccount,
                 hasAuth: hasAuth,
                 lastUsedAt: meta?.lastUsedAt,
                 lastLoginStatus: meta?.lastLoginStatus,
-                defaultWorkspaceEmail: inferDefaultWorkspaceEmail(fromAuthPath: paths.accountAuthPath(name))
+                defaultWorkspaceEmail: inferDefaultWorkspaceEmail(fromAuthPath: managedAuthPath(for: name, paths: paths) ?? paths.accountAuthPath(name))
             )
         }
 
@@ -69,7 +70,13 @@ extension CodexAccountService {
             throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
 
-        try applyAccountAuthToDefault(account: account, forceLock: false, paths: paths)
+        let lock = try acquireAuthLock(account: account, force: false, paths: paths)
+        defer { lock.release() }
+        try AuthSwapService.switchToAccount(
+            named: account,
+            previousAccountName: config.currentAccount,
+            paths: paths
+        )
 
         config.currentAccount = account
         try saveConfig(config, paths: paths)
@@ -107,6 +114,7 @@ extension CodexAccountService {
 
         if deleteData {
             try? fileManager.removeItem(atPath: paths.accountDir(account))
+            removeManagedHomeIfNeeded(account: account, paths: paths)
         }
 
         return RemoveAccountPayload(removedAccount: account, currentAccount: config.currentAccount)
@@ -133,6 +141,7 @@ extension CodexAccountService {
         } else {
             try createDirectory(path: dstDir, mode: 0o700)
         }
+        renameManagedHomeIfNeeded(from: source, to: target, paths: paths)
 
         config.accounts.remove(source)
         config.accounts.insert(target)
@@ -146,6 +155,36 @@ extension CodexAccountService {
         }
 
         return RenameAccountPayload(from: source, to: target, currentAccount: config.currentAccount)
+    }
+
+    private func renameManagedHomeIfNeeded(from source: String, to target: String, paths: PathContext) {
+        guard isManagedHomeMigrationComplete(paths: paths),
+              let sourceHome = ManagedCodexHomeFactory.homeURL(for: source, multicodexHome: paths.multicodexHome)
+        else {
+            return
+        }
+
+        let targetHome = ManagedCodexHomeFactory.scopedRootURL(multicodexHome: paths.multicodexHome)
+            .appendingPathComponent(ManagedCodexHomeFactory.sanitize(target), isDirectory: true)
+        try? fileManager.removeItem(at: targetHome)
+        try? fileManager.moveItem(at: sourceHome, to: targetHome)
+    }
+
+    private func removeManagedHomeIfNeeded(account: String, paths: PathContext) {
+        guard isManagedHomeMigrationComplete(paths: paths),
+              let home = ManagedCodexHomeFactory.homeURL(for: account, multicodexHome: paths.multicodexHome)
+        else {
+            return
+        }
+
+        let rootPath = ManagedCodexHomeFactory.scopedRootURL(multicodexHome: paths.multicodexHome)
+            .standardizedFileURL.path
+        let targetPath = home.standardizedFileURL.path
+        let rootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        guard targetPath.hasPrefix(rootPrefix), targetPath != rootPath else {
+            return
+        }
+        try? fileManager.removeItem(at: home)
     }
 
     func importDefaultAuthNow(into name: String) throws -> ImportAccountPayload {
@@ -185,6 +224,9 @@ extension CodexAccountService {
 
         try createDirectory(path: paths.accountDir(account), mode: 0o700)
         try writeFileAtomic(data: authData, path: paths.accountAuthPath(account), mode: 0o600)
+        if let managedHome = managedHomeForMutatingAuth(account: account, paths: paths) {
+            try ManagedCodexHomeFactory.writeAuthData(authData, to: managedHome)
+        }
         _ = try updateAccountMeta(account: account, paths: paths) { meta in
             meta.lastUsedAt = Self.nowISO()
         }

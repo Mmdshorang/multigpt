@@ -18,26 +18,23 @@ enum AuthSwapService {
 
         // Step 1: Displaced account preservation
         if let previousName = previousAccountName,
-           let previousHome = ManagedCodexHomeFactory.homeURL(for: previousName),
            let currentSystemAuth = try? Data(contentsOf: URL(fileURLWithPath: paths.defaultCodexAuthPath))
         {
-            let managedAuth = try? ManagedCodexHomeFactory.readAuthData(from: previousHome)
-            if managedAuth == nil || managedAuth != currentSystemAuth {
-                try? ManagedCodexHomeFactory.writeAuthData(currentSystemAuth, to: previousHome)
-                MultiCodexLog.log(
-                    .auth,
-                    level: .info,
-                    "Preserved displaced auth to \(previousName)'s managed home"
-                )
-            }
+            try? writeAuthData(currentSystemAuth, account: previousName, paths: paths)
+            MultiCodexLog.log(
+                .auth,
+                level: .info,
+                "Preserved displaced auth to \(previousName)'s account storage"
+            )
         }
 
-        // Step 2: Read target account's auth
-        guard let targetHome = ManagedCodexHomeFactory.homeURL(for: targetName) else {
-            throw AuthSwapError.managedHomeNotFound(targetName)
-        }
-        guard let targetAuthData = try ManagedCodexHomeFactory.readAuthData(from: targetHome) else {
-            throw AuthSwapError.authNotFound(targetName)
+        // Step 2: Read target account's auth, preferring scoped managed homes.
+        let targetAuthData = try readAuthData(account: targetName, paths: paths)
+
+        guard let targetAuthData else {
+            try? FileManager.default.removeItem(at: systemAuthURL)
+            MultiCodexLog.log(.auth, level: .info, "Cleared system auth for \(targetName)")
+            return
         }
 
         // Step 3: Atomic swap using POSIX rename()
@@ -62,6 +59,41 @@ enum AuthSwapService {
             try? FileManager.default.removeItem(at: stagedURL)
             throw error
         }
+    }
+
+    private static func readAuthData(account: String, paths: CodexAccountService.PathContext) throws -> Data? {
+        if isManagedHomeMigrationComplete(paths: paths),
+           let home = ManagedCodexHomeFactory.homeURL(for: account, multicodexHome: paths.multicodexHome),
+           let data = try ManagedCodexHomeFactory.readAuthData(from: home)
+        {
+            return data
+        }
+
+        return try? Data(contentsOf: URL(fileURLWithPath: paths.accountAuthPath(account)))
+    }
+
+    private static func writeAuthData(_ data: Data, account: String, paths: CodexAccountService.PathContext) throws {
+        let legacyURL = URL(fileURLWithPath: paths.accountAuthPath(account))
+        try FileManager.default.createDirectory(
+            at: legacyURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try data.write(to: legacyURL, options: .atomic)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: Int16(0o600))],
+            ofItemAtPath: legacyURL.path
+        )
+
+        if isManagedHomeMigrationComplete(paths: paths) {
+            let home = try ManagedCodexHomeFactory.createHome(for: account, multicodexHome: paths.multicodexHome)
+            try ManagedCodexHomeFactory.writeAuthData(data, to: home)
+        }
+    }
+
+    private static func isManagedHomeMigrationComplete(paths: CodexAccountService.PathContext) -> Bool {
+        let markerURL = URL(fileURLWithPath: paths.multicodexHome)
+            .appendingPathComponent(".managed-migration-complete")
+        return FileManager.default.fileExists(atPath: markerURL.path)
     }
 
     private static func atomicRename(at sourceURL: URL, to destinationURL: URL) throws {

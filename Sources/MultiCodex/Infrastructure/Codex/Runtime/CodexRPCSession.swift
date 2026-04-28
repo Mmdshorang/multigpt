@@ -31,24 +31,51 @@ actor CodexRPCSession {
     private var initialized = false
     private var pendingRequests: [Int: CheckedContinuation<[String: Any], Error>] = [:]
     private var scopedHomePath: String?
+    private var customCodexPath: String?
+    private var launchEnvironment: [String: String]?
 
-    func ensureReady(scopedHomePath: String? = nil) async throws {
-        if self.scopedHomePath != scopedHomePath {
+    func ensureReady(
+        scopedHomePath: String? = nil,
+        customCodexPath: String? = nil,
+        environment: [String: String]? = nil
+    ) async throws {
+        if self.scopedHomePath != scopedHomePath
+            || self.customCodexPath != customCodexPath
+            || self.launchEnvironment != environment
+        {
             shutdown()
             self.scopedHomePath = scopedHomePath
+            self.customCodexPath = customCodexPath
+            self.launchEnvironment = environment
         }
         if let proc = process, proc.isRunning, initialized { return }
         try launch()
         try await initialize()
     }
 
-    func fetchRateLimits(scopedHomePath: String? = nil) async throws -> [String: Any] {
-        try await ensureReady(scopedHomePath: scopedHomePath)
+    func fetchRateLimits(
+        scopedHomePath: String? = nil,
+        customCodexPath: String? = nil,
+        environment: [String: String]? = nil
+    ) async throws -> [String: Any] {
+        try await ensureReady(
+            scopedHomePath: scopedHomePath,
+            customCodexPath: customCodexPath,
+            environment: environment
+        )
         return try await request(method: "account/rateLimits/read")
     }
 
-    func fetchAccount(scopedHomePath: String? = nil) async throws -> [String: Any] {
-        try await ensureReady(scopedHomePath: scopedHomePath)
+    func fetchAccount(
+        scopedHomePath: String? = nil,
+        customCodexPath: String? = nil,
+        environment: [String: String]? = nil
+    ) async throws -> [String: Any] {
+        try await ensureReady(
+            scopedHomePath: scopedHomePath,
+            customCodexPath: customCodexPath,
+            environment: environment
+        )
         return try await request(method: "account/read")
     }
 
@@ -73,15 +100,15 @@ actor CodexRPCSession {
         shutdown()
 
         let runtime = try CodexRuntimeResolver.resolve(
-            customCodexPath: nil,
+            customCodexPath: customCodexPath,
             fileManager: .default,
-            environment: ProcessInfo.processInfo.environment
+            environment: launchEnvironment ?? ProcessInfo.processInfo.environment
         )
         let proc = Process()
         proc.executableURL = runtime.executableURL
         proc.arguments = runtime.prefixArguments + ["-s", "read-only", "-a", "untrusted", "app-server"]
 
-        var env = ProcessInfo.processInfo.environment
+        var env = launchEnvironment ?? ProcessInfo.processInfo.environment
         if let path = LoginShellPathResolver.resolvePath(from: env) {
             env["PATH"] = path
         }
