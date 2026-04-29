@@ -14,13 +14,13 @@ struct MultiCodexApp: App {
                 )
         } label: {
             let current = viewModel.accounts.first(where: { $0.isCurrent })
-            let fiveHourUsed = current?.usage.fiveHour.usedPercent
-            let weeklyUsed = current?.usage.weekly.usedPercent
             let isStale = current?.connectionState != .connected
 
             Image(nsImage: MenuBarIconRenderer.render(
-                fiveHourPercent: fiveHourUsed,
-                weeklyPercent: weeklyUsed,
+                fiveHourProgress: current.map { viewModel.progressValue(for: $0.usage.fiveHour) } ?? 0,
+                weeklyProgress: current.map { viewModel.progressValue(for: $0.usage.weekly) } ?? 0,
+                fiveHourUsedPercent: current?.usage.fiveHour.usedPercent,
+                weeklyUsedPercent: current?.usage.weekly.usedPercent,
                 isStale: isStale
             ))
         }

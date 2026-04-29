@@ -90,18 +90,40 @@ extension CodexAccountService {
             legacyAccounts = needsLive
         }
 
-        // Parallel fetch for isolated managed-home accounts only
+        // Parallel fetch for isolated managed-home accounts only. Direct managed API
+        // is an optimization; failed accounts still fall back to the serial
+        // auth-swap/RPC path below because the API can fail independently of Codex.
+        var managedFallbackReasons: [String: String] = [:]
         if !managedAccounts.isEmpty {
             let parallelResults = fetchManagedLimitsParallel(accounts: managedAccounts, paths: paths)
             results.append(contentsOf: parallelResults.results)
-            errors.append(contentsOf: parallelResults.errors)
+            managedFallbackReasons = Dictionary(
+                uniqueKeysWithValues: parallelResults.errors.map { ($0.account, $0.message) }
+            )
+            if !managedFallbackReasons.isEmpty {
+                MultiCodexLog.log(
+                    .refresh,
+                    level: .info,
+                    "Managed API fetch failed; falling back to serial RPC",
+                    metadata: ["accounts": managedFallbackReasons.keys.sorted().joined(separator: ",")]
+                )
+            }
         }
 
         // Serial fetch for legacy accounts that require auth swapping
-        if !legacyAccounts.isEmpty {
-            let serialResults = fetchLimitsSerial(targets: legacyAccounts, paths: paths)
+        let serialTargets = legacyAccounts + managedFallbackReasons.keys.sorted()
+        if !serialTargets.isEmpty {
+            let serialResults = fetchLimitsSerial(targets: serialTargets, paths: paths)
             results.append(contentsOf: serialResults.results)
-            errors.append(contentsOf: serialResults.errors)
+            errors.append(contentsOf: serialResults.errors.map { error in
+                guard let managedReason = managedFallbackReasons[error.account] else {
+                    return error
+                }
+                return LimitsErrorEntry(
+                    account: error.account,
+                    message: "\(managedReason); serial fallback failed: \(error.message)"
+                )
+            })
         }
 
         return LimitsPayload(results: results, errors: errors)
@@ -155,10 +177,10 @@ extension CodexAccountService {
             try? setCachedLimits(account: account, snapshot: snapshot, provider: "managed-api", paths: paths)
             return (LimitsResult(account: account, source: "live-managed", snapshot: snapshot, ageSec: nil), nil)
         } catch {
+            let message = "Managed API failed: \(error.localizedDescription)"
             MultiCodexLog.log(.refresh, level: .debug, "Managed API fetch failed for \(account): \(error.localizedDescription)")
+            return (nil, LimitsErrorEntry(account: account, message: message))
         }
-
-        return (nil, LimitsErrorEntry(account: account, message: "Managed API fetch failed for \(account)"))
     }
 
     private func fetchLimitsSerial(targets: [String], paths: PathContext) -> (results: [LimitsResult], errors: [LimitsErrorEntry]) {
@@ -167,10 +189,11 @@ extension CodexAccountService {
 
         for account in targets {
             // Legacy path: try API then RPC with auth swapping
+            let apiAuthPath = managedAuthPath(for: account, paths: paths) ?? paths.accountAuthPath(account)
             let apiResult: RateLimitSnapshot?
             let apiError: Error?
             do {
-                apiResult = try fetchRateLimitsViaApiForAuthPath(paths.accountAuthPath(account))
+                apiResult = try fetchRateLimitsViaApiForAuthPath(apiAuthPath)
                 apiError = nil
             } catch {
                 apiResult = nil

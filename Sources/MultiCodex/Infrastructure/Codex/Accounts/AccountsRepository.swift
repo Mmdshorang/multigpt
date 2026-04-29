@@ -77,6 +77,9 @@ extension CodexAccountService {
             previousAccountName: config.currentAccount,
             paths: paths
         )
+        Task {
+            await CodexRPCSession.shared.shutdown()
+        }
 
         config.currentAccount = account
         try saveConfig(config, paths: paths)

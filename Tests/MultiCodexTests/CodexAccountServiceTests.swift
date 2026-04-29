@@ -173,6 +173,37 @@ final class CodexAccountServiceTests: XCTestCase {
         XCTAssertTrue(limits.errors[0].message.contains("RPC fallback failed"))
     }
 
+    func testManagedFetchFallsBackToSerialRpcWhenApiFails() async throws {
+        let service = makeSandboxedService()
+        service.customCodexPath = "/not/a/real/codex/path"
+
+        _ = try await service.addAccount(name: "alpha")
+
+        let accountAuthPath = (service.effectiveMulticodexHomePath() as NSString)
+            .appendingPathComponent("accounts/alpha/auth.json")
+        try writeText(
+            """
+            {
+              "tokens": {
+                "access_token": "invalid-token",
+                "refresh_token": "invalid-refresh"
+              },
+              "last_refresh": "2001-01-01T00:00:00Z"
+            }
+            """,
+            to: accountAuthPath
+        )
+        _ = try ManagedAccountMigrator.migrateIfNeeded(paths: service.currentPaths())
+
+        let limits = try await service.fetchLimits(refreshLive: true)
+
+        XCTAssertEqual(limits.results.count, 0)
+        XCTAssertEqual(limits.errors.count, 1)
+        XCTAssertTrue(limits.errors[0].message.contains("Managed API failed"))
+        XCTAssertTrue(limits.errors[0].message.contains("API failed"))
+        XCTAssertTrue(limits.errors[0].message.contains("RPC fallback failed"))
+    }
+
     func testSwitchRenameRemoveUpdateConfigAndMeta() async throws {
         let service = makeSandboxedService()
 

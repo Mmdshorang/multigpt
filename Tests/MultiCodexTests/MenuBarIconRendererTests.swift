@@ -4,8 +4,10 @@ import XCTest
 final class MenuBarIconRendererTests: XCTestCase {
     func testRenderedIconUsesMenuBarTemplateSize() {
         let image = MenuBarIconRenderer.render(
-            fiveHourPercent: 42,
-            weeklyPercent: 17,
+            fiveHourProgress: 0.58,
+            weeklyProgress: 0.83,
+            fiveHourUsedPercent: 42,
+            weeklyUsedPercent: 17,
             isStale: false
         )
 

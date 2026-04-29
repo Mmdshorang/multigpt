@@ -4,7 +4,13 @@ import AppKit
 enum MenuBarIconRenderer {
     private static let size = NSSize(width: 18, height: 18)
 
-    static func render(fiveHourPercent: Double?, weeklyPercent: Double?, isStale: Bool) -> NSImage {
+    static func render(
+        fiveHourProgress: Double,
+        weeklyProgress: Double,
+        fiveHourUsedPercent: Double?,
+        weeklyUsedPercent: Double?,
+        isStale: Bool
+    ) -> NSImage {
         let image = NSImage(size: size)
         image.lockFocus()
 
@@ -17,20 +23,20 @@ enum MenuBarIconRenderer {
         context.setAllowsAntialiasing(true)
 
         let alpha: CGFloat = isStale ? 0.48 : 1
-        let fiveHour = normalized(fiveHourPercent)
-        let weekly = normalized(weeklyPercent)
+        let fiveHour = normalizedProgress(fiveHourProgress)
+        let weekly = normalizedProgress(weeklyProgress)
 
         drawUsageBar(
             in: CGRect(x: 2.5, y: 10.5, width: 13, height: 3.5),
             progress: fiveHour,
-            accent: color(for: fiveHourPercent),
+            accent: color(for: fiveHourUsedPercent),
             alpha: alpha,
             context: context
         )
         drawUsageBar(
             in: CGRect(x: 2.5, y: 4.5, width: 13, height: 3.5),
             progress: weekly,
-            accent: color(for: weeklyPercent),
+            accent: color(for: weeklyUsedPercent),
             alpha: alpha,
             context: context
         )
@@ -72,9 +78,8 @@ enum MenuBarIconRenderer {
         context.fillPath()
     }
 
-    private static func normalized(_ percent: Double?) -> CGFloat {
-        guard let percent else { return 0 }
-        return CGFloat(min(1, max(0, percent / 100)))
+    private static func normalizedProgress(_ progress: Double) -> CGFloat {
+        CGFloat(min(1, max(0, progress)))
     }
 
     private static func color(for percent: Double?) -> NSColor {
