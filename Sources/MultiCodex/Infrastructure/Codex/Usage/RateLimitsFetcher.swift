@@ -85,12 +85,16 @@ extension CodexAccountService {
         var errors: [LimitsErrorEntry] = []
         var needsLive: [String] = []
 
+        func emitPartial() {
+            onPartialResult?(LimitsPayload(results: results, errors: errors))
+        }
+
         for account in targets {
             try cancellationToken.checkCancellation()
             if !refreshLive, let cached = try getCachedLimits(account: account, ttlMs: Double(ttlSeconds * 1000), paths: paths) {
                 let ageSec = Int((cached.ageMs / 1000.0).rounded())
                 results.append(LimitsResult(account: account, source: "cached", snapshot: cached.snapshot, ageSec: ageSec))
-                onPartialResult?(LimitsPayload(results: results, errors: errors))
+                emitPartial()
             } else {
                 needsLive.append(account)
             }
@@ -132,7 +136,7 @@ extension CodexAccountService {
             managedFallbackReasons = Dictionary(
                 uniqueKeysWithValues: parallelResults.errors.map { ($0.account, $0.message) }
             )
-            onPartialResult?(LimitsPayload(results: results, errors: errors))
+            emitPartial()
             if !managedFallbackReasons.isEmpty {
                 MultiCodexLog.log(
                     .refresh,
@@ -151,32 +155,15 @@ extension CodexAccountService {
                 paths: paths,
                 cancellationToken: cancellationToken
             ) { partial in
-                let mappedErrors = partial.errors.map { error in
-                    guard let managedReason = managedFallbackReasons[error.account] else {
-                        return error
-                    }
-                    return LimitsErrorEntry(
-                        account: error.account,
-                        message: "\(managedReason); serial fallback failed: \(error.message)"
-                    )
-                }
-                onPartialResult?(
-                    LimitsPayload(
-                        results: results + partial.results,
-                        errors: errors + mappedErrors
-                    )
+                let mappedErrors = partial.errors.map { mergeManagedFallbackReason(into: $0, managedReasons: managedFallbackReasons) }
+                let merged = LimitsPayload(
+                    results: results + partial.results,
+                    errors: errors + mappedErrors
                 )
+                onPartialResult?(merged)
             }
             results.append(contentsOf: serialResults.results)
-            errors.append(contentsOf: serialResults.errors.map { error in
-                guard let managedReason = managedFallbackReasons[error.account] else {
-                    return error
-                }
-                return LimitsErrorEntry(
-                    account: error.account,
-                    message: "\(managedReason); serial fallback failed: \(error.message)"
-                )
-            })
+            errors.append(contentsOf: serialResults.errors.map { mergeManagedFallbackReason(into: $0, managedReasons: managedFallbackReasons) })
         }
 
         return LimitsPayload(results: results, errors: errors)
@@ -253,11 +240,25 @@ extension CodexAccountService {
         }
     }
 
+    private func mergeManagedFallbackReason(
+        into error: LimitsErrorEntry,
+        managedReasons: [String: String]
+    ) -> LimitsErrorEntry {
+        guard let managedReason = managedReasons[error.account] else {
+            return error
+        }
+        return LimitsErrorEntry(
+            account: error.account,
+            message: "\(managedReason); serial fallback failed: \(error.message)"
+        )
+    }
+
+    // Legacy auth-swap fetch must stay serial because it touches the shared system auth file.
     private func fetchLimitsSerial(
         targets: [String],
         paths: PathContext,
         cancellationToken: RefreshCancellationToken,
-        onPartialResult: (LimitsPayload) -> Void
+        onSerialPartial: (LimitsPayload) -> Void
     ) throws -> (results: [LimitsResult], errors: [LimitsErrorEntry]) {
         var results: [LimitsResult] = []
         var errors: [LimitsErrorEntry] = []
@@ -279,7 +280,7 @@ extension CodexAccountService {
             if let snapshot = apiResult {
                 try? setCachedLimits(account: account, snapshot: snapshot, provider: "api", paths: paths)
                 results.append(LimitsResult(account: account, source: "live-api", snapshot: snapshot, ageSec: nil))
-                onPartialResult(LimitsPayload(results: results, errors: errors))
+                onSerialPartial(LimitsPayload(results: results, errors: errors))
                 continue
             }
 
@@ -299,14 +300,14 @@ extension CodexAccountService {
             if let snapshot = rpcResult {
                 try? setCachedLimits(account: account, snapshot: snapshot, provider: "rpc", paths: paths)
                 results.append(LimitsResult(account: account, source: "live-rpc", snapshot: snapshot, ageSec: nil))
-                onPartialResult(LimitsPayload(results: results, errors: errors))
+                onSerialPartial(LimitsPayload(results: results, errors: errors))
                 continue
             }
 
             let apiMessage = apiError?.localizedDescription ?? "unknown"
             let rpcMessage = rpcError?.localizedDescription ?? "unknown"
             errors.append(LimitsErrorEntry(account: account, message: "API failed (\(apiMessage)); RPC fallback failed (\(rpcMessage))"))
-            onPartialResult(LimitsPayload(results: results, errors: errors))
+            onSerialPartial(LimitsPayload(results: results, errors: errors))
         }
 
         return (results: results, errors: errors)
