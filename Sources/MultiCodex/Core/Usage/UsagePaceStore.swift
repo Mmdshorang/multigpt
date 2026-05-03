@@ -47,6 +47,24 @@ actor UsagePaceStore {
         try? persist()
     }
 
+    func record(accounts: [AccountUsage]) {
+        ensureLoaded()
+        let sampledAt = Date()
+        for account in accounts where account.usage.fiveHour.usedPercent != nil {
+            let snapshot = Snapshot(
+                accountName: account.name,
+                sampledAt: sampledAt,
+                fiveHourUsedPercent: account.usage.fiveHour.usedPercent ?? 0,
+                weeklyUsedPercent: account.usage.weekly.usedPercent ?? 0,
+                fiveHourResetsAt: account.usage.fiveHour.resetsAt,
+                weeklyResetsAt: account.usage.weekly.resetsAt
+            )
+            snapshots.append(snapshot)
+        }
+        trimExpired()
+        try? persist()
+    }
+
     func snapshots(for accountName: String, since: Date) -> [Snapshot] {
         ensureLoaded()
         return snapshots.filter { $0.accountName == accountName && $0.sampledAt >= since }

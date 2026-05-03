@@ -224,31 +224,13 @@ struct DashboardAccountRow: View {
     // MARK: - Expanded Content
 
     private var expandedDisclosure: some View {
-        expandedContent
-            .padding(.top, 12)
-            .opacity(Double(disclosureProgress))
-            .scaleEffect(x: 1, y: 0.96 + (0.04 * disclosureProgress), anchor: .top)
-            .frame(height: expandedDisclosureHeight * disclosureProgress, alignment: .top)
-            .clipped()
-            .allowsHitTesting(disclosureProgress > 0.98)
-            .accessibilityHidden(disclosureProgress < 0.5)
-    }
-
-    private var expandedDisclosureHeight: CGFloat {
-        let metricsHeight: CGFloat = 46
-        let topPadding: CGFloat = 12
-        let contentSpacing: CGFloat = 10
-        var footerHeight: CGFloat = 0
-
-        if row.account.paceSummary != nil {
-            footerHeight += 14
+        Group {
+            if isExpanded {
+                expandedContent
+                    .padding(.top, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
-
-        if row.workspaceEmailHint != nil || ((row.account.costReport?.totalCostUSD ?? 0) > 0) {
-            footerHeight += footerHeight > 0 ? 19 : 13
-        }
-
-        return topPadding + metricsHeight + (footerHeight > 0 ? contentSpacing + footerHeight : 0)
     }
 
     private var expandedContent: some View {

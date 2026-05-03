@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 final class AccountsRefreshController {
     unowned let viewModel: AccountsMenuViewModel
+    private let usagePaceStore = UsagePaceStore()
 
     init(viewModel: AccountsMenuViewModel) {
         self.viewModel = viewModel
@@ -26,7 +27,7 @@ final class AccountsRefreshController {
 
         // Proactively refresh aging tokens before fetching usage
         if refreshLive {
-            let tokenErrors = viewModel.accountService.refreshStaleTokens()
+            let tokenErrors = await viewModel.accountService.refreshStaleTokens()
             if !tokenErrors.isEmpty {
                 MultiCodexLog.log(
                     .auth,
@@ -48,18 +49,20 @@ final class AccountsRefreshController {
         do {
             let accountsPayload = try await viewModel.accountService.fetchAccounts()
             fetchedAccounts = accountsPayload
-            applyMergedAccounts(
+            await applyMergedAccounts(
                 accountsPayload: accountsPayload,
                 limits: LimitsPayload(results: [], errors: []),
-                previousAccounts: previousAccounts
+                previousAccounts: previousAccounts,
+                recordPace: false
             )
 
             let limits = try await viewModel.accountService.fetchLimits(refreshLive: refreshLive)
 
-            applyMergedAccounts(
+            await applyMergedAccounts(
                 accountsPayload: accountsPayload,
                 limits: limits,
-                previousAccounts: previousAccounts
+                previousAccounts: previousAccounts,
+                recordPace: true
             )
             let quotaTransitions = QuotaTransitionDetector.detectTransitions(
                 previous: previousAccounts,
@@ -100,10 +103,11 @@ final class AccountsRefreshController {
             MultiCodexLog.log(.refresh, level: .error, "Refresh failed: \(error.localizedDescription)")
             viewModel.cliResolutionHint = viewModel.accountService.resolutionHint
             if let fetchedAccounts {
-                applyMergedAccounts(
+                await applyMergedAccounts(
                     accountsPayload: fetchedAccounts,
                     limits: LimitsPayload(results: [], errors: []),
-                    previousAccounts: previousAccounts
+                    previousAccounts: previousAccounts,
+                    recordPace: false
                 )
                 viewModel.lastRefreshError = nil
                 viewModel.refreshWarningMessage = "Loaded accounts, but usage refresh failed: \(error.localizedDescription)"
@@ -184,8 +188,9 @@ final class AccountsRefreshController {
     private func applyMergedAccounts(
         accountsPayload: AccountsListPayload,
         limits: LimitsPayload,
-        previousAccounts: [AccountUsage]
-    ) {
+        previousAccounts: [AccountUsage],
+        recordPace: Bool
+    ) async {
         viewModel.updateAccounts(
             AccountUsageMergeService.mergeAccounts(
                 accounts: accountsPayload,
@@ -193,6 +198,9 @@ final class AccountsRefreshController {
                 previousAccounts: previousAccounts
             )
         )
+        if recordPace {
+            await usagePaceStore.record(accounts: viewModel.accounts)
+        }
         viewModel.clearFocusedAccountIfMissing()
         viewModel.syncSelectedSettingsAccount()
     }
@@ -226,10 +234,11 @@ final class AccountsRefreshController {
         }
 
         let currentAccount = accountsPayload.currentAccount
+        let knownAccountModified = currentAccount.flatMap { service.storedAuthModifiedDate(for: $0, paths: paths) }
         let result = AccountReconciliation.reconcile(
             configCurrentAccount: currentAccount,
             systemAuthLastModified: systemModified,
-            knownAccountLastModified: nil,
+            knownAccountLastModified: knownAccountModified,
             systemIdentity: systemIdentity,
             accountIdentities: accountIdentities
         )
@@ -248,7 +257,12 @@ final class AccountsRefreshController {
             )
 
             if let detectedName = result.detectedAccountName {
-                viewModel.applyCurrentAccountLocally(named: detectedName)
+                do {
+                    try service.persistCurrentAccountIfKnown(detectedName)
+                    viewModel.applyCurrentAccountLocally(named: detectedName)
+                } catch {
+                    viewModel.refreshWarningMessage = "Detected account \(detectedName), but failed to persist reconciliation."
+                }
             } else if let email = result.detectedEmail {
                 viewModel.refreshWarningMessage = "Detected external login for \(email). This account is not in MultiCodex."
             }

@@ -31,18 +31,6 @@ enum AccountUsageMergeService {
                 resetsAt: usage.weekly.resetsAt
             )
 
-            // Record historical snapshots for pace analysis
-            if usage.fiveHour.usedPercent != nil {
-                let store = UsagePaceStore()
-                Task {
-                    await store.record(
-                        accountName: account.name,
-                        fiveHour: usage.fiveHour,
-                        weekly: usage.weekly
-                    )
-                }
-            }
-
             return AccountUsage(
                 name: account.name,
                 isCurrent: account.isCurrent || account.name == accounts.currentAccount,
