@@ -1824,6 +1824,30 @@ final class AccountsMenuViewModelTests: XCTestCase {
         viewModel.sequentialLoginState?.isRunning = true
         XCTAssertFalse(viewModel.canStartMaintenanceAccountAction)
     }
+
+    func testApplyAutomaticSwitchSkipsWhenStrategyIsManual() {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
+        ]
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.accountSwitchingStrategy = .manual
+        viewModel.updateAccounts([
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
+        ])
+
+        let recommendation = AccountSwitchRecommendation(
+            previousAccountName: "alpha",
+            accountName: "beta",
+            reason: "Test bypass"
+        )
+        viewModel.refreshController.applyAutomaticSwitch(recommendation: recommendation)
+
+        // Switch should be skipped because strategy is .manual
+        XCTAssertTrue(service.switchCalls.isEmpty)
+    }
 }
 
 private final class MockCodexAccountService: CodexAccountServicing {

@@ -205,6 +205,10 @@ final class AccountsRefreshController {
 
     func applyAutomaticSwitch(recommendation: AccountSwitchRecommendation) {
         let viewModel = viewModel
+        guard viewModel.accountSwitchingStrategy != .manual else {
+            MultiCodexLog.log(.refresh, level: .error, "applyAutomaticSwitch called while strategy is .manual — skipping switch to \(recommendation.accountName)")
+            return
+        }
         viewModel.runSwitchAction(named: recommendation.accountName) {
             try await viewModel.accountService.switchAccount(name: recommendation.accountName)
             viewModel.lastRefreshError = nil
