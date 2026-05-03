@@ -26,7 +26,7 @@ just check
 ```
 
 If full `just check` is too slow during iteration, use:
-
+r
 ```bash
 swift test
 scripts/swift-safe.sh build
@@ -34,8 +34,8 @@ scripts/swift-safe.sh build
 
 ## Phase 1 — Foundation
 
-**Target effort:** ~14 hours  
-**Release readiness:** Safe for v0.5.0-alpha or patch/minor release.  
+**Target effort:** ~14 hours
+**Release readiness:** Safe for v0.5.0-alpha or patch/minor release.
 **Primary value:** Debuggability, better usage recovery, reliable identity parsing, user notifications.
 
 ### 1.1 Structured Logging
@@ -229,8 +229,8 @@ Required outcomes:
 
 ## Phase 2 — Usage Intelligence
 
-**Target effort:** ~12 hours  
-**Depends on:** Phase 1 logging.  
+**Target effort:** ~12 hours
+**Depends on:** Phase 1 logging.
 **Primary value:** Predictive auto-switching based on burn rate.
 
 ### 2.1 Usage Pace Prediction
@@ -303,8 +303,8 @@ Add tests:
 
 ## Phase 3 — Resilience
 
-**Target effort:** ~9 hours  
-**Depends on:** Phase 1 JWT identity.  
+**Target effort:** ~9 hours
+**Depends on:** Phase 1 JWT identity.
 **Primary value:** Stay logged in and detect external auth changes.
 
 ### 3.1 Token Auto-Refresh
@@ -372,8 +372,8 @@ Add tests:
 
 ## Phase 4 — Managed Homes Architecture
 
-**Target effort:** ~40 hours  
-**Depends on:** Phase 3 preferred.  
+**Target effort:** ~40 hours
+**Depends on:** Phase 3 preferred.
 **Primary value:** Crash-safe auth, parallel fetches, faster refresh, future persistent RPC.
 
 ### Recommended Sub-Phases
@@ -459,7 +459,7 @@ Acceptance:
 
 ## Phase 5 — Value Add
 
-**Target effort:** ~36 hours  
+**Target effort:** ~36 hours
 **Depends on:** Phase 2 for pace-related UI; Phase 4 preferred for export/import managed-home support.
 
 Recommended order:
