@@ -69,8 +69,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
             multicodexHome: tempRoot.appendingPathComponent("multicodex", isDirectory: true).path
         )
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedResolvedIdentityByAccount = [
             "alpha": ResolvedAccountIdentity(email: "alpha@example.com", plan: nil, accountId: nil, authMethod: .oauth),
@@ -167,9 +167,9 @@ final class AccountsMenuViewModelTests: XCTestCase {
             AccountUsageMergeService.mergeAccounts(
                 accounts: AccountsListPayload(
                     accounts: [
-                        AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-                        AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-                        AccountEntry(name: "gamma", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+                        makeAccountEntry(name: "alpha", isCurrent: true),
+                        makeAccountEntry(name: "beta"),
+                        makeAccountEntry(name: "gamma"),
                     ],
                     currentAccount: "alpha"
                 ),
@@ -458,7 +458,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         service.fetchAccountsError = nil
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [LimitsResult(account: "alpha", source: "live-api", snapshot: nil, ageSec: nil)],
@@ -487,7 +487,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     func testStartPaintsCachedUsageBeforeSlowLiveRefreshCompletes() async {
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.fetchCachedLimitsResult = LimitsPayload(
             results: [
@@ -520,7 +520,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [LimitsResult(account: "alpha", source: "live-api", snapshot: nil, ageSec: nil)],
@@ -552,7 +552,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [LimitsResult(account: "alpha", source: "live-api", snapshot: nil, ageSec: nil)],
@@ -582,8 +582,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: "expired"),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastLoginStatus: "expired"),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -619,8 +619,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let service = MockCodexAccountService()
         let notifier = MockAutoSwitchNotifier()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: "expired"),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastLoginStatus: "expired"),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -656,8 +656,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -724,8 +724,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let service = MockCodexAccountService()
         let notifier = MockAutoSwitchNotifier()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -777,8 +777,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let notifier = MockAutoSwitchNotifier()
         notifier.sendResult = .permissionDenied
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -862,8 +862,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let service = MockCodexAccountService()
         let notifier = MockAutoSwitchNotifier()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -925,7 +925,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
 
@@ -969,7 +969,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
         service.loginHomeStatusExitCode = 1
@@ -1009,7 +1009,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1034,7 +1034,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedInferredEmailFromLoginHome = "personal-fresh@example.com"
 
@@ -1060,7 +1060,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1088,7 +1088,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1120,7 +1120,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1142,7 +1142,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1189,7 +1189,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1213,7 +1213,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.loginInAppDelayNanoseconds = 300_000_000
 
@@ -1254,19 +1254,14 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let service = MockCodexAccountService()
         service.loginInAppDelayNanoseconds = 500_000_000
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
-        let emptyUsage = UsageSummary(
-            fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
-            weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
-            credits: "-"
-        )
 
         let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
         viewModel.updateAccounts([
-            AccountUsage(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
-            AccountUsage(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
         ])
 
         viewModel.startNewAccountLogin()
@@ -1287,21 +1282,16 @@ final class AccountsMenuViewModelTests: XCTestCase {
     func testSwitchCanStartWhileRefreshIsRunning() async {
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.fetchLimitsDelayNanoseconds = 500_000_000
 
-        let emptyUsage = UsageSummary(
-            fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
-            weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
-            credits: "-"
-        )
 
         let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
         viewModel.updateAccounts([
-            AccountUsage(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
-            AccountUsage(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
         ])
 
         viewModel.refreshLive()
@@ -1319,7 +1309,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
     func testRefreshAppliesPartialUsageBeforeFullLimitsReturn() async {
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.partialLimitsPayloads = [
             LimitsPayload(
@@ -1351,21 +1341,16 @@ final class AccountsMenuViewModelTests: XCTestCase {
     func testSwitchCancelsActiveRefreshToken() async throws {
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.fetchLimitsDelayNanoseconds = 500_000_000
 
-        let emptyUsage = UsageSummary(
-            fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
-            weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
-            credits: "-"
-        )
 
         let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
         viewModel.updateAccounts([
-            AccountUsage(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
-            AccountUsage(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
         ])
 
         viewModel.refreshLive()
@@ -1386,8 +1371,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1432,8 +1417,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1485,8 +1470,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1531,7 +1516,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true, hasAuth: false),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1575,7 +1560,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1619,7 +1604,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1686,7 +1671,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         let needsLoginService = MockCodexAccountService()
         needsLoginService.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true, hasAuth: false),
         ]
         let needsLoginNotifier = MockAutoSwitchNotifier()
         let needsLogin = AccountsMenuViewModel(
@@ -1704,7 +1689,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         let completeService = MockCodexAccountService()
         completeService.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         let completeNotifier = MockAutoSwitchNotifier()
         let complete = AccountsMenuViewModel(
@@ -2062,7 +2047,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
             }
         } else {
             stubbedAccounts.append(
-                AccountEntry(name: name, isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil)
+                makeAccountEntry(name: name)
             )
         }
         return ImportAccountPayload(account: name)

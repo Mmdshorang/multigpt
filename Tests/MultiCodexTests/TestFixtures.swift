@@ -16,6 +16,26 @@ func makeEphemeralDefaults() -> UserDefaults {
     return defaults
 }
 
+// MARK: - Account Entry Fixtures
+
+func makeAccountEntry(
+    name: String,
+    isCurrent: Bool = false,
+    hasAuth: Bool = true,
+    lastUsedAt: String? = nil,
+    lastLoginStatus: String? = nil,
+    defaultWorkspaceEmail: String? = nil
+) -> AccountEntry {
+    AccountEntry(
+        name: name,
+        isCurrent: isCurrent,
+        hasAuth: hasAuth,
+        lastUsedAt: lastUsedAt,
+        lastLoginStatus: lastLoginStatus,
+        defaultWorkspaceEmail: defaultWorkspaceEmail
+    )
+}
+
 // MARK: - Usage Fixtures
 
 struct UsageFixtures {
@@ -35,6 +55,14 @@ struct UsageFixtures {
         )
     }
 
+    static func makeEmptyUsageSummary() -> UsageSummary {
+        UsageSummary(
+            fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+            weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+            credits: "-"
+        )
+    }
+
     static func makeUsageSummary(
         fiveHour: UsageMetric? = nil,
         weekly: UsageMetric? = nil,
@@ -44,6 +72,24 @@ struct UsageFixtures {
             fiveHour: fiveHour ?? makeUsageMetric(label: "5h", periodMinutes: 300),
             weekly: weekly ?? makeUsageMetric(label: "Weekly", periodMinutes: 10080),
             credits: credits
+        )
+    }
+
+    static func makeAccountUsage(
+        name: String,
+        isCurrent: Bool = false,
+        hasAuth: Bool = true,
+        usage: UsageSummary? = nil
+    ) -> AccountUsage {
+        AccountUsage(
+            name: name,
+            isCurrent: isCurrent,
+            hasAuth: hasAuth,
+            lastUsedAt: nil,
+            lastLoginStatus: nil,
+            usage: usage ?? makeEmptyUsageSummary(),
+            source: "",
+            usageError: nil
         )
     }
 }
