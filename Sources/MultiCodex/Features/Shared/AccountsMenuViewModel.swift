@@ -112,6 +112,21 @@ final class AccountsMenuViewModel: ObservableObject {
         accounts.first(where: { $0.isCurrent })
     }
 
+    var canStartSwitchAction: Bool {
+        switchingAccountName == nil && authMutationInFlightName == nil
+    }
+
+    var canStartLoginAction: Bool {
+        loginInFlightName == nil && authMutationInFlightName == nil
+    }
+
+    var canStartMaintenanceAccountAction: Bool {
+        accountActionInFlightName == nil
+            && switchingAccountName == nil
+            && authMutationInFlightName == nil
+            && sequentialLoginState?.isRunning != true
+    }
+
     var menuBarTitle: String {
         guard let current = currentAccount else {
             return accounts.isEmpty ? "mcx" : "mcx ?"

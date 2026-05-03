@@ -626,17 +626,15 @@ extension AccountsMenuContentView {
     }
 
     var isSwitchBusy: Bool {
-        viewModel.switchingAccountName != nil || viewModel.authMutationInFlightName != nil
+        !viewModel.canStartSwitchAction
     }
 
     var isLoginBusy: Bool {
-        viewModel.loginInFlightName != nil || viewModel.authMutationInFlightName != nil
+        !viewModel.canStartLoginAction
     }
 
     var isActionBusy: Bool {
-        viewModel.accountActionInFlightName != nil
-            || viewModel.switchingAccountName != nil
-            || viewModel.authMutationInFlightName != nil
+        !viewModel.canStartMaintenanceAccountAction
     }
 
     var runtimeStatus: RuntimeStatusPresentation {

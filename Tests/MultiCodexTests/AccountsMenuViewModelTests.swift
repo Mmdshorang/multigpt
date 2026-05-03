@@ -1808,6 +1808,37 @@ final class AccountsMenuViewModelTests: XCTestCase {
         }
         return String(format: "%.1f%%", value)
     }
+
+    // MARK: - Action Availability
+
+    func testActionAvailabilityAllowsSwitchDuringRefreshAndLogin() {
+        let viewModel = AccountsMenuViewModel(accountService: MockCodexAccountService(), startImmediately: false)
+
+        viewModel.isRefreshing = true
+        XCTAssertTrue(viewModel.canStartSwitchAction)
+
+        viewModel.loginInFlightName = "new-account"
+        XCTAssertTrue(viewModel.canStartSwitchAction)
+        XCTAssertFalse(viewModel.canStartLoginAction)
+
+        viewModel.authMutationInFlightName = "alpha"
+        XCTAssertFalse(viewModel.canStartSwitchAction)
+        XCTAssertFalse(viewModel.canStartLoginAction)
+    }
+
+    func testActionAvailabilityKeepsMaintenanceActionsConservative() {
+        let viewModel = AccountsMenuViewModel(accountService: MockCodexAccountService(), startImmediately: false)
+
+        XCTAssertTrue(viewModel.canStartMaintenanceAccountAction)
+
+        viewModel.accountActionInFlightName = "alpha"
+        XCTAssertFalse(viewModel.canStartMaintenanceAccountAction)
+
+        viewModel.accountActionInFlightName = nil
+        viewModel.sequentialLoginState = SequentialLoginState(items: [SequentialLoginItem(accountName: "beta")])
+        viewModel.sequentialLoginState?.isRunning = true
+        XCTAssertFalse(viewModel.canStartMaintenanceAccountAction)
+    }
 }
 
 private final class MockCodexAccountService: CodexAccountServicing {
