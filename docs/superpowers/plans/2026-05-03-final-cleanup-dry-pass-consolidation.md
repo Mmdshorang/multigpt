@@ -791,14 +791,24 @@ Review focus:
 - Do not change account recommendation scoring.
 - Do not change storage schema.
 
+## Completion Notes
+
+Implemented across 7 commits (`a0d5089` through `f7b0c4d`):
+- Centralized action availability into `canStartSwitchAction`, `canStartLoginAction`, `canStartMaintenanceAccountAction` on view model.
+- Consolidated refresh lifecycle: `cancelActiveRefreshForUserSwitch()` helper, `isRefreshStale(generation:)` helper, single `triggerRefresh` entrypoint.
+- Deduplicated limits partial assembly with `emitPartial()` local and `mergeManagedFallbackReason(into:managedReasons:)` helper.
+- Removed dead default protocol overload for `fetchLimits(refreshLive:cancellationToken:onPartialResult:)`.
+- Added documentation invariant comments on `triggerRefresh` and `fetchLimitsSerial`.
+- Consolidated test fixtures: `makeAccountEntry`, `UsageFixtures.makeEmptyUsageSummary`, `UsageFixtures.makeAccountUsage` in `TestFixtures.swift`.
+
 ## Completion Criteria
 
-- Duplicate busy-state logic removed from menu/settings.
-- All app refresh scheduling flows through one generation-tracked path.
-- Cancellation token path remains covered by tests.
-- Partial usage update path remains covered by tests.
-- Repeated test fixture blocks are reduced.
-- Full `rtk just check` passes.
-- Full `rtk git diff --check` passes.
-- Manual smoke test passes.
+- [x] Duplicate busy-state logic removed from menu/settings.
+- [x] All app refresh scheduling flows through one generation-tracked path.
+- [x] Cancellation token path remains covered by tests.
+- [x] Partial usage update path remains covered by tests.
+- [x] Repeated test fixture blocks are reduced.
+- [x] Full `rtk just check` passes.
+- [x] Full `rtk git diff --check` passes.
+- [ ] Manual smoke test passes (pending manual verification).
 
