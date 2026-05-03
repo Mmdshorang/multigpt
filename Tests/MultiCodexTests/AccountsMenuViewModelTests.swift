@@ -76,6 +76,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
             "alpha": ResolvedAccountIdentity(email: "alpha@example.com", plan: nil, accountId: nil, authMethod: .oauth),
             "beta": ResolvedAccountIdentity(email: "beta@example.com", plan: nil, accountId: nil, authMethod: .oauth),
         ]
+        // Mark the known account auth as older than the system auth so external modification is detected.
+        service.stubbedStoredAuthModifiedDate = Date().addingTimeInterval(-120)
 
         let viewModel = AccountsMenuViewModel(
             accountService: service,
@@ -1848,6 +1850,44 @@ final class AccountsMenuViewModelTests: XCTestCase {
         // Switch should be skipped because strategy is .manual
         XCTAssertTrue(service.switchCalls.isEmpty)
     }
+
+    func testManualStrategyDoesNotWarnWhenSystemAuthNotExternallyModified() {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 10, weeklyUsed: 10), ageSec: nil),
+                LimitsResult(account: "beta", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 20, weeklyUsed: 20), ageSec: nil),
+            ],
+            errors: []
+        )
+        // Simulate copy-paste: config says alpha is current, system auth says beta,
+        // but system auth was NOT recently modified (timestamps match).
+        service.stubbedResolvedIdentityByAccount = [
+            "alpha": ResolvedAccountIdentity(email: "alpha@test.com", plan: nil, accountId: "a1", authMethod: .oauth),
+            "beta": ResolvedAccountIdentity(email: "beta@test.com", plan: nil, accountId: "b1", authMethod: .oauth),
+        ]
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.accountSwitchingStrategy = .manual
+        viewModel.updateAccounts([
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
+        ])
+
+        let expectation = expectation(description: "Refresh completes")
+        Task { @MainActor in
+            await viewModel.refreshController.performRefresh(refreshLive: false, allowAutoSwitch: false)
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
+
+        // No warning because system auth wasn't externally modified
+        XCTAssertNil(viewModel.refreshWarningMessage)
+    }
 }
 
 private final class MockCodexAccountService: CodexAccountServicing {
@@ -1887,6 +1927,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var stubbedDefaultWorkspaceEmailByAccount: [String: String] = [:]
     var stubbedResolvedIdentityByAccount: [String: ResolvedAccountIdentity] = [:]
     var stubbedInferredEmailFromLoginHome: String?
+    var stubbedStoredAuthModifiedDate: Date?
     var pathContext = CodexAccountService.PathContext(homeDir: "/tmp", multicodexHome: "/tmp/multicodex")
 
     private(set) var switchCalls: [String] = []
@@ -2166,7 +2207,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     }
 
     func storedAuthModifiedDate(for account: String, paths: CodexAccountService.PathContext) -> Date? {
-        nil
+        stubbedStoredAuthModifiedDate
     }
 
     func resolveFromAuthPayload(_ authPayload: [String: Any]) -> ResolvedAccountIdentity? {

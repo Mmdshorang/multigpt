@@ -329,14 +329,14 @@ final class AccountsRefreshController {
                     "configAccount": result.configCurrentAccount ?? "none",
                     "detectedAccount": result.detectedAccountName ?? "unknown",
                     "detectedEmail": result.detectedEmail ?? "none",
-                    "externallyModified": result.systemAuthChangedExternally ? "yes" : "unknown",
+                    "externallyModified": result.systemAuthChangedExternally ? "yes" : "no",
                 ]
             )
 
             if viewModel.accountSwitchingStrategy == .manual {
-                if let detectedName = result.detectedAccountName {
+                if result.systemAuthChangedExternally, let detectedName = result.detectedAccountName {
                     viewModel.refreshWarningMessage = "Detected external login for \(detectedName). Auto-switching is off."
-                } else if let email = result.detectedEmail {
+                } else if result.systemAuthChangedExternally, let email = result.detectedEmail {
                     viewModel.refreshWarningMessage = "Detected external login for \(email). Auto-switching is off."
                 }
             } else if let detectedName = result.detectedAccountName {
@@ -346,7 +346,7 @@ final class AccountsRefreshController {
                 } catch {
                     viewModel.refreshWarningMessage = "Detected account \(detectedName), but failed to persist reconciliation."
                 }
-            } else if let email = result.detectedEmail {
+            } else if result.systemAuthChangedExternally, let email = result.detectedEmail {
                 viewModel.refreshWarningMessage = "Detected external login for \(email). This account is not in MultiCodex."
             }
         }
