@@ -2,6 +2,75 @@ import XCTest
 @testable import MultiCodex
 
 final class AccountExportServiceTests: XCTestCase {
+    func testImportRejectsPathTraversalAccountName() throws {
+        let tempDir = NSTemporaryDirectory() + "mc-test-import-traversal-\(UUID().uuidString)"
+        let fm = FileManager.default
+        try fm.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: tempDir) }
+
+        let service = CodexAccountService()
+        service.sandboxHomeDirectory = (tempDir as NSString).appendingPathComponent("home")
+        service.sandboxMulticodexHomeDirectory = (tempDir as NSString).appendingPathComponent("config")
+        try fm.createDirectory(atPath: service.effectiveMulticodexHomePath(), withIntermediateDirectories: true)
+
+        let payload = AccountExportService.ExportPayload(
+            version: 1,
+            exportedAt: "2026-05-03T00:00:00Z",
+            appVersion: "0.5.0",
+            accounts: [.init(name: "../../escaped", auth: Data("{}".utf8))],
+            preferences: nil,
+            currentAccount: nil
+        )
+
+        let exportURL = URL(fileURLWithPath: tempDir).appendingPathComponent("bad-export.json")
+        try JSONEncoder().encode(payload).write(to: exportURL)
+        var prefs = AppPreferencesStore(defaults: makeEphemeralDefaults())
+
+        XCTAssertThrowsError(
+            try AccountExportService.importAccounts(
+                from: exportURL,
+                accountService: service,
+                preferencesStore: &prefs
+            )
+        )
+    }
+
+    func testWriteBackupDataUses0600Permissions() throws {
+        let tempDir = NSTemporaryDirectory() + "mc-test-export-perms-\(UUID().uuidString)"
+        let fm = FileManager.default
+        try fm.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: tempDir) }
+
+        let fileURL = URL(fileURLWithPath: tempDir).appendingPathComponent("backup.json")
+        try AccountExportService.writeBackupData(Data("{}".utf8), to: fileURL)
+        let attrs = try fm.attributesOfItem(atPath: fileURL.path)
+        let perms = (attrs[.posixPermissions] as? NSNumber)?.intValue
+        XCTAssertEqual(perms, 0o600)
+    }
+
+    func testExportPrefersManagedAuthWhenMigrationComplete() throws {
+        let tempDir = NSTemporaryDirectory() + "mc-test-export-managed-\(UUID().uuidString)"
+        let fm = FileManager.default
+        try fm.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: tempDir) }
+
+        let service = CodexAccountService()
+        service.sandboxHomeDirectory = (tempDir as NSString).appendingPathComponent("home")
+        service.sandboxMulticodexHomeDirectory = (tempDir as NSString).appendingPathComponent("config")
+        try fm.createDirectory(atPath: service.effectiveMulticodexHomePath(), withIntermediateDirectories: true)
+        _ = try service.addAccountNow(name: "alpha")
+        let paths = service.currentPaths()
+        try Data().write(to: URL(fileURLWithPath: (paths.multicodexHome as NSString).appendingPathComponent(".managed-migration-complete")))
+        try Data("{\"tokens\":{\"access_token\":\"legacy\"}}".utf8).write(to: URL(fileURLWithPath: paths.accountAuthPath("alpha")))
+        let managedHome = try ManagedCodexHomeFactory.createHome(for: "alpha", multicodexHome: paths.multicodexHome)
+        try ManagedCodexHomeFactory.writeAuthData(Data("{\"tokens\":{\"access_token\":\"managed\"}}".utf8), to: managedHome)
+
+        let data = try AccountExportService.exportData(accountService: service, preferencesStore: AppPreferencesStore(defaults: makeEphemeralDefaults()))
+        let payload = try JSONDecoder().decode(AccountExportService.ExportPayload.self, from: data)
+        let authString = String(data: payload.accounts.first!.auth, encoding: .utf8)
+        XCTAssertTrue(authString?.contains("managed") == true)
+    }
+
     func testExportAndImportRoundTrip() throws {
         let tempDir = NSTemporaryDirectory() + "mc-test-export-\(UUID().uuidString)"
         let fm = FileManager.default

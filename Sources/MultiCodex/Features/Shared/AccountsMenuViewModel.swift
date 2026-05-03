@@ -263,6 +263,25 @@ final class AccountsMenuViewModel: ObservableObject {
         refreshController.triggerRefresh(refreshLive: true)
     }
 
+    func reloadPreferencesFromStore() {
+        customCodexPath = preferences.customCodexPath
+        resetDisplayMode = preferences.resetDisplayMode
+        selectedSettingsSection = preferences.selectedSettingsSection
+        selectedSettingsAccountName = preferences.selectedSettingsAccountName
+        menuDensity = preferences.menuDensity
+        usageBarStyle = preferences.usageBarStyle
+        accountSortCriterion = preferences.accountSortCriterion
+        accountSortWindow = preferences.accountSortWindow
+        accountSortDirection = preferences.accountSortDirection
+        showAllAccountsInMenu = preferences.showAllAccountsInMenu
+        accountSwitchingStrategy = preferences.accountSwitchingStrategy
+        autoSwitchNotificationsEnabled = preferences.autoSwitchNotificationsEnabled
+        limitsCacheTTLSeconds = CodexAccountService.normalizedLimitsCacheTTLSeconds(preferences.limitsCacheTTLSeconds)
+        accountService.customCodexPath = customCodexPath.isEmpty ? nil : customCodexPath
+        accountService.limitsCacheTTLSeconds = limitsCacheTTLSeconds
+        resortAccounts()
+    }
+
     func performMenuAlertAction(_ action: MenuAlertState.Action) {
         switch action {
         case .openRuntimeSettings:

@@ -40,6 +40,7 @@ enum AccountExportService {
     enum ExportError: LocalizedError {
         case unsupportedVersion(Int)
         case noAccounts
+        case invalidAccountName(String)
 
         var errorDescription: String? {
             switch self {
@@ -47,6 +48,8 @@ enum AccountExportService {
                 return "Unsupported export file version: \(v)"
             case .noAccounts:
                 return "No accounts to export."
+            case .invalidAccountName(let name):
+                return "Invalid account name in backup: \(name)"
             }
         }
     }
@@ -66,7 +69,7 @@ enum AccountExportService {
 
         var exportedAccounts: [ExportedAccount] = []
         for accountName in config.accounts {
-            let authPath = paths.accountAuthPath(accountName)
+            let authPath = accountService.managedAuthPath(for: accountName, paths: paths) ?? paths.accountAuthPath(accountName)
             guard let authData = try? Data(contentsOf: URL(fileURLWithPath: authPath)) else {
                 MultiCodexLog.log(.config, level: .debug, "Skipping account \(accountName) — auth data missing")
                 continue
@@ -119,6 +122,10 @@ enum AccountExportService {
         var conflicts: [String] = []
 
         for account in payload.accounts {
+            let validatedName = try accountService.validatedAccountName(account.name)
+            guard validatedName == account.name else {
+                throw ExportError.invalidAccountName(account.name)
+            }
             let exists = existingConfig.accounts.contains(account.name)
 
             if exists {
@@ -131,10 +138,9 @@ enum AccountExportService {
                     break
                 }
             }
-
-            let dir = paths.accountDir(account.name)
+            let dir = paths.accountDir(validatedName)
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-            let authPath = paths.accountAuthPath(account.name)
+            let authPath = paths.accountAuthPath(validatedName)
             try account.auth.write(to: URL(fileURLWithPath: authPath), options: .atomic)
             try FileManager.default.setAttributes(
                 [.posixPermissions: NSNumber(value: Int16(0o600))],
@@ -144,7 +150,7 @@ enum AccountExportService {
             // Register in config if new
             if !exists {
                 var config = try accountService.loadConfig(paths: paths)
-                config.accounts.insert(account.name)
+                config.accounts.insert(validatedName)
                 try accountService.saveConfig(config, paths: paths)
             }
 
@@ -164,6 +170,14 @@ enum AccountExportService {
         )
 
         return ImportResult(imported: imported, skipped: skipped, failed: failed, conflicts: conflicts)
+    }
+
+    static func writeBackupData(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: Int16(0o600))],
+            ofItemAtPath: url.path
+        )
     }
 
     private static func applyImportPreferences(_ prefs: ExportedPreferences, to store: inout AppPreferencesStore) {

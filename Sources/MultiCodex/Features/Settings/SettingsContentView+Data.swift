@@ -105,7 +105,7 @@ extension SettingsContentView {
                 panel.begin { response in
                     if response == .OK, let url = panel.url {
                         do {
-                            try data.write(to: url)
+                            try AccountExportService.writeBackupData(data, to: url)
                         } catch {
                             exportError = error.localizedDescription
                         }
@@ -138,6 +138,7 @@ extension SettingsContentView {
                         preferencesStore: &prefs
                     )
                     viewModel.preferences = prefs
+                    viewModel.reloadPreferencesFromStore()
                     self.importResult = importResult
                     viewModel.refreshLive()
                 } catch {
