@@ -88,9 +88,18 @@ extension SettingsContentView {
         )
     }
 
+    var isSwitchActionRunning: Bool {
+        viewModel.switchingAccountName != nil || viewModel.authMutationInFlightName != nil
+    }
+
+    var isLoginActionRunning: Bool {
+        viewModel.loginInFlightName != nil || viewModel.authMutationInFlightName != nil
+    }
+
     var isAccountActionRunning: Bool {
         viewModel.accountActionInFlightName != nil
             || viewModel.switchingAccountName != nil
+            || viewModel.authMutationInFlightName != nil
             || viewModel.sequentialLoginState?.isRunning == true
     }
 

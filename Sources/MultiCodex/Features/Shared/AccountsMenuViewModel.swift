@@ -11,6 +11,8 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var switchingAccountName: String?
     @Published var cliResolutionHint: String?
     @Published var accountActionInFlightName: String?
+    @Published var loginInFlightName: String?
+    @Published var authMutationInFlightName: String?
     @Published var accountActionMessage: String?
     @Published var accountActionError: String?
     @Published var runtimeProbeSummary: String?
@@ -38,6 +40,8 @@ final class AccountsMenuViewModel: ObservableObject {
     var preferences: AppPreferencesStore
 
     var refreshLoopTask: Task<Void, Never>?
+    var activeRefreshTask: Task<Void, Never>?
+    var refreshGeneration = 0
     var didBecomeActiveObserver: NSObjectProtocol?
     var pendingInteractiveLoginSession: PendingInteractiveLoginSession?
     var feedbackAutoClearTask: Task<Void, Never>?
@@ -101,6 +105,7 @@ final class AccountsMenuViewModel: ObservableObject {
         feedbackAutoClearTask?.cancel()
         sequentialLoginTask?.cancel()
         refreshLoopTask?.cancel()
+        activeRefreshTask?.cancel()
     }
 
     var currentAccount: AccountUsage? {
@@ -235,10 +240,7 @@ final class AccountsMenuViewModel: ObservableObject {
         }
 
         Task { @MainActor in
-            await refreshController.performRefresh(refreshLive: false)
-            if shouldPreferLiveRefreshForAutoSwitching {
-                await refreshController.performRefresh(refreshLive: true)
-            }
+            await refreshController.performStartupRefresh()
         }
         startRefreshLoop()
     }
@@ -250,7 +252,7 @@ final class AccountsMenuViewModel: ObservableObject {
                 if Task.isCancelled {
                     break
                 }
-                await refreshController.performRefresh(refreshLive: shouldPreferLiveRefreshForAutoSwitching)
+                refreshController.triggerRefresh(refreshLive: shouldPreferLiveRefreshForAutoSwitching)
             }
         }
     }
@@ -468,6 +470,19 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     func clearAccountActionFeedback() { accountManagement.clearAccountActionFeedback() }
+
+    func runAuthMutation<T>(
+        named name: String,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        while authMutationInFlightName != nil {
+            try Task.checkCancellation()
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        authMutationInFlightName = name
+        defer { authMutationInFlightName = nil }
+        return try await operation()
+    }
 
     func runSwitchAction(
         named name: String,

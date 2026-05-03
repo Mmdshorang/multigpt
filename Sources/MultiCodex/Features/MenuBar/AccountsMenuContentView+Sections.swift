@@ -582,10 +582,10 @@ extension AccountsMenuContentView {
     func performPrimaryAction(for row: AccountRowState) {
         switch row.primaryAction {
         case .switchAccount:
-            guard !isActionBusy else { return }
+            guard !isSwitchBusy else { return }
             viewModel.switchToAccount(named: row.name)
         case .relogin:
-            guard !isActionBusy else { return }
+            guard !isLoginBusy else { return }
             viewModel.openLoginInTerminal(for: row.name)
         case .none:
             toggleExpanded(row.name)
@@ -625,8 +625,18 @@ extension AccountsMenuContentView {
         )
     }
 
+    var isSwitchBusy: Bool {
+        viewModel.switchingAccountName != nil || viewModel.authMutationInFlightName != nil
+    }
+
+    var isLoginBusy: Bool {
+        viewModel.loginInFlightName != nil || viewModel.authMutationInFlightName != nil
+    }
+
     var isActionBusy: Bool {
-        viewModel.isRefreshing || viewModel.accountActionInFlightName != nil || viewModel.switchingAccountName != nil
+        viewModel.accountActionInFlightName != nil
+            || viewModel.switchingAccountName != nil
+            || viewModel.authMutationInFlightName != nil
     }
 
     var runtimeStatus: RuntimeStatusPresentation {

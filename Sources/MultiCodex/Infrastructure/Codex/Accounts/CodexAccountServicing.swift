@@ -7,6 +7,12 @@ protocol CodexAccountServicing: AnyObject {
 
     func fetchAccounts() async throws -> AccountsListPayload
     func fetchLimits(refreshLive: Bool) async throws -> LimitsPayload
+    func fetchLimits(
+        refreshLive: Bool,
+        cancellationToken: RefreshCancellationToken,
+        onPartialResult: @escaping @Sendable (LimitsPayload) -> Void
+    ) async throws -> LimitsPayload
+    func fetchCachedLimits() async throws -> LimitsPayload
     func switchAccount(name: String) async throws
     func removeAccount(name: String, deleteData: Bool) async throws -> RemoveAccountPayload
     func renameAccount(from oldName: String, to newName: String) async throws -> RenameAccountPayload
@@ -30,8 +36,39 @@ protocol CodexAccountServicing: AnyObject {
 
 extension CodexAccountService: CodexAccountServicing {}
 
+final class RefreshCancellationToken: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    func checkCancellation() throws {
+        if isCancelled {
+            throw CancellationError()
+        }
+    }
+}
+
 extension CodexAccountServicing {
     func currentPaths() -> CodexAccountService.PathContext {
         currentPaths(loginHome: nil)
+    }
+
+    func fetchLimits(
+        refreshLive: Bool,
+        cancellationToken: RefreshCancellationToken,
+        onPartialResult: @escaping @Sendable (LimitsPayload) -> Void
+    ) async throws -> LimitsPayload {
+        try await fetchLimits(refreshLive: refreshLive)
     }
 }

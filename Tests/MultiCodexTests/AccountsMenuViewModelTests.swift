@@ -53,6 +53,44 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertTrue(persisted.autoSwitchNotificationsEnabled)
     }
 
+    func testManualStrategyDoesNotReconcileExternalAuthIntoCurrentAccount() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MultiCodexTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let codexHome = tempRoot.appendingPathComponent(".codex", isDirectory: true)
+        try FileManager.default.createDirectory(at: codexHome, withIntermediateDirectories: true)
+        try Data(#"{"email":"beta@example.com"}"#.utf8)
+            .write(to: codexHome.appendingPathComponent("auth.json"))
+
+        let service = MockCodexAccountService()
+        service.pathContext = CodexAccountService.PathContext(
+            homeDir: tempRoot.path,
+            multicodexHome: tempRoot.appendingPathComponent("multicodex", isDirectory: true).path
+        )
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.stubbedResolvedIdentityByAccount = [
+            "alpha": ResolvedAccountIdentity(email: "alpha@example.com", plan: nil, accountId: nil, authMethod: .oauth),
+            "beta": ResolvedAccountIdentity(email: "beta@example.com", plan: nil, accountId: nil, authMethod: .oauth),
+        ]
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+
+        await viewModel.refreshController.performRefresh(refreshLive: false)
+
+        XCTAssertEqual(viewModel.accountSwitchingStrategy, .manual)
+        XCTAssertEqual(viewModel.currentAccount?.name, "alpha")
+        XCTAssertTrue(service.persistedCurrentAccountNames.isEmpty)
+        XCTAssertEqual(viewModel.refreshWarningMessage, "Detected external login for beta. Auto-switching is off.")
+    }
+
     func testSelectSettingsSectionPersistsSelection() {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
@@ -444,6 +482,38 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.lastRefreshError)
         XCTAssertEqual(viewModel.accounts.map(\.name), ["alpha"])
         XCTAssertEqual(viewModel.accounts.first?.usage.fiveHour.percentText, previousFiveHour)
+    }
+
+    func testStartPaintsCachedUsageBeforeSlowLiveRefreshCompletes() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.fetchCachedLimitsResult = LimitsPayload(
+            results: [
+                LimitsResult(
+                    account: "alpha",
+                    source: "cached",
+                    snapshot: RateLimitSnapshot(
+                        primary: RateLimitWindow(usedPercent: 25, windowDurationMins: 300, resetsAt: nil),
+                        secondary: RateLimitWindow(usedPercent: 50, windowDurationMins: 10080, resetsAt: nil),
+                        credits: nil
+                    ),
+                    ageSec: 120
+                )
+            ],
+            errors: []
+        )
+        service.fetchLimitsDelayNanoseconds = 500_000_000
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: true)
+
+        await waitUntil(timeoutSeconds: 0.3) {
+            viewModel.accounts.first?.usage.fiveHour.usedPercent == 25
+        }
+
+        XCTAssertEqual(service.fetchCachedLimitsCalls, 1)
+        XCTAssertTrue(viewModel.isRefreshing)
     }
 
     func testPerformRefreshPublishesAccountsBeforeSlowLimitsComplete() async throws {
@@ -1180,6 +1250,138 @@ final class AccountsMenuViewModelTests: XCTestCase {
         )
     }
 
+    func testSwitchCanStartWhileNewAccountLoginIsRunning() async {
+        let service = MockCodexAccountService()
+        service.loginInAppDelayNanoseconds = 500_000_000
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+
+        let emptyUsage = UsageSummary(
+            fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+            weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+            credits: "-"
+        )
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.updateAccounts([
+            AccountUsage(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
+            AccountUsage(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
+        ])
+
+        viewModel.startNewAccountLogin()
+
+        await waitUntil(timeoutSeconds: 0.2) {
+            viewModel.loginInFlightName != nil
+        }
+
+        viewModel.switchToAccount(named: "beta")
+
+        await waitUntil(timeoutSeconds: 0.3) {
+            viewModel.currentAccount?.name == "beta"
+        }
+
+        XCTAssertNotNil(viewModel.loginInFlightName)
+    }
+
+    func testSwitchCanStartWhileRefreshIsRunning() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.fetchLimitsDelayNanoseconds = 500_000_000
+
+        let emptyUsage = UsageSummary(
+            fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+            weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+            credits: "-"
+        )
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.updateAccounts([
+            AccountUsage(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
+            AccountUsage(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
+        ])
+
+        viewModel.refreshLive()
+        await waitUntil(timeoutSeconds: 0.2) {
+            viewModel.isRefreshing
+        }
+
+        viewModel.switchToAccount(named: "beta")
+
+        await waitUntil(timeoutSeconds: 0.3) {
+            viewModel.switchingAccountName == "beta" || viewModel.currentAccount?.name == "beta"
+        }
+    }
+
+    func testRefreshAppliesPartialUsageBeforeFullLimitsReturn() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.partialLimitsPayloads = [
+            LimitsPayload(
+                results: [
+                    LimitsResult(
+                        account: "alpha",
+                        source: "live-api",
+                        snapshot: RateLimitSnapshot(
+                            primary: RateLimitWindow(usedPercent: 10, windowDurationMins: 300, resetsAt: nil),
+                            secondary: RateLimitWindow(usedPercent: 20, windowDurationMins: 10080, resetsAt: nil),
+                            credits: nil
+                        ),
+                        ageSec: nil
+                    ),
+                ],
+                errors: []
+            ),
+        ]
+        service.fetchLimitsDelayNanoseconds = 500_000_000
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.refreshLive()
+
+        await waitUntil(timeoutSeconds: 0.2) {
+            viewModel.accounts.first?.usage.fiveHour.usedPercent == 10
+        }
+    }
+
+    func testSwitchCancelsActiveRefreshToken() async throws {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+        ]
+        service.fetchLimitsDelayNanoseconds = 500_000_000
+
+        let emptyUsage = UsageSummary(
+            fiveHour: UsageMetric(label: "5h", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+            weekly: UsageMetric(label: "weekly", percentText: "-", usedPercent: nil, periodMinutes: nil, resetsAt: nil),
+            credits: "-"
+        )
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.updateAccounts([
+            AccountUsage(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
+            AccountUsage(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil, usage: emptyUsage, source: "", usageError: nil),
+        ])
+
+        viewModel.refreshLive()
+        await waitUntil(timeoutSeconds: 0.2) {
+            service.receivedCancellationTokens.count == 1
+        }
+        let token = try XCTUnwrap(service.receivedCancellationTokens.first)
+
+        viewModel.switchToAccount(named: "beta")
+
+        await waitUntil(timeoutSeconds: 0.2) {
+            token.isCancelled
+        }
+        XCTAssertTrue(token.isCancelled)
+    }
+
     func testSwitchToAccountCompletesBeforeBackgroundRefreshFinishes() async throws {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
@@ -1645,6 +1847,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var stubbedDefaultWorkspaceEmailByAccount: [String: String] = [:]
     var stubbedResolvedIdentityByAccount: [String: ResolvedAccountIdentity] = [:]
     var stubbedInferredEmailFromLoginHome: String?
+    var pathContext = CodexAccountService.PathContext(homeDir: "/tmp", multicodexHome: "/tmp/multicodex")
 
     private(set) var switchCalls: [String] = []
     private(set) var removeCalls: [RemoveCall] = []
@@ -1657,6 +1860,13 @@ private final class MockCodexAccountService: CodexAccountServicing {
     private(set) var openNewLoginCalls: [String] = []
     private(set) var loginInAppCalls: [LoginCall] = []
     private(set) var fetchLimitsRefreshLiveCalls: [Bool] = []
+    private(set) var persistedCurrentAccountNames: [String] = []
+    var fetchCachedLimitsResult = LimitsPayload(results: [], errors: [])
+    var fetchCachedLimitsDelayNanoseconds: UInt64 = 0
+    private(set) var fetchCachedLimitsCalls = 0
+    var onFetchLimitsStarted: (() -> Void)?
+    var partialLimitsPayloads: [LimitsPayload] = []
+    private(set) var receivedCancellationTokens: [RefreshCancellationToken] = []
 
     func fetchAccounts() async throws -> AccountsListPayload {
         if let fetchAccountsError {
@@ -1681,10 +1891,45 @@ private final class MockCodexAccountService: CodexAccountServicing {
             throw fetchLimitsError
         }
         fetchLimitsRefreshLiveCalls.append(refreshLive)
+        onFetchLimitsStarted?()
         if fetchLimitsDelayNanoseconds > 0 {
             try? await Task.sleep(nanoseconds: fetchLimitsDelayNanoseconds)
         }
         return stubbedLimits
+    }
+
+    func fetchLimits(
+        refreshLive: Bool,
+        cancellationToken: RefreshCancellationToken,
+        onPartialResult: @escaping @Sendable (LimitsPayload) -> Void
+    ) async throws -> LimitsPayload {
+        if let fetchLimitsError {
+            throw fetchLimitsError
+        }
+        fetchLimitsRefreshLiveCalls.append(refreshLive)
+        receivedCancellationTokens.append(cancellationToken)
+        onFetchLimitsStarted?()
+        for payload in partialLimitsPayloads {
+            if cancellationToken.isCancelled {
+                throw CancellationError()
+            }
+            onPartialResult(payload)
+        }
+        if fetchLimitsDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: fetchLimitsDelayNanoseconds)
+        }
+        if cancellationToken.isCancelled {
+            throw CancellationError()
+        }
+        return stubbedLimits
+    }
+
+    func fetchCachedLimits() async throws -> LimitsPayload {
+        fetchCachedLimitsCalls += 1
+        if fetchCachedLimitsDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: fetchCachedLimitsDelayNanoseconds)
+        }
+        return fetchCachedLimitsResult
     }
 
     func switchAccount(name: String) async throws {
@@ -1876,14 +2121,19 @@ private final class MockCodexAccountService: CodexAccountServicing {
         [:]
     }
 
-    func persistCurrentAccountIfKnown(_ name: String) throws {}
+    func persistCurrentAccountIfKnown(_ name: String) throws {
+        persistedCurrentAccountNames.append(name)
+    }
 
     func storedAuthModifiedDate(for account: String, paths: CodexAccountService.PathContext) -> Date? {
         nil
     }
 
     func resolveFromAuthPayload(_ authPayload: [String: Any]) -> ResolvedAccountIdentity? {
-        nil
+        guard let email = authPayload["email"] as? String else {
+            return nil
+        }
+        return ResolvedAccountIdentity(email: email, plan: nil, accountId: nil, authMethod: .oauth)
     }
 
     func resolvedIdentityForAccount(name: String) -> ResolvedAccountIdentity? {
@@ -1891,7 +2141,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     }
 
     func currentPaths(loginHome: String?) -> CodexAccountService.PathContext {
-        CodexAccountService.PathContext(homeDir: "/tmp", multicodexHome: "/tmp/multicodex")
+        pathContext
     }
 }
 

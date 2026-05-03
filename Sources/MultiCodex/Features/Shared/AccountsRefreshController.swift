@@ -9,8 +9,13 @@ final class AccountsRefreshController {
         self.viewModel = viewModel
     }
 
-    func performRefresh(refreshLive: Bool, allowAutoSwitch: Bool = true) async {
+    func performRefresh(refreshLive: Bool, allowAutoSwitch: Bool = true, generation: Int? = nil) async {
         let viewModel = viewModel
+
+        func isStale() -> Bool {
+            Task.isCancelled || generation.map({ $0 != viewModel.refreshGeneration }) == true
+        }
+
         if viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion {
             MultiCodexLog.log(.refresh, level: .debug, "Skipped refresh while interactive login is pending")
             return
@@ -28,6 +33,10 @@ final class AccountsRefreshController {
         // Proactively refresh aging tokens before fetching usage
         if refreshLive {
             let tokenErrors = await viewModel.accountService.refreshStaleTokens()
+            if isStale() {
+                viewModel.isRefreshing = false
+                return
+            }
             if !tokenErrors.isEmpty {
                 MultiCodexLog.log(
                     .auth,
@@ -48,6 +57,10 @@ final class AccountsRefreshController {
 
         do {
             let accountsPayload = try await viewModel.accountService.fetchAccounts()
+            if isStale() {
+                viewModel.isRefreshing = false
+                return
+            }
             fetchedAccounts = accountsPayload
             await applyMergedAccounts(
                 accountsPayload: accountsPayload,
@@ -56,7 +69,33 @@ final class AccountsRefreshController {
                 recordPace: false
             )
 
-            let limits = try await viewModel.accountService.fetchLimits(refreshLive: refreshLive)
+            let cancellationToken = RefreshCancellationToken()
+            let limits = try await withTaskCancellationHandler {
+                try await viewModel.accountService.fetchLimits(
+                    refreshLive: refreshLive,
+                    cancellationToken: cancellationToken
+                ) { [weak self] partial in
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        let viewModel = self.viewModel
+                        if Task.isCancelled || generation.map({ $0 != viewModel.refreshGeneration }) == true {
+                            return
+                        }
+                        await self.applyMergedAccounts(
+                            accountsPayload: accountsPayload,
+                            limits: partial,
+                            previousAccounts: previousAccounts,
+                            recordPace: false
+                        )
+                    }
+                }
+            } onCancel: {
+                cancellationToken.cancel()
+            }
+            if isStale() {
+                viewModel.isRefreshing = false
+                return
+            }
 
             await applyMergedAccounts(
                 accountsPayload: accountsPayload,
@@ -74,7 +113,7 @@ final class AccountsRefreshController {
 
             viewModel.lastUpdatedAt = Date()
             viewModel.cliResolutionHint = viewModel.accountService.resolutionHint
-            if allowAutoSwitch, viewModel.switchingAccountName == nil {
+            if allowAutoSwitch, viewModel.accountSwitchingStrategy != .manual, viewModel.switchingAccountName == nil {
                 switchRecommendation = AccountSwitchRecommendationService.recommendation(
                     for: viewModel.accountSwitchingStrategy,
                     accounts: viewModel.accounts
@@ -100,6 +139,9 @@ final class AccountsRefreshController {
 
             performReconciliation(accountsPayload: accountsPayload)
         } catch {
+            if isStale() || error is CancellationError {
+                return
+            }
             MultiCodexLog.log(.refresh, level: .error, "Refresh failed: \(error.localizedDescription)")
             viewModel.cliResolutionHint = viewModel.accountService.resolutionHint
             if let fetchedAccounts {
@@ -121,10 +163,47 @@ final class AccountsRefreshController {
         }
     }
 
-    func triggerRefresh(refreshLive: Bool) {
+    func performStartupRefresh() async {
         let viewModel = viewModel
-        Task {
-            await viewModel.refreshController.performRefresh(refreshLive: refreshLive)
+        guard !viewModel.isRefreshing else {
+            return
+        }
+
+        viewModel.isRefreshing = true
+        let previousAccounts = viewModel.accounts
+
+        do {
+            let accountsPayload = try await viewModel.accountService.fetchAccounts()
+            let cachedLimits = try? await viewModel.accountService.fetchCachedLimits()
+            await applyMergedAccounts(
+                accountsPayload: accountsPayload,
+                limits: cachedLimits ?? LimitsPayload(results: [], errors: []),
+                previousAccounts: previousAccounts,
+                recordPace: cachedLimits?.results.isEmpty == false
+            )
+            viewModel.lastRefreshError = nil
+            viewModel.refreshWarningMessage = nil
+
+            viewModel.isRefreshing = false
+            triggerRefresh(refreshLive: viewModel.shouldPreferLiveRefreshForAutoSwitching)
+        } catch {
+            viewModel.lastRefreshError = error.localizedDescription
+            viewModel.refreshWarningMessage = nil
+            viewModel.isRefreshing = false
+        }
+    }
+
+    func triggerRefresh(refreshLive: Bool, allowAutoSwitch: Bool = true) {
+        let viewModel = viewModel
+        viewModel.activeRefreshTask?.cancel()
+        viewModel.refreshGeneration += 1
+        let generation = viewModel.refreshGeneration
+        viewModel.activeRefreshTask = Task { @MainActor in
+            await viewModel.refreshController.performRefresh(
+                refreshLive: refreshLive,
+                allowAutoSwitch: allowAutoSwitch,
+                generation: generation
+            )
         }
     }
 
@@ -153,9 +232,7 @@ final class AccountsRefreshController {
                     )
                 )
             }
-            Task { @MainActor in
-                await viewModel.refreshController.performRefresh(refreshLive: false, allowAutoSwitch: false)
-            }
+            viewModel.refreshController.triggerRefresh(refreshLive: false, allowAutoSwitch: false)
         }
     }
 
@@ -256,7 +333,13 @@ final class AccountsRefreshController {
                 ]
             )
 
-            if let detectedName = result.detectedAccountName {
+            if viewModel.accountSwitchingStrategy == .manual {
+                if let detectedName = result.detectedAccountName {
+                    viewModel.refreshWarningMessage = "Detected external login for \(detectedName). Auto-switching is off."
+                } else if let email = result.detectedEmail {
+                    viewModel.refreshWarningMessage = "Detected external login for \(email). Auto-switching is off."
+                }
+            } else if let detectedName = result.detectedAccountName {
                 do {
                     try service.persistCurrentAccountIfKnown(detectedName)
                     viewModel.applyCurrentAccountLocally(named: detectedName)

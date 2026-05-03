@@ -37,7 +37,7 @@ extension SettingsContentView {
                             title: "Login New Account",
                             symbol: "person.crop.circle.badge.plus",
                             role: .primary,
-                            isDisabled: isAccountActionRunning
+                            isDisabled: isLoginActionRunning
                         ) {
                             viewModel.startNewAccountLogin()
                         }
@@ -58,7 +58,7 @@ extension SettingsContentView {
                                 title: "Start Batch Login",
                                 symbol: "list.number",
                                 role: .secondary,
-                                isDisabled: isAccountActionRunning
+                                isDisabled: isLoginActionRunning
                             ) {
                                 openSequentialLoginTracker()
                             }
@@ -112,7 +112,7 @@ extension SettingsContentView {
                                 title: viewModel.isCodexRuntimeAvailable ? "Log In First Account" : "Open Runtime Settings",
                                 symbol: viewModel.isCodexRuntimeAvailable ? "person.crop.circle.badge.plus" : "terminal",
                                 role: .primary,
-                                isDisabled: isAccountActionRunning
+                                isDisabled: isLoginActionRunning
                             ) {
                                 if viewModel.isCodexRuntimeAvailable {
                                     viewModel.startNewAccountLogin()
@@ -339,7 +339,7 @@ extension SettingsContentView {
                     ) {
                         viewModel.switchToAccount(named: account.name)
                     }
-                    .disabled(isAccountActionRunning)
+                    .disabled(isSwitchActionRunning)
                 }
 
                 ActionPillButton(
@@ -348,7 +348,7 @@ extension SettingsContentView {
                 ) {
                     viewModel.openLoginInTerminal(for: account.name)
                 }
-                .disabled(isAccountActionRunning)
+                .disabled(isLoginActionRunning)
 
                 ActionPillButton(
                     title: "Check Status",

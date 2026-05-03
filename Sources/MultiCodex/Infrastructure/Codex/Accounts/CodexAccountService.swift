@@ -158,8 +158,36 @@ final class CodexAccountService {
     }
 
     func fetchLimits(refreshLive: Bool) async throws -> LimitsPayload {
+        try await fetchLimits(
+            refreshLive: refreshLive,
+            cancellationToken: RefreshCancellationToken(),
+            onPartialResult: { _ in }
+        )
+    }
+
+    func fetchLimits(
+        refreshLive: Bool,
+        cancellationToken: RefreshCancellationToken,
+        onPartialResult: @escaping @Sendable (LimitsPayload) -> Void
+    ) async throws -> LimitsPayload {
+        let worker = Task.detached(priority: .userInitiated) { [self] in
+            try fetchLimitsNow(
+                refreshLive: refreshLive,
+                cancellationToken: cancellationToken,
+                onPartialResult: onPartialResult
+            )
+        }
+        return try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            cancellationToken.cancel()
+            worker.cancel()
+        }
+    }
+
+    func fetchCachedLimits() async throws -> LimitsPayload {
         try await Task.detached(priority: .userInitiated) { [self] in
-            try fetchLimitsNow(refreshLive: refreshLive)
+            try fetchCachedLimitsNow()
         }.value
     }
 

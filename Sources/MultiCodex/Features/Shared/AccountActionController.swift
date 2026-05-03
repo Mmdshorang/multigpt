@@ -40,14 +40,14 @@ final class AccountActionController {
 
     func startLoginFlow(accountName: String, createIfNeeded: Bool) {
         let viewModel = viewModel
-        guard viewModel.accountActionInFlightName == nil,
+        guard viewModel.loginInFlightName == nil,
               viewModel.pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
         else {
             return
         }
 
         Task {
-            viewModel.accountActionInFlightName = accountName
+            viewModel.loginInFlightName = accountName
             viewModel.focusedAccountName = accountName
             viewModel.feedbackAutoClearTask?.cancel()
             viewModel.feedbackAutoClearTask = nil
@@ -55,7 +55,7 @@ final class AccountActionController {
             viewModel.accountActionError = nil
 
             defer {
-                viewModel.accountActionInFlightName = nil
+                viewModel.loginInFlightName = nil
             }
 
             do {
@@ -116,14 +116,14 @@ final class AccountActionController {
 
     func resumePendingInteractiveLogin(_ session: PendingInteractiveLoginSession) {
         let viewModel = viewModel
-        guard viewModel.accountActionInFlightName == nil else {
+        guard viewModel.loginInFlightName == nil else {
             return
         }
 
         Task {
-            viewModel.accountActionInFlightName = session.accountName
+            viewModel.loginInFlightName = session.accountName
             viewModel.focusedAccountName = session.accountName
-            defer { viewModel.accountActionInFlightName = nil }
+            defer { viewModel.loginInFlightName = nil }
 
             _ = await self.completeInteractiveLogin(session: session, preserveFailedSession: true)
         }
@@ -152,7 +152,7 @@ final class AccountActionController {
         guard var state = viewModel.sequentialLoginState,
               !state.items.isEmpty,
               !state.isRunning,
-              viewModel.accountActionInFlightName == nil,
+              viewModel.loginInFlightName == nil,
               viewModel.switchingAccountName == nil,
               viewModel.pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
         else {
@@ -255,9 +255,11 @@ final class AccountActionController {
                 )
             }
 
-            _ = try await viewModel.accountService.importAuth(fromHome: session.loginSandboxHome, into: session.accountName)
-            if session.shouldApplyAccountAuthOnSuccess {
-                try await viewModel.accountService.switchAccount(name: session.accountName)
+            try await viewModel.runAuthMutation(named: session.accountName) { [self] in
+                _ = try await viewModel.accountService.importAuth(fromHome: session.loginSandboxHome, into: session.accountName)
+                if session.shouldApplyAccountAuthOnSuccess {
+                    try await viewModel.accountService.switchAccount(name: session.accountName)
+                }
             }
 
             var effectiveAccountName = session.accountName
@@ -311,9 +313,7 @@ final class AccountActionController {
                     setAccountFeedback(message: message, error: nil)
                 }
 
-                Task { @MainActor in
-                    await viewModel.refreshController.performRefresh(refreshLive: true, allowAutoSwitch: false)
-                }
+                viewModel.refreshController.triggerRefresh(refreshLive: true, allowAutoSwitch: false)
 
                 return InteractiveLoginOutcome(
                     success: true,
@@ -410,9 +410,7 @@ final class AccountActionController {
             viewModel.accountActionInFlightName = nil
 
             if shouldRefresh {
-                Task { @MainActor in
-                    await viewModel.refreshController.performRefresh(refreshLive: false)
-                }
+                viewModel.refreshController.triggerRefresh(refreshLive: false)
             }
         }
     }

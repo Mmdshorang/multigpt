@@ -11,16 +11,21 @@ final class AccountManagementController {
 
     func switchToAccount(named name: String) {
         let viewModel = viewModel
+        viewModel.activeRefreshTask?.cancel()
+        viewModel.activeRefreshTask = nil
+        viewModel.refreshGeneration += 1
+        viewModel.isRefreshing = false
+
         viewModel.runSwitchAction(named: name) {
-            try await viewModel.accountService.switchAccount(name: name)
+            try await viewModel.runAuthMutation(named: name) {
+                try await viewModel.accountService.switchAccount(name: name)
+            }
             viewModel.lastRefreshError = nil
             viewModel.applyCurrentAccountLocally(named: name)
             viewModel.focusedAccountName = name
             viewModel.settingsController.syncSelectedSettingsAccount()
             viewModel.accountActions.setAccountFeedback(message: "Now using \(name).", error: nil)
-            Task { @MainActor in
-                await viewModel.refreshController.performRefresh(refreshLive: false, allowAutoSwitch: false)
-            }
+            viewModel.refreshController.triggerRefresh(refreshLive: false, allowAutoSwitch: false)
         }
     }
 
