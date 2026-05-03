@@ -2,6 +2,14 @@ import XCTest
 @testable import MultiCodex
 
 final class CodexRPCSessionTests: XCTestCase {
+    func testTimeoutCleanupRemovesPendingAndResumesWithTimeout() async {
+        let session = CodexRPCSession()
+        let result = await session._testTriggerTimeoutCleanup(method: "account/read")
+        XCTAssertEqual(result.pendingBefore, 1)
+        XCTAssertEqual(result.pendingAfter, 0)
+        XCTAssertTrue(result.timedOut)
+    }
+
     func testShutdownDoesNotCrashWhenNotStarted() async {
         let session = CodexRPCSession()
         await session.shutdown()

@@ -11,6 +11,7 @@ actor CodexRPCSession {
         case requestFailed(String)
         case malformed(String)
         case processDied
+        case requestTimedOut(String)
 
         var errorDescription: String? {
             switch self {
@@ -19,6 +20,7 @@ actor CodexRPCSession {
             case .requestFailed(let msg): return "Codex RPC error: \(msg)"
             case .malformed(let msg): return "Codex RPC malformed response: \(msg)"
             case .processDied: return "Codex RPC process exited."
+            case .requestTimedOut(let method): return "Codex RPC request timed out: \(method)"
             }
         }
     }
@@ -33,6 +35,7 @@ actor CodexRPCSession {
     private var scopedHomePath: String?
     private var customCodexPath: String?
     private var launchEnvironment: [String: String]?
+    private let requestTimeoutNanoseconds: UInt64 = 30_000_000_000
 
     func ensureReady(
         scopedHomePath: String? = nil,
@@ -63,7 +66,7 @@ actor CodexRPCSession {
             customCodexPath: customCodexPath,
             environment: environment
         )
-        return try await request(method: "account/rateLimits/read")
+        return try await requestWithTimeout(method: "account/rateLimits/read")
     }
 
     func fetchAccount(
@@ -76,13 +79,14 @@ actor CodexRPCSession {
             customCodexPath: customCodexPath,
             environment: environment
         )
-        return try await request(method: "account/read")
+        return try await requestWithTimeout(method: "account/read")
     }
 
     func shutdown() {
-        guard let proc = process, proc.isRunning else { return }
-        MultiCodexLog.log(.rpc, level: .info, "Shutting down RPC session")
-        proc.terminate()
+        if let proc = process, proc.isRunning {
+            MultiCodexLog.log(.rpc, level: .info, "Shutting down RPC session")
+            proc.terminate()
+        }
         process = nil
         stdinPipe = nil
         stdoutPipe = nil
@@ -134,6 +138,9 @@ actor CodexRPCSession {
         self.stdoutPipe = stdout
         self.stdoutBuffer = Data()
         self.initialized = false
+        proc.terminationHandler = { [weak self] _ in
+            Task { await self?.handleProcessTerminated() }
+        }
 
         MultiCodexLog.log(
             .rpc,
@@ -146,7 +153,7 @@ actor CodexRPCSession {
 
     private func initialize() async throws {
         guard process?.isRunning == true else { throw SessionError.processDied }
-        _ = try await request(method: "initialize", params: [
+        _ = try await requestWithTimeout(method: "initialize", params: [
             "clientInfo": ["name": "multicodex-mac", "version": "0.5"],
         ])
         try sendNotification(method: "initialized")
@@ -158,15 +165,44 @@ actor CodexRPCSession {
         guard process?.isRunning == true else { throw SessionError.processDied }
         let id = nextID
         nextID += 1
-        return try await withCheckedThrowingContinuation { continuation in
+        let timeoutTask = Task {
+            try await Task.sleep(nanoseconds: requestTimeoutNanoseconds)
+            await handleRequestTimeout(id: id, method: method)
+        }
+        let response: [String: Any] = try await withCheckedThrowingContinuation { continuation in
             pendingRequests[id] = continuation
             do {
                 try sendPayload(["id": id, "method": method, "params": params ?? [:]])
             } catch {
+                timeoutTask.cancel()
                 pendingRequests.removeValue(forKey: id)
                 continuation.resume(throwing: error)
             }
         }
+        timeoutTask.cancel()
+        return response
+    }
+
+    private func handleProcessTerminated() {
+        process = nil
+        stdinPipe = nil
+        stdoutPipe = nil
+        stdoutBuffer = Data()
+        initialized = false
+        for (_, continuation) in pendingRequests {
+            continuation.resume(throwing: SessionError.processDied)
+        }
+        pendingRequests.removeAll()
+    }
+
+    private func requestWithTimeout(method: String, params: [String: Any]? = nil) async throws -> [String: Any] {
+        try await request(method: method, params: params)
+    }
+
+    private func handleRequestTimeout(id: Int, method: String) {
+        guard let continuation = pendingRequests.removeValue(forKey: id) else { return }
+        continuation.resume(throwing: SessionError.requestTimedOut(method))
+        shutdown()
     }
 
     private func sendNotification(method: String) throws {
@@ -213,4 +249,31 @@ actor CodexRPCSession {
             }
         }
     }
+
+#if DEBUG
+    func _testTriggerTimeoutCleanup(method: String = "test/method") async -> (pendingBefore: Int, pendingAfter: Int, timedOut: Bool) {
+        let id = nextID
+        nextID += 1
+
+        let waitForContinuation = Task { () -> Bool in
+            do {
+                _ = try await withCheckedThrowingContinuation { continuation in
+                    pendingRequests[id] = continuation
+                }
+                return false
+            } catch SessionError.requestTimedOut(let timedOutMethod) {
+                return timedOutMethod == method
+            } catch {
+                return false
+            }
+        }
+
+        await Task.yield()
+        let pendingBefore = pendingRequests.count
+        handleRequestTimeout(id: id, method: method)
+        let timedOut = await waitForContinuation.value
+        let pendingAfter = pendingRequests.count
+        return (pendingBefore, pendingAfter, timedOut)
+    }
+#endif
 }
