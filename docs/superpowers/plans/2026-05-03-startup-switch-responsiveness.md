@@ -1118,6 +1118,10 @@ Expected: commit succeeds.
 - `authMutationInFlightName` is UI state, not a real cross-process lock. Service-level auth locking must remain inside auth swap/switch services.
 - If partial callback creates nested `Task` calls, verify no MainActor ordering bug lets final empty limits erase partials.
 
+## Implementation Note
+
+Implemented in commit `49141e8` and earlier with generation-tracked refreshes, refresh cancellation tokens, partial limits application, and manual-mode reconciliation guard.
+
 ## Completion Criteria
 
 - Startup account rows render before live limits complete.
