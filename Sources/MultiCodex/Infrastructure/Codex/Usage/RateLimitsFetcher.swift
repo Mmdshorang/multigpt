@@ -137,20 +137,37 @@ extension CodexAccountService {
 
         let group = DispatchGroup()
         let lock = NSLock()
+        var completed = Set<String>()
+        var timedOut = false
 
         for account in accounts {
             group.enter()
             DispatchQueue.global(qos: .userInitiated).async {
                 let (result, error) = self.fetchManagedAccountLimits(account, paths: paths)
                 lock.lock()
+                guard !timedOut else {
+                    lock.unlock()
+                    group.leave()
+                    return
+                }
                 if let result { results.append(result) }
                 if let error { errors.append(error) }
+                completed.insert(account)
                 lock.unlock()
                 group.leave()
             }
         }
 
-        _ = group.wait(timeout: .now() + 60)
+        let waitResult = group.wait(timeout: .now() + 60)
+        if waitResult == .timedOut {
+            lock.lock()
+            timedOut = true
+            let missing = accounts.filter { !completed.contains($0) }
+            for account in missing {
+                errors.append(LimitsErrorEntry(account: account, message: "Managed refresh timed out."))
+            }
+            lock.unlock()
+        }
 
         MultiCodexLog.log(
             .refresh,
@@ -264,7 +281,8 @@ extension CodexAccountService {
             semaphore.signal()
         }
 
-        guard semaphore.wait(timeout: .now() + 12) == .success else {
+        guard semaphore.wait(timeout: .now() + 35) == .success else {
+            Task { await CodexRPCSession.shared.shutdown() }
             throw CodexAccountServiceError(message: "Codex persistent RPC timed out while fetching rate limits.")
         }
 
