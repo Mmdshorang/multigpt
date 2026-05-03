@@ -14,7 +14,7 @@ enum UpdateChecker {
         }
     }
 
-    static let repository = "mohamadhosein/multicodex"
+    static let repository = "momoazn/multicodex"
 
     static func checkForUpdate(currentVersion: String) async throws -> Release? {
         let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!

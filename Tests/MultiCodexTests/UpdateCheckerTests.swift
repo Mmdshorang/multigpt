@@ -2,6 +2,10 @@ import XCTest
 @testable import MultiCodex
 
 final class UpdateCheckerTests: XCTestCase {
+    func testRepositoryMatchesPublicReleaseRepository() {
+        XCTAssertEqual(UpdateChecker.repository, "momoazn/multicodex")
+    }
+
     func testVersionComparisonNewer() {
         // Access private method indirectly through the release check logic
         XCTAssertTrue(isNewer("1.0.0", than: "0.9.0"))
