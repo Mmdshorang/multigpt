@@ -520,6 +520,13 @@ final class AccountsMenuViewModel: ObservableObject {
         }
     }
 
+    func cancelActiveRefreshForUserSwitch() {
+        activeRefreshTask?.cancel()
+        activeRefreshTask = nil
+        refreshGeneration += 1
+        isRefreshing = false
+    }
+
     func clearFocusedAccountIfMissing() {
         if let focusedAccountName,
            !accounts.contains(where: { $0.name == focusedAccountName })

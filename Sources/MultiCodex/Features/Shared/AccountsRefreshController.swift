@@ -12,10 +12,6 @@ final class AccountsRefreshController {
     func performRefresh(refreshLive: Bool, allowAutoSwitch: Bool = true, generation: Int? = nil) async {
         let viewModel = viewModel
 
-        func isStale() -> Bool {
-            Task.isCancelled || generation.map({ $0 != viewModel.refreshGeneration }) == true
-        }
-
         if viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion {
             MultiCodexLog.log(.refresh, level: .debug, "Skipped refresh while interactive login is pending")
             return
@@ -33,7 +29,7 @@ final class AccountsRefreshController {
         // Proactively refresh aging tokens before fetching usage
         if refreshLive {
             let tokenErrors = await viewModel.accountService.refreshStaleTokens()
-            if isStale() {
+            if isRefreshStale(generation: generation) {
                 viewModel.isRefreshing = false
                 return
             }
@@ -57,7 +53,7 @@ final class AccountsRefreshController {
 
         do {
             let accountsPayload = try await viewModel.accountService.fetchAccounts()
-            if isStale() {
+            if isRefreshStale(generation: generation) {
                 viewModel.isRefreshing = false
                 return
             }
@@ -77,8 +73,7 @@ final class AccountsRefreshController {
                 ) { [weak self] partial in
                     Task { @MainActor [weak self] in
                         guard let self else { return }
-                        let viewModel = self.viewModel
-                        if Task.isCancelled || generation.map({ $0 != viewModel.refreshGeneration }) == true {
+                        if self.isRefreshStale(generation: generation) {
                             return
                         }
                         await self.applyMergedAccounts(
@@ -92,7 +87,7 @@ final class AccountsRefreshController {
             } onCancel: {
                 cancellationToken.cancel()
             }
-            if isStale() {
+            if isRefreshStale(generation: generation) {
                 viewModel.isRefreshing = false
                 return
             }
@@ -139,7 +134,7 @@ final class AccountsRefreshController {
 
             performReconciliation(accountsPayload: accountsPayload)
         } catch {
-            if isStale() || error is CancellationError {
+            if isRefreshStale(generation: generation) || error is CancellationError {
                 return
             }
             MultiCodexLog.log(.refresh, level: .error, "Refresh failed: \(error.localizedDescription)")
@@ -193,6 +188,7 @@ final class AccountsRefreshController {
         }
     }
 
+    // Invariant: all app refreshes go through this method so generation checks can drop stale results.
     func triggerRefresh(refreshLive: Bool, allowAutoSwitch: Bool = true) {
         let viewModel = viewModel
         viewModel.activeRefreshTask?.cancel()
@@ -350,5 +346,9 @@ final class AccountsRefreshController {
                 viewModel.refreshWarningMessage = "Detected external login for \(email). This account is not in MultiCodex."
             }
         }
+    }
+
+    private func isRefreshStale(generation: Int?) -> Bool {
+        Task.isCancelled || generation.map { $0 != viewModel.refreshGeneration } == true
     }
 }

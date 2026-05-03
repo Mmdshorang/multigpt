@@ -11,10 +11,7 @@ final class AccountManagementController {
 
     func switchToAccount(named name: String) {
         let viewModel = viewModel
-        viewModel.activeRefreshTask?.cancel()
-        viewModel.activeRefreshTask = nil
-        viewModel.refreshGeneration += 1
-        viewModel.isRefreshing = false
+        viewModel.cancelActiveRefreshForUserSwitch()
 
         viewModel.runSwitchAction(named: name) {
             try await viewModel.runAuthMutation(named: name) {
