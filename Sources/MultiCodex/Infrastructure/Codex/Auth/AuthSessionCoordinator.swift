@@ -323,7 +323,7 @@ extension CodexAccountService {
 
     /// Proactively refresh tokens for all accounts with aging auth.
     /// Called during background refresh cycles, before fetching usage.
-    func refreshStaleTokens() -> [String: Error] {
+    func refreshStaleTokensNow() -> [String: Error] {
         let paths = currentPaths()
         guard let config = try? loadConfig(paths: paths) else {
             return [:]
@@ -370,6 +370,21 @@ extension CodexAccountService {
             }
         }
         return errors
+    }
+
+    func refreshStaleTokens() async -> [String: Error] {
+        await Task.detached(priority: .utility) { [self] in
+            refreshStaleTokensNow()
+        }.value
+    }
+
+    func refreshStaleTokens() -> [String: Error] {
+        refreshStaleTokensNow()
+    }
+
+    func storedAuthModifiedDate(for account: String, paths: PathContext) -> Date? {
+        let authPath = managedAuthPath(for: account, paths: paths) ?? paths.accountAuthPath(account)
+        return try? fileManager.attributesOfItem(atPath: authPath)[.modificationDate] as? Date
     }
 
     func validatedAccountName(_ name: String) throws -> String {

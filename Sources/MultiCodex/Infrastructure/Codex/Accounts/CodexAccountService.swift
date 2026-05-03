@@ -152,15 +152,20 @@ final class CodexAccountService {
     }
 
     func fetchAccounts() async throws -> AccountsListPayload {
-        try fetchAccountsNow()
+        try await Task.detached(priority: .userInitiated) { [self] in
+            try fetchAccountsNow()
+        }.value
     }
 
     func fetchLimits(refreshLive: Bool) async throws -> LimitsPayload {
-        try fetchLimitsNow(refreshLive: refreshLive)
+        try await Task.detached(priority: .userInitiated) { [self] in
+            try fetchLimitsNow(refreshLive: refreshLive)
+        }.value
     }
 
     func switchAccount(name: String) async throws {
         _ = try switchAccountNow(name: name)
+        await CodexRPCSession.shared.shutdown()
     }
 
     func addAccount(name: String) async throws -> AddAccountPayload {

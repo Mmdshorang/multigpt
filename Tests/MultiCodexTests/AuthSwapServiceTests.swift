@@ -28,4 +28,43 @@ final class AuthSwapServiceTests: XCTestCase {
         let readBack = try Data(contentsOf: URL(fileURLWithPath: authPath))
         XCTAssertEqual(readBack, targetAuth)
     }
+
+    func testSwitchMissingTargetAuthPreservesSystemAuth() throws {
+        let tempDir = NSTemporaryDirectory() + "/mc-test-swap-missing-\(UUID().uuidString)"
+        let fm = FileManager.default
+        try fm.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: tempDir) }
+
+        let paths = CodexAccountService.PathContext(
+            homeDir: tempDir,
+            multicodexHome: (tempDir as NSString).appendingPathComponent("config")
+        )
+        try fm.createDirectory(atPath: paths.defaultCodexHome, withIntermediateDirectories: true)
+        let systemAuthPath = paths.defaultCodexAuthPath
+        try Data("{\"tokens\":{\"access_token\":\"keep\"}}".utf8).write(to: URL(fileURLWithPath: systemAuthPath))
+
+        XCTAssertThrowsError(
+            try AuthSwapService.switchToAccount(named: "missing", previousAccountName: "prev", paths: paths)
+        )
+
+        let after = try Data(contentsOf: URL(fileURLWithPath: systemAuthPath))
+        XCTAssertTrue(String(data: after, encoding: .utf8)?.contains("keep") == true)
+    }
+
+    func testClearSystemAuthRemovesFileWhenPresent() throws {
+        let tempDir = NSTemporaryDirectory() + "/mc-test-clear-auth-\(UUID().uuidString)"
+        let fm = FileManager.default
+        try fm.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: tempDir) }
+
+        let paths = CodexAccountService.PathContext(
+            homeDir: tempDir,
+            multicodexHome: (tempDir as NSString).appendingPathComponent("config")
+        )
+        try fm.createDirectory(atPath: paths.defaultCodexHome, withIntermediateDirectories: true)
+        try Data("{\"tokens\":{\"access_token\":\"x\"}}".utf8).write(to: URL(fileURLWithPath: paths.defaultCodexAuthPath))
+
+        try AuthSwapService.clearSystemAuth(paths: paths)
+        XCTAssertFalse(fm.fileExists(atPath: paths.defaultCodexAuthPath))
+    }
 }

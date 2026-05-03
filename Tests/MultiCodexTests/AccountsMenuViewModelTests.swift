@@ -1872,8 +1872,14 @@ private final class MockCodexAccountService: CodexAccountServicing {
         probeRuntimeResult
     }
 
-    func refreshStaleTokens() -> [String: Error] {
+    func refreshStaleTokens() async -> [String: Error] {
         [:]
+    }
+
+    func persistCurrentAccountIfKnown(_ name: String) throws {}
+
+    func storedAuthModifiedDate(for account: String, paths: CodexAccountService.PathContext) -> Date? {
+        nil
     }
 
     func resolveFromAuthPayload(_ authPayload: [String: Any]) -> ResolvedAccountIdentity? {

@@ -20,7 +20,7 @@ enum AuthSwapService {
         if let previousName = previousAccountName,
            let currentSystemAuth = try? Data(contentsOf: URL(fileURLWithPath: paths.defaultCodexAuthPath))
         {
-            try? writeAuthData(currentSystemAuth, account: previousName, paths: paths)
+            try writeAuthData(currentSystemAuth, account: previousName, paths: paths)
             MultiCodexLog.log(
                 .auth,
                 level: .info,
@@ -32,9 +32,7 @@ enum AuthSwapService {
         let targetAuthData = try readAuthData(account: targetName, paths: paths)
 
         guard let targetAuthData else {
-            try? FileManager.default.removeItem(at: systemAuthURL)
-            MultiCodexLog.log(.auth, level: .info, "Cleared system auth for \(targetName)")
-            return
+            throw AuthSwapError.authNotFound(targetName)
         }
 
         // Step 3: Atomic swap using POSIX rename()
@@ -113,6 +111,16 @@ enum AuthSwapService {
                 userInfo: [NSFilePathErrorKey: destinationPath]
             )
         }
+    }
+
+    static func clearSystemAuth(paths: CodexAccountService.PathContext) throws {
+        let systemAuthURL = URL(fileURLWithPath: paths.defaultCodexAuthPath)
+        do {
+            try FileManager.default.removeItem(at: systemAuthURL)
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileNoSuchFileError {
+            // Already absent is fine.
+        }
+        MultiCodexLog.log(.auth, level: .info, "Cleared system auth")
     }
 
     enum AuthSwapError: LocalizedError {

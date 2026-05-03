@@ -8,10 +8,14 @@ enum ManagedAccountMigrator {
             .appendingPathComponent(".managed-migration-complete")
 
         guard !FileManager.default.fileExists(atPath: markerURL.path) else { return 0 }
+        try FileManager.default.createDirectory(
+            at: URL(fileURLWithPath: paths.multicodexHome),
+            withIntermediateDirectories: true
+        )
 
         let legacyAccountsDir = paths.accountsDir
         guard FileManager.default.fileExists(atPath: legacyAccountsDir) else {
-            try? Data().write(to: markerURL)
+            try Data().write(to: markerURL)
             return 0
         }
 
@@ -34,7 +38,7 @@ enum ManagedAccountMigrator {
             migrated += 1
         }
 
-        try? Data("migrated \(migrated) accounts at \(ISO8601DateFormatter().string(from: Date()))".utf8)
+        try Data("migrated \(migrated) accounts at \(ISO8601DateFormatter().string(from: Date()))".utf8)
             .write(to: markerURL)
 
         MultiCodexLog.log(

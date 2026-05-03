@@ -77,10 +77,6 @@ extension CodexAccountService {
             previousAccountName: config.currentAccount,
             paths: paths
         )
-        Task {
-            await CodexRPCSession.shared.shutdown()
-        }
-
         config.currentAccount = account
         try saveConfig(config, paths: paths)
         _ = try updateAccountMeta(account: account, paths: paths) { meta in
@@ -109,7 +105,7 @@ extension CodexAccountService {
             if let nextAccount = config.currentAccount {
                 try applyAccountAuthToDefault(account: nextAccount, forceLock: false, paths: paths)
             } else {
-                try deleteFileIfExists(paths.defaultCodexAuthPath)
+                try AuthSwapService.clearSystemAuth(paths: paths)
             }
         }
 
@@ -158,6 +154,17 @@ extension CodexAccountService {
         }
 
         return RenameAccountPayload(from: source, to: target, currentAccount: config.currentAccount)
+    }
+
+    func persistCurrentAccountIfKnown(_ name: String) throws {
+        let account = normalizeAccountName(name)
+        let paths = currentPaths()
+        var config = try loadConfig(paths: paths)
+        guard config.accounts.contains(account) else {
+            throw CodexAccountServiceError(message: "Unknown account: \(account)")
+        }
+        config.currentAccount = account
+        try saveConfig(config, paths: paths)
     }
 
     private func renameManagedHomeIfNeeded(from source: String, to target: String, paths: PathContext) {

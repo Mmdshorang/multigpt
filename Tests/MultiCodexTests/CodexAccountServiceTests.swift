@@ -209,6 +209,7 @@ final class CodexAccountServiceTests: XCTestCase {
 
         _ = try await service.addAccount(name: "alpha")
         _ = try await service.addAccount(name: "beta")
+        try writeText("{\"tokens\":{\"access_token\":\"beta-token\"}}\n", to: service.currentPaths().accountAuthPath("beta"))
         try await service.switchAccount(name: "beta")
         _ = try await service.renameAccount(from: "beta", to: "gamma")
         _ = try await service.removeAccount(name: "alpha", deleteData: true)
@@ -234,6 +235,7 @@ final class CodexAccountServiceTests: XCTestCase {
 
         _ = try await service.addAccount(name: "alpha")
         _ = try await service.addAccount(name: "beta")
+        try writeText("{\"tokens\":{\"access_token\":\"alpha-token\"}}\n", to: service.currentPaths().accountAuthPath("alpha"))
         try await service.switchAccount(name: "alpha")
 
         let defaultAuthPath = (sandbox as NSString).appendingPathComponent(".codex/auth.json")
@@ -259,6 +261,7 @@ final class CodexAccountServiceTests: XCTestCase {
         let sandbox = try XCTUnwrap(service.sandboxHomeDirectory)
 
         _ = try await service.addAccount(name: "alpha")
+        try writeText("{\"tokens\":{\"access_token\":\"alpha-token\"}}\n", to: service.currentPaths().accountAuthPath("alpha"))
         try await service.switchAccount(name: "alpha")
 
         let defaultAuthPath = (sandbox as NSString).appendingPathComponent(".codex/auth.json")
@@ -316,6 +319,19 @@ final class CodexAccountServiceTests: XCTestCase {
         let defaultAuthPath = (sandbox as NSString).appendingPathComponent(".codex/auth.json")
         let defaultAfter = try String(contentsOfFile: defaultAuthPath, encoding: .utf8)
         XCTAssertTrue(defaultAfter.contains("managed-beta"))
+    }
+
+    func testPersistCurrentAccountIfKnownUpdatesConfig() throws {
+        let service = makeSandboxedService()
+        _ = try service.addAccountNow(name: "alpha")
+        try service.persistCurrentAccountIfKnown("alpha")
+        let config = try service.loadConfig(paths: service.currentPaths())
+        XCTAssertEqual(config.currentAccount, "alpha")
+    }
+
+    func testPersistCurrentAccountIfKnownThrowsForUnknownAccount() throws {
+        let service = makeSandboxedService()
+        XCTAssertThrowsError(try service.persistCurrentAccountIfKnown("ghost"))
     }
 
     func testFetchStatusRestoresDefaultAuthAfterCommandFailure() async throws {
