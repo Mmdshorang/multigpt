@@ -36,6 +36,8 @@ protocol CodexAccountServicing: AnyObject {
 
 extension CodexAccountService: CodexAccountServicing {}
 
+/// Crosses the async-to-blocking boundary used by the limits fetcher.
+/// Cancelling the Swift task alone cannot stop detached legacy auth work.
 final class RefreshCancellationToken: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
@@ -62,13 +64,5 @@ final class RefreshCancellationToken: @unchecked Sendable {
 extension CodexAccountServicing {
     func currentPaths() -> CodexAccountService.PathContext {
         currentPaths(loginHome: nil)
-    }
-
-    func fetchLimits(
-        refreshLive: Bool,
-        cancellationToken: RefreshCancellationToken,
-        onPartialResult: @escaping @Sendable (LimitsPayload) -> Void
-    ) async throws -> LimitsPayload {
-        try await fetchLimits(refreshLive: refreshLive)
     }
 }
