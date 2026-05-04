@@ -1046,6 +1046,41 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertTrue(service.importFromHomeCalls.isEmpty)
     }
 
+    func testReloginReopensTerminalWhenPreviousSessionIsStillWaiting() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.openLoginInTerminal(for: "alpha")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.openLoginCalls.count == 1
+                && viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion
+        }
+
+        let firstSandbox = viewModel.pendingInteractiveLoginSession?.loginSandboxHome
+        viewModel.openLoginInTerminal(for: "alpha")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.openLoginCalls.count == 2
+        }
+
+        XCTAssertEqual(service.openLoginCalls, ["alpha", "alpha"])
+        XCTAssertNotEqual(viewModel.pendingInteractiveLoginSession?.loginSandboxHome, firstSandbox)
+        if let firstSandbox {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: firstSandbox))
+        }
+    }
+
     func testStartNewAccountLoginStoresAuthWithoutAutoSwitching() async {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()

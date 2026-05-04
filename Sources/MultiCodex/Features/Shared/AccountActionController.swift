@@ -40,10 +40,23 @@ final class AccountActionController {
 
     func startLoginFlow(accountName: String, createIfNeeded: Bool) {
         let viewModel = viewModel
-        guard viewModel.loginInFlightName == nil,
-              viewModel.pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
-        else {
+        guard viewModel.loginInFlightName == nil else {
             return
+        }
+        if let pendingSession = viewModel.pendingInteractiveLoginSession,
+           pendingSession.phase == .waitingForExternalCompletion
+        {
+            guard pendingSession.accountName == accountName,
+                  pendingSession.createIfNeeded == createIfNeeded
+            else {
+                setAccountFeedback(
+                    message: nil,
+                    error: "Finish login for \(pendingSession.accountName) before starting another login."
+                )
+                return
+            }
+            removeLoginSandboxIfPossible(pendingSession.loginSandboxHome)
+            viewModel.pendingInteractiveLoginSession = nil
         }
 
         Task {
