@@ -93,6 +93,45 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.refreshWarningMessage, "Detected external login for beta. Auto-switching is off.")
     }
 
+    func testRefreshWarningCompressesVerboseFallbackErrors() {
+        let service = MockCodexAccountService()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+
+        let warning = viewModel.refreshController.formatRefreshWarning(
+            from: [
+                LimitsErrorEntry(
+                    account: "account-0fffff",
+                    message: "Managed API failed: Usage request failed: The request timed out.; serial fallback failed: API failed (Usage request failed: A TLS error caused the secure connection to fail.); RPC fallback failed (Codex RPC error: failed to fetch codex rate limits: error sending request for url (https://chatgpt.com/backend-api/wham/usage))"
+                ),
+            ]
+        )
+
+        XCTAssertEqual(warning, "Some accounts could not refresh usage. account-0fffff: Timed out")
+    }
+
+    func testRefreshWarningShowsCountForHiddenErrors() {
+        let service = MockCodexAccountService()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+
+        let warning = viewModel.refreshController.formatRefreshWarning(
+            from: [
+                LimitsErrorEntry(account: "alpha", message: "Managed refresh timed out."),
+                LimitsErrorEntry(account: "beta", message: "API failed (Usage request failed: A TLS error caused the secure connection to fail.)"),
+                LimitsErrorEntry(account: "gamma", message: "Codex RPC error: upstream unavailable"),
+            ]
+        )
+
+        XCTAssertEqual(warning, "Some accounts could not refresh usage. alpha: Timed out | beta: Secure connection failed (+1 more)")
+    }
+
     func testSelectSettingsSectionPersistsSelection() {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()

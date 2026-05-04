@@ -252,14 +252,49 @@ final class AccountsRefreshController {
     }
 
     func formatRefreshWarning(from errors: [LimitsErrorEntry]) -> String {
-        let previews = errors.prefix(2).map { "\($0.account): \($0.message)" }
+        let previews = errors.prefix(2).map { "\($0.account): \(summarizeLimitsErrorMessage($0.message))" }
         let suffix: String
         if errors.count > previews.count {
             suffix = " (+\(errors.count - previews.count) more)"
         } else {
             suffix = ""
         }
-        return "Some accounts could not refresh. " + previews.joined(separator: " | ") + suffix
+        return "Some accounts could not refresh usage. " + previews.joined(separator: " | ") + suffix
+    }
+
+    private func summarizeLimitsErrorMessage(_ message: String) -> String {
+        let lowered = message.lowercased()
+
+        if lowered.contains("timed out") || lowered.contains("timeout") || lowered.contains("refresh timed out") {
+            return "Timed out"
+        }
+        if lowered.contains("tls error") || lowered.contains("secure connection") {
+            return "Secure connection failed"
+        }
+        if lowered.contains("http 401") || lowered.contains("unauthorized") || lowered.contains("needs login") {
+            return "Sign-in required"
+        }
+        if lowered.contains("http 429") || lowered.contains("rate limit") {
+            return "Rate-limited"
+        }
+        if lowered.contains("http 5") || lowered.contains("internal server error") || lowered.contains("service unavailable") {
+            return "Service unavailable"
+        }
+        if lowered.contains("could not run") || lowered.contains("no such file") || lowered.contains("not found") {
+            return "Runtime unavailable"
+        }
+        if lowered.contains("rpc fallback failed") || lowered.contains("rpc error") {
+            return "Usage API failed"
+        }
+        if lowered.contains("api failed") || lowered.contains("usage request failed") {
+            return "Usage request failed"
+        }
+
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return "Unknown error"
+        }
+        return String(trimmed.prefix(80))
     }
 
     private func applyMergedAccounts(
