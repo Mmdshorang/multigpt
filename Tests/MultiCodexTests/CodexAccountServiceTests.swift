@@ -361,6 +361,61 @@ final class CodexAccountServiceTests: XCTestCase {
         XCTAssertTrue(defaultAfter.contains("default"))
     }
 
+    func testWithAccountAuthRejectsSnapshotWhenRuntimeAuthIdentityChanges() throws {
+        let service = makeSandboxedService()
+        let paths = service.currentPaths()
+
+        try writeText("{\"tokens\":{\"account_id\":\"alpha\",\"access_token\":\"alpha-old\"}}\n", to: paths.accountAuthPath("alpha"))
+        try writeText("{\"tokens\":{\"account_id\":\"previous\",\"access_token\":\"previous\"}}\n", to: paths.defaultCodexAuthPath)
+
+        XCTAssertThrowsError(
+            try service.withAccountAuth(account: "alpha", forceLock: false, restorePreviousAuth: true, paths: paths) {
+                try self.writeText("{\"tokens\":{\"account_id\":\"beta\",\"access_token\":\"beta\"}}\n", to: paths.defaultCodexAuthPath)
+            }
+        ) { error in
+            guard case AuthSwapService.AuthSwapError.externalAuthDetected(let previousAccount, let previousIdentity, let systemIdentity) = error else {
+                return XCTFail("Expected externalAuthDetected, got \(error)")
+            }
+            XCTAssertEqual(previousAccount, "alpha")
+            XCTAssertEqual(previousIdentity?.accountId, "alpha")
+            XCTAssertEqual(systemIdentity?.accountId, "beta")
+        }
+
+        let accountAfter = try String(contentsOfFile: paths.accountAuthPath("alpha"), encoding: .utf8)
+        XCTAssertTrue(accountAfter.contains("alpha-old"))
+        XCTAssertFalse(accountAfter.contains("beta"))
+
+        let defaultAfter = try String(contentsOfFile: paths.defaultCodexAuthPath, encoding: .utf8)
+        XCTAssertTrue(defaultAfter.contains("previous"))
+    }
+
+    func testWithAccountAuthRejectsSnapshotWhenRuntimeAuthDisappears() throws {
+        let service = makeSandboxedService()
+        let paths = service.currentPaths()
+
+        try writeText("{\"tokens\":{\"account_id\":\"alpha\",\"access_token\":\"alpha-old\"}}\n", to: paths.accountAuthPath("alpha"))
+        try writeText("{\"tokens\":{\"account_id\":\"previous\",\"access_token\":\"previous\"}}\n", to: paths.defaultCodexAuthPath)
+
+        XCTAssertThrowsError(
+            try service.withAccountAuth(account: "alpha", forceLock: false, restorePreviousAuth: true, paths: paths) {
+                try FileManager.default.removeItem(atPath: paths.defaultCodexAuthPath)
+            }
+        ) { error in
+            guard case AuthSwapService.AuthSwapError.externalAuthDetected(let previousAccount, let previousIdentity, let systemIdentity) = error else {
+                return XCTFail("Expected externalAuthDetected, got \(error)")
+            }
+            XCTAssertEqual(previousAccount, "alpha")
+            XCTAssertEqual(previousIdentity?.accountId, "alpha")
+            XCTAssertNil(systemIdentity)
+        }
+
+        let accountAfter = try String(contentsOfFile: paths.accountAuthPath("alpha"), encoding: .utf8)
+        XCTAssertTrue(accountAfter.contains("alpha-old"))
+
+        let defaultAfter = try String(contentsOfFile: paths.defaultCodexAuthPath, encoding: .utf8)
+        XCTAssertTrue(defaultAfter.contains("previous"))
+    }
+
     func testBaseEnvironmentMergesLoginShellPathAheadOfGuiPath() {
         let service = CodexAccountService()
         configureEnvironment(

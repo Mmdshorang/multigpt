@@ -182,12 +182,18 @@ extension CodexAccountService {
         let previousAuth = restorePreviousAuth ? readFileIfExists(defaultAuthPath) : nil
 
         try setDefaultAuthFromAccount(account: account, paths: paths)
+        let expectedAccountAuth = readFileIfExists(defaultAuthPath)
         let restoreDefaultAuth = {
             try self.restoreDefaultAuth(previousAuth, defaultAuthPath: defaultAuthPath)
         }
 
         do {
             let result = try body()
+            try verifyDefaultAuthMatchesAccount(
+                account: account,
+                expectedAccountAuth: expectedAccountAuth,
+                currentDefaultAuth: readFileIfExists(defaultAuthPath)
+            )
             try snapshotDefaultAuthToAccount(account: account, paths: paths)
             if restorePreviousAuth {
                 try restoreDefaultAuth()
@@ -199,6 +205,54 @@ extension CodexAccountService {
             }
             throw error
         }
+    }
+
+    private func verifyDefaultAuthMatchesAccount(
+        account: String,
+        expectedAccountAuth: Data?,
+        currentDefaultAuth: Data?
+    ) throws {
+        guard let expectedAccountAuth else {
+            return
+        }
+        guard let currentDefaultAuth else {
+            throw AuthSwapService.AuthSwapError.externalAuthDetected(
+                previousAccount: account,
+                previousIdentity: resolveAuthIdentity(from: expectedAccountAuth),
+                systemIdentity: nil
+            )
+        }
+        if authIdentityMatches(currentDefaultAuth, expectedAccountAuth) {
+            return
+        }
+        throw AuthSwapService.AuthSwapError.externalAuthDetected(
+            previousAccount: account,
+            previousIdentity: resolveAuthIdentity(from: expectedAccountAuth),
+            systemIdentity: resolveAuthIdentity(from: currentDefaultAuth)
+        )
+    }
+
+    private func authIdentityMatches(_ lhs: Data, _ rhs: Data) -> Bool {
+        let leftIdentity = resolveAccountIdentity(from: lhs)
+        let rightIdentity = resolveAccountIdentity(from: rhs)
+        if AccountIdentityMatcher.matches(leftIdentity, rightIdentity) {
+            return true
+        }
+        return lhs == rhs
+    }
+
+    private func resolveAccountIdentity(from data: Data) -> AccountIdentity {
+        guard let resolved = resolveAuthIdentity(from: data) else {
+            return .unresolved
+        }
+        return AccountIdentityResolver.resolve(accountId: resolved.accountId, email: resolved.email)
+    }
+
+    private func resolveAuthIdentity(from data: Data) -> ResolvedAccountIdentity? {
+        guard let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return resolveFromAuthPayload(payload)
     }
 
     func applyAccountAuthToDefault(account: String, forceLock: Bool, paths: PathContext) throws {
