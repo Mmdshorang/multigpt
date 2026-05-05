@@ -118,7 +118,7 @@ enum AccountExportService {
         let existingConfig = try accountService.loadConfig(paths: paths)
         var imported = 0
         var skipped = 0
-        var failed = 0
+        let failed = 0
         var conflicts: [String] = []
 
         for account in payload.accounts {

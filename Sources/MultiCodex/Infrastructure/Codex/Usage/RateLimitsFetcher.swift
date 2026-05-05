@@ -169,6 +169,11 @@ extension CodexAccountService {
         return LimitsPayload(results: results, errors: errors)
     }
 
+    /// Box to allow mutation of a captured Bool inside @Sendable closures.
+    private final class TimedOutBox {
+        var timedOut = false
+    }
+
     /// Parallel fetch ONLY for accounts with managed homes.
     /// These accounts read auth from their isolated directory — no global auth swap needed.
     private func fetchManagedLimitsParallel(accounts: [String], paths: PathContext) -> (results: [LimitsResult], errors: [LimitsErrorEntry]) {
@@ -178,14 +183,14 @@ extension CodexAccountService {
         let group = DispatchGroup()
         let lock = NSLock()
         var completed = Set<String>()
-        var timedOut = false
+        let timedOutBox = TimedOutBox()
 
         for account in accounts {
             group.enter()
-            DispatchQueue.global(qos: .userInitiated).async {
+            DispatchQueue.global(qos: .userInitiated).async { [timedOutBox] in
                 let (result, error) = self.fetchManagedAccountLimits(account, paths: paths)
                 lock.lock()
-                guard !timedOut else {
+                guard !timedOutBox.timedOut else {
                     lock.unlock()
                     group.leave()
                     return
@@ -201,7 +206,7 @@ extension CodexAccountService {
         let waitResult = group.wait(timeout: .now() + 60)
         if waitResult == .timedOut {
             lock.lock()
-            timedOut = true
+            timedOutBox.timedOut = true
             let missing = accounts.filter { !completed.contains($0) }
             for account in missing {
                 errors.append(LimitsErrorEntry(account: account, message: "Managed refresh timed out."))

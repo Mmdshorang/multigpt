@@ -167,7 +167,7 @@ actor CodexRPCSession {
         nextID += 1
         let timeoutTask = Task {
             try await Task.sleep(nanoseconds: requestTimeoutNanoseconds)
-            await handleRequestTimeout(id: id, method: method)
+            handleRequestTimeout(id: id, method: method)
         }
         let response: [String: Any] = try await withCheckedThrowingContinuation { continuation in
             pendingRequests[id] = continuation
