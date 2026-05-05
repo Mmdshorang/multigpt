@@ -86,6 +86,32 @@ extension CodexAccountService {
         return SwitchAccountPayload(currentAccount: account)
     }
 
+    func forceSwitchAccountNow(name: String) throws -> SwitchAccountPayload {
+        let account = normalizeAccountName(name)
+        let paths = currentPaths()
+        var config = try loadConfig(paths: paths)
+
+        guard config.accounts.contains(account) else {
+            throw CodexAccountServiceError(message: "Unknown account: \(account)")
+        }
+
+        let lock = try acquireAuthLock(account: account, force: true, paths: paths)
+        defer { lock.release() }
+        try AuthSwapService.switchToAccount(
+            named: account,
+            previousAccountName: config.currentAccount,
+            paths: paths,
+            force: true
+        )
+        config.currentAccount = account
+        try saveConfig(config, paths: paths)
+        _ = try updateAccountMeta(account: account, paths: paths) { meta in
+            meta.lastUsedAt = Self.nowISO()
+        }
+
+        return SwitchAccountPayload(currentAccount: account)
+    }
+
     func removeAccountNow(name: String, deleteData: Bool) throws -> RemoveAccountPayload {
         let account = normalizeAccountName(name)
         let paths = currentPaths()

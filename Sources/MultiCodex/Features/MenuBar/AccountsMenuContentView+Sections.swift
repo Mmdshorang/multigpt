@@ -150,10 +150,12 @@ extension AccountsMenuContentView {
     func alertBanner(_ alert: MenuAlertState) -> some View {
         AlertActionCard(
             alert: alert,
-            isDisabled: isActionBusy
-        ) {
-            performAlertAction(alert)
-        }
+            isDisabled: isActionBusy,
+            action: { performAlertAction(alert) },
+            secondaryAction: alert.secondaryAction.map { action in
+                { performAlertAction(MenuAlertState(severity: alert.severity, title: alert.title, message: alert.message, actionTitle: alert.secondaryActionTitle ?? "", action: action)) }
+            }
+        )
     }
 }
 

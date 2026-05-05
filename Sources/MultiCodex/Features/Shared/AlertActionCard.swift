@@ -9,6 +9,7 @@ struct AlertActionCard: View {
     var fillOpacity: Double = 0.08
     var borderOpacity: Double = 0.22
     let action: () -> Void
+    let secondaryAction: (() -> Void)?
 
     private var tone: Color {
         AccountPresentation.alertColor(for: alert.severity)
@@ -29,6 +30,28 @@ struct AlertActionCard: View {
 
     private var actionRole: ActionPillRole {
         alert.severity == .refreshError ? .primary : .secondary
+    }
+
+    init(
+        alert: MenuAlertState,
+        isDisabled: Bool = false,
+        horizontalPadding: CGFloat = DashboardTokens.Spacing.cardPadding,
+        verticalPadding: CGFloat = 10,
+        cornerRadius: CGFloat = DashboardTokens.Spacing.cardRadius,
+        fillOpacity: Double = 0.08,
+        borderOpacity: Double = 0.22,
+        action: @escaping () -> Void,
+        secondaryAction: (() -> Void)? = nil
+    ) {
+        self.alert = alert
+        self.isDisabled = isDisabled
+        self.horizontalPadding = horizontalPadding
+        self.verticalPadding = verticalPadding
+        self.cornerRadius = cornerRadius
+        self.fillOpacity = fillOpacity
+        self.borderOpacity = borderOpacity
+        self.action = action
+        self.secondaryAction = secondaryAction
     }
 
     var body: some View {
@@ -61,13 +84,24 @@ struct AlertActionCard: View {
 
             Spacer(minLength: 8)
 
-            ActionPillButton(
-                title: alert.actionTitle,
-                symbol: "arrow.right.circle.fill",
-                role: actionRole,
-                isDisabled: isDisabled,
-                action: action
-            )
+            HStack(spacing: 6) {
+                if let secondaryAction, let title = alert.secondaryActionTitle {
+                    ActionPillButton(
+                        title: title,
+                        symbol: "exclamationmark.triangle.fill",
+                        role: .secondary,
+                        isDisabled: isDisabled,
+                        action: secondaryAction
+                    )
+                }
+                ActionPillButton(
+                    title: alert.actionTitle,
+                    symbol: "arrow.right.circle.fill",
+                    role: actionRole,
+                    isDisabled: isDisabled,
+                    action: action
+                )
+            }
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)

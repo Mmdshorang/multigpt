@@ -12,16 +12,52 @@ final class AccountManagementController {
     func switchToAccount(named name: String) {
         let viewModel = viewModel
         viewModel.cancelActiveRefreshForUserSwitch()
+        viewModel.pendingForceSwitchTarget = nil
+
+        viewModel.runSwitchAction(named: name) {
+            do {
+                try await viewModel.runAuthMutation(named: name) {
+                    try await viewModel.accountService.switchAccount(name: name)
+                }
+                viewModel.lastRefreshError = nil
+                viewModel.applyCurrentAccountLocally(named: name)
+                viewModel.focusedAccountName = name
+                viewModel.settingsController.syncSelectedSettingsAccount()
+                viewModel.accountActions.setAccountFeedback(message: "Now using \(name).", error: nil)
+                viewModel.refreshController.triggerRefresh(refreshLive: false, allowAutoSwitch: false)
+            } catch let error as AuthSwapService.AuthSwapError {
+                switch error {
+                case .externalAuthDetected(_, _, let systemIdentity):
+                    let email = systemIdentity?.email ?? "unknown"
+                    viewModel.externalAuthImportCandidate = ExternalAuthImportCandidate(
+                        accountName: email,
+                        email: email
+                    )
+                    viewModel.pendingForceSwitchTarget = name
+                    viewModel.accountActions.setAccountFeedback(
+                        message: nil,
+                        error: "Switch blocked: external auth detected (\(email)). Import it or force-switch."
+                    )
+                default:
+                    throw error
+                }
+            }
+        }
+    }
+
+    func forceSwitchToAccount(named name: String) {
+        let viewModel = viewModel
+        viewModel.pendingForceSwitchTarget = nil
 
         viewModel.runSwitchAction(named: name) {
             try await viewModel.runAuthMutation(named: name) {
-                try await viewModel.accountService.switchAccount(name: name)
+                try await viewModel.accountService.forceSwitchAccount(name: name)
             }
             viewModel.lastRefreshError = nil
             viewModel.applyCurrentAccountLocally(named: name)
             viewModel.focusedAccountName = name
             viewModel.settingsController.syncSelectedSettingsAccount()
-            viewModel.accountActions.setAccountFeedback(message: "Now using \(name).", error: nil)
+            viewModel.accountActions.setAccountFeedback(message: "Force-switched to \(name).", error: nil)
             viewModel.refreshController.triggerRefresh(refreshLive: false, allowAutoSwitch: false)
         }
     }
@@ -105,6 +141,7 @@ final class AccountManagementController {
             _ = try await self.viewModel.accountService.addAccount(name: accountName)
             _ = try await self.viewModel.accountService.importDefaultAuth(into: accountName)
             self.viewModel.externalAuthImportCandidate = nil
+            self.viewModel.pendingForceSwitchTarget = nil
             self.viewModel.refreshWarningMessage = nil
             self.viewModel.upsertAuthenticatedAccountLocally(named: accountName)
             return AccountActionOutcome.success("Imported external login as \(accountName).")

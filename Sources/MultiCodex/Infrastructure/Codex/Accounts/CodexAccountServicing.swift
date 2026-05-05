@@ -14,6 +14,7 @@ protocol CodexAccountServicing: AnyObject {
     ) async throws -> LimitsPayload
     func fetchCachedLimits() async throws -> LimitsPayload
     func switchAccount(name: String) async throws
+    func forceSwitchAccount(name: String) async throws
     func addAccount(name: String) async throws -> AddAccountPayload
     func removeAccount(name: String, deleteData: Bool) async throws -> RemoveAccountPayload
     func renameAccount(from oldName: String, to newName: String) async throws -> RenameAccountPayload

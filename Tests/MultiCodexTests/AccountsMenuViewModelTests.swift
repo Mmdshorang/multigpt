@@ -2265,6 +2265,24 @@ private final class MockCodexAccountService: CodexAccountServicing {
         }
     }
 
+    private(set) var forceSwitchCalls: [String] = []
+
+    func forceSwitchAccount(name: String) async throws {
+        if let switchError {
+            throw switchError
+        }
+        forceSwitchCalls.append(name)
+        stubbedAccounts = stubbedAccounts.map { account in
+            AccountEntry(
+                name: account.name,
+                isCurrent: account.name == name,
+                hasAuth: account.hasAuth,
+                lastUsedAt: account.lastUsedAt,
+                lastLoginStatus: account.lastLoginStatus
+            )
+        }
+    }
+
     func addAccount(name: String) async throws -> AddAccountPayload {
         addCalls.append(name)
         if !stubbedAccounts.contains(where: { $0.name == name }) {

@@ -163,6 +163,7 @@ struct MenuAlertState {
         case refreshLive
         case relogin(accountName: String)
         case importExternalAuth
+        case forceSwitch(accountName: String)
     }
 
     let severity: Severity
@@ -170,6 +171,26 @@ struct MenuAlertState {
     let message: String
     let actionTitle: String
     let action: Action
+    let secondaryActionTitle: String?
+    let secondaryAction: Action?
+
+    init(
+        severity: Severity,
+        title: String,
+        message: String,
+        actionTitle: String,
+        action: Action,
+        secondaryActionTitle: String? = nil,
+        secondaryAction: Action? = nil
+    ) {
+        self.severity = severity
+        self.title = title
+        self.message = message
+        self.actionTitle = actionTitle
+        self.action = action
+        self.secondaryActionTitle = secondaryActionTitle
+        self.secondaryAction = secondaryAction
+    }
 }
 
 struct ExternalAuthImportCandidate: Equatable {

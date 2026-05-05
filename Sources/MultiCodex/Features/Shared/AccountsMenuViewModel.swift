@@ -16,6 +16,7 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var accountActionMessage: String?
     @Published var accountActionError: String?
     @Published var externalAuthImportCandidate: ExternalAuthImportCandidate?
+    @Published var pendingForceSwitchTarget: String?
     @Published var runtimeProbeSummary: String?
     @Published var isCodexRuntimeAvailable = false
     @Published var focusedAccountName: String?
@@ -231,6 +232,19 @@ final class AccountsMenuViewModel: ObservableObject {
         if policyAlert?.severity == .runtimeUnavailable || policyAlert?.severity == .refreshError {
             return policyAlert
         }
+        if let pendingForceSwitchTarget {
+            let email = externalAuthImportCandidate?.email ?? "unknown"
+            return MenuAlertState(
+                severity: .externalAuth,
+                title: "Switch blocked",
+                message: "External auth detected (\(email)). Import it or force-switch to \(pendingForceSwitchTarget).",
+                actionTitle: "Import Account",
+                action: .importExternalAuth,
+                secondaryActionTitle: "Force Switch",
+                secondaryAction: .forceSwitch(accountName: pendingForceSwitchTarget)
+            )
+        }
+
         if let externalAuthImportCandidate {
             return MenuAlertState(
                 severity: .externalAuth,
@@ -328,6 +342,8 @@ final class AccountsMenuViewModel: ObservableObject {
             openLoginInTerminal(for: accountName)
         case .importExternalAuth:
             importExternalAuthCandidate()
+        case let .forceSwitch(accountName):
+            forceSwitchToAccount(named: accountName)
         }
     }
 
@@ -474,6 +490,7 @@ final class AccountsMenuViewModel: ObservableObject {
     func chooseCustomCodexPath() { settingsController.chooseCustomCodexPath() }
 
     func switchToAccount(named name: String) { accountManagement.switchToAccount(named: name) }
+    func forceSwitchToAccount(named name: String) { accountManagement.forceSwitchToAccount(named: name) }
 
     func startNewAccountLogin() { accountManagement.startNewAccountLogin() }
 

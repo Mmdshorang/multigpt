@@ -196,6 +196,11 @@ final class CodexAccountService {
         await CodexRPCSession.shared.shutdown()
     }
 
+    func forceSwitchAccount(name: String) async throws {
+        _ = try forceSwitchAccountNow(name: name)
+        await CodexRPCSession.shared.shutdown()
+    }
+
     func addAccount(name: String) async throws -> AddAccountPayload {
         try addAccountNow(name: name)
     }

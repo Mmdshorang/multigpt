@@ -357,6 +357,7 @@ final class AccountsRefreshController {
 
         if result.isInSync {
             viewModel.externalAuthImportCandidate = nil
+            viewModel.pendingForceSwitchTarget = nil
             if viewModel.refreshWarningMessage?.hasPrefix("Detected external login") == true {
                 viewModel.refreshWarningMessage = nil
             }
@@ -386,6 +387,7 @@ final class AccountsRefreshController {
             }
 
             viewModel.externalAuthImportCandidate = nil
+            viewModel.pendingForceSwitchTarget = nil
             if viewModel.accountSwitchingStrategy == .manual {
                 if result.systemAuthChangedExternally, let detectedName = result.detectedAccountName {
                     viewModel.refreshWarningMessage = "Detected external login for \(detectedName). Auto-switching is off."
