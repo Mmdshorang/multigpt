@@ -182,8 +182,6 @@ extension AccountsMenuContentView {
                         resetText: current.usage.weekly.resetText(mode: viewModel.resetDisplayMode)
                     )
                 }
-
-                currentAccountCard(current)
             }
         }
     }
@@ -226,39 +224,6 @@ extension AccountsMenuContentView {
         .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
     }
 
-    private func currentAccountCard(_ account: AccountUsage) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AccountPresentation.statusColor(for: account.connectionState).opacity(0.14))
-                    .frame(width: 28, height: 28)
-                    .overlay(
-                        Image(systemName: account.connectionState == .connected ? "person.crop.circle.fill" : "person.crop.circle.badge.exclamationmark")
-                            .font(DashboardTokens.Font.bodySemibold())
-                            .foregroundStyle(AccountPresentation.statusColor(for: account.connectionState))
-                    )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(account.name)
-                            .font(DashboardTokens.Font.accountName())
-                            .foregroundStyle(DashboardTokens.textPrimary)
-                            .lineLimit(1)
-                    }
-
-                    if let email = account.workspaceEmailHint {
-                        Text(email)
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer()
-            }
-        }
-        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
-    }
 }
 
 // MARK: - Runtime Status Panel
@@ -316,28 +281,66 @@ extension AccountsMenuContentView {
                 .help(areAllAccountsExpanded ? "Collapse all" : "Expand all")
             }
 
+            healthSummaryRow
+
             sortOptionsRow
 
-            VStack(spacing: 5) {
-                ForEach(visibleRows) { row in
-                    DashboardAccountRow(
-                        row: row,
-                        isExpanded: expandedAccountNames.contains(row.name),
-                        fiveHourProgressValue: viewModel.progressValue(for: row.account.usage.fiveHour),
-                        weeklyProgressValue: viewModel.progressValue(for: row.account.usage.weekly),
-                        fiveHourPercentText: viewModel.displayPercentText(for: row.account.usage.fiveHour),
-                        weeklyPercentText: viewModel.displayPercentText(for: row.account.usage.weekly),
-                        isBusy: isActionBusy,
-                        isSwitching: viewModel.switchingAccountName == row.name,
-                        isAuthRunning: viewModel.accountActionInFlightName == row.name,
-                        onActivate: { performPrimaryAction(for: row) },
-                        onRowTap: { toggleExpanded(row.name) },
-                        onToggleExpanded: { toggleExpanded(row.name) }
-                    )
+            if shouldScrollAccountsList {
+                ScrollView(.vertical, showsIndicators: false) {
+                    accountsRowsList
                 }
+                .frame(height: accountsListScrollHeight)
+                .animation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion), value: accountsListScrollHeight)
+            } else {
+                accountsRowsList
             }
         }
         .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
+    }
+
+    private var accountsRowsList: some View {
+        VStack(spacing: 5) {
+            ForEach(visibleRows) { row in
+                DashboardAccountRow(
+                    row: row,
+                    isExpanded: expandedAccountNames.contains(row.name),
+                    fiveHourProgressValue: viewModel.progressValue(for: row.account.usage.fiveHour),
+                    weeklyProgressValue: viewModel.progressValue(for: row.account.usage.weekly),
+                    fiveHourPercentText: viewModel.displayPercentText(for: row.account.usage.fiveHour),
+                    weeklyPercentText: viewModel.displayPercentText(for: row.account.usage.weekly),
+                    isBusy: isActionBusy,
+                    isSwitching: viewModel.switchingAccountName == row.name,
+                    isAuthRunning: viewModel.accountActionInFlightName == row.name,
+                    onActivate: { performPrimaryAction(for: row) },
+                    onRowTap: { toggleAccountDisclosure(row.name) },
+                    onToggleExpanded: { toggleAccountDisclosure(row.name) }
+                )
+            }
+        }
+    }
+
+    private var accountsListMaxHeight: CGFloat {
+        let screenHeight = NSScreen.main?.visibleFrame.height ?? 820
+        return min(680, max(480, screenHeight - 180))
+    }
+
+    private var accountsListScrollHeight: CGFloat {
+        min(accountsListMaxHeight, max(320, estimatedAccountsListHeight))
+    }
+
+    private var shouldScrollAccountsList: Bool {
+        estimatedAccountsListHeight > accountsListMaxHeight
+    }
+
+    private var estimatedAccountsListHeight: CGFloat {
+        let rows = visibleRows
+        guard !rows.isEmpty else { return 0 }
+
+        let rowHeights = rows.reduce(CGFloat(0)) { total, row in
+            total + (expandedAccountNames.contains(row.name) ? 118 : 58)
+        }
+        let gaps = CGFloat(max(0, rows.count - 1)) * 5
+        return rowHeights + gaps
     }
 }
 
@@ -529,6 +532,38 @@ extension AccountsMenuContentView {
         }
         return "\(allRows.count) accounts"
     }
+
+    private var healthSummaryRow: some View {
+        let health = AccountsHealthSummary.from(viewModel.accounts)
+        guard viewModel.accounts.count > 1 else { return AnyView(EmptyView()) }
+        return AnyView(
+            HStack(spacing: 8) {
+                Text(health.summaryText)
+                    .font(DashboardTokens.Font.caption())
+                    .foregroundStyle(DashboardTokens.textSecondary)
+
+                if health.atRiskAccounts > 0 {
+                    Text("\(health.atRiskAccounts) at risk")
+                        .font(DashboardTokens.Font.caption())
+                        .foregroundStyle(DashboardTokens.statusOrange)
+                }
+
+                Spacer()
+
+                if let nextReset = health.nextResetAt {
+                    Text("Next reset: \(UsageFormatter.resetText(for: nextReset, mode: .relative))")
+                        .font(DashboardTokens.Font.caption())
+                        .foregroundStyle(DashboardTokens.textTertiary)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(DashboardTokens.cardBackgroundSubtle)
+            )
+        )
+    }
 }
 
 // MARK: - Actions
@@ -547,15 +582,13 @@ extension AccountsMenuContentView {
     func performPrimaryAction(for row: AccountRowState) {
         switch row.primaryAction {
         case .switchAccount:
-            guard !isActionBusy else { return }
+            guard !isSwitchBusy else { return }
             viewModel.switchToAccount(named: row.name)
         case .relogin:
-            guard !isActionBusy else { return }
+            guard !isLoginBusy else { return }
             viewModel.openLoginInTerminal(for: row.name)
         case .none:
-            withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
-                toggleExpanded(row.name)
-            }
+            toggleExpanded(row.name)
         }
     }
 
@@ -570,7 +603,7 @@ extension AccountsMenuContentView {
     }
 
     func toastView(text: String, color: Color) -> some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             Circle()
                 .fill(color)
                 .frame(width: 6, height: 6)
@@ -579,6 +612,17 @@ extension AccountsMenuContentView {
                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(DashboardTokens.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if viewModel.canAbortPendingLogin {
+                ActionPillButton(
+                    title: "Abort Login",
+                    symbol: "xmark.circle",
+                    layout: .iconOnly
+                ) {
+                    viewModel.abortPendingLogin()
+                }
+                .help("Abort pending login")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -592,8 +636,16 @@ extension AccountsMenuContentView {
         )
     }
 
+    var isSwitchBusy: Bool {
+        !viewModel.canStartSwitchAction
+    }
+
+    var isLoginBusy: Bool {
+        !viewModel.canStartLoginAction
+    }
+
     var isActionBusy: Bool {
-        viewModel.isRefreshing || viewModel.accountActionInFlightName != nil || viewModel.switchingAccountName != nil
+        !viewModel.canStartMaintenanceAccountAction
     }
 
     var runtimeStatus: RuntimeStatusPresentation {
@@ -647,6 +699,10 @@ extension AccountsMenuContentView {
         }
     }
 
+    func toggleAccountDisclosure(_ accountName: String) {
+        toggleExpanded(accountName)
+    }
+
     var areAllAccountsExpanded: Bool {
         let visibleNames = Set(visibleRows.map(\.name))
         guard !visibleNames.isEmpty else { return false }
@@ -655,7 +711,7 @@ extension AccountsMenuContentView {
 
     func toggleAllAccountsExpanded() {
         let visibleNames = Set(visibleRows.map(\.name))
-        withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
+        withAnimation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion)) {
             if areAllAccountsExpanded {
                 expandedAccountNames.subtract(visibleNames)
             } else {

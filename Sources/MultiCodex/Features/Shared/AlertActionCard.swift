@@ -22,6 +22,8 @@ struct AlertActionCard: View {
             return "Error"
         case .authRequired:
             return "Account"
+        case .externalAuth:
+            return "Import"
         }
     }
 

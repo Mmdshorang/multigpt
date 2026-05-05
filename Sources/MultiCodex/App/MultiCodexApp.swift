@@ -13,13 +13,16 @@ struct MultiCodexApp: App {
                     idealWidth: 400
                 )
         } label: {
-            MenuBarStatusLabelView(
-                title: viewModel.menuBarTitle,
-                symbolName: viewModel.menuBarSymbol,
-                fiveHourFraction: viewModel.currentFiveHourFraction,
-                weeklyFraction: viewModel.currentWeeklyFraction,
-                hasError: viewModel.lastRefreshError != nil || viewModel.refreshWarningMessage != nil
-            )
+            let current = viewModel.accounts.first(where: { $0.isCurrent })
+            let isStale = current?.connectionState != .connected
+
+            Image(nsImage: MenuBarIconRenderer.render(
+                fiveHourProgress: current.map { viewModel.progressValue(for: $0.usage.fiveHour) } ?? 0,
+                weeklyProgress: current.map { viewModel.progressValue(for: $0.usage.weekly) } ?? 0,
+                fiveHourUsedPercent: current?.usage.fiveHour.usedPercent,
+                weeklyUsedPercent: current?.usage.weekly.usedPercent,
+                isStale: isStale
+            ))
         }
         .menuBarExtraStyle(.window)
 

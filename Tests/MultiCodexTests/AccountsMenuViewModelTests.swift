@@ -53,6 +53,197 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertTrue(persisted.autoSwitchNotificationsEnabled)
     }
 
+    func testManualStrategyDoesNotReconcileExternalAuthIntoCurrentAccount() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MultiCodexTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let codexHome = tempRoot.appendingPathComponent(".codex", isDirectory: true)
+        try FileManager.default.createDirectory(at: codexHome, withIntermediateDirectories: true)
+        try Data(#"{"email":"beta@example.com"}"#.utf8)
+            .write(to: codexHome.appendingPathComponent("auth.json"))
+
+        let service = MockCodexAccountService()
+        service.pathContext = CodexAccountService.PathContext(
+            homeDir: tempRoot.path,
+            multicodexHome: tempRoot.appendingPathComponent("multicodex", isDirectory: true).path
+        )
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
+        ]
+        service.stubbedResolvedIdentityByAccount = [
+            "alpha": ResolvedAccountIdentity(email: "alpha@example.com", plan: nil, accountId: nil, authMethod: .oauth),
+            "beta": ResolvedAccountIdentity(email: "beta@example.com", plan: nil, accountId: nil, authMethod: .oauth),
+        ]
+        // Mark the known account auth as older than the system auth so external modification is detected.
+        service.stubbedStoredAuthModifiedDate = Date().addingTimeInterval(-120)
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+
+        await viewModel.refreshController.performRefresh(refreshLive: false)
+
+        XCTAssertEqual(viewModel.accountSwitchingStrategy, .manual)
+        XCTAssertEqual(viewModel.currentAccount?.name, "alpha")
+        XCTAssertTrue(service.persistedCurrentAccountNames.isEmpty)
+        XCTAssertEqual(viewModel.refreshWarningMessage, "Detected external login for beta. Auto-switching is off.")
+    }
+
+    func testUnknownExternalAuthShowsImportAlertWithoutAutoSwitching() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MultiCodexTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let codexHome = tempRoot.appendingPathComponent(".codex", isDirectory: true)
+        try FileManager.default.createDirectory(at: codexHome, withIntermediateDirectories: true)
+        try Data(#"{"email":"new@example.com"}"#.utf8)
+            .write(to: codexHome.appendingPathComponent("auth.json"))
+
+        let service = MockCodexAccountService()
+        service.pathContext = CodexAccountService.PathContext(
+            homeDir: tempRoot.path,
+            multicodexHome: tempRoot.appendingPathComponent("multicodex", isDirectory: true).path
+        )
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.stubbedResolvedIdentityByAccount = [
+            "alpha": ResolvedAccountIdentity(email: "alpha@example.com", plan: nil, accountId: nil, authMethod: .oauth),
+        ]
+        service.stubbedStoredAuthModifiedDate = Date().addingTimeInterval(-120)
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+        viewModel.setAccountSwitchingStrategy(.failover)
+
+        await viewModel.refreshController.performRefresh(refreshLive: false)
+
+        XCTAssertEqual(viewModel.currentAccount?.name, "alpha")
+        XCTAssertTrue(service.persistedCurrentAccountNames.isEmpty)
+        XCTAssertNil(viewModel.refreshWarningMessage)
+        XCTAssertEqual(
+            viewModel.externalAuthImportCandidate,
+            ExternalAuthImportCandidate(accountName: "new@example.com", email: "new@example.com")
+        )
+        XCTAssertEqual(viewModel.prioritizedMenuAlert?.action, .importExternalAuth)
+    }
+
+    func testImportExternalAuthCandidateAddsNewAccountWithoutChangingCurrent() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
+                accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+                limits: service.stubbedLimits
+            )
+        )
+        viewModel.externalAuthImportCandidate = ExternalAuthImportCandidate(
+            accountName: "new@example.com",
+            email: "new@example.com"
+        )
+
+        viewModel.importExternalAuthCandidate()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.addCalls.contains("new@example.com")
+                && service.importCalls.contains("new@example.com")
+        }
+
+        XCTAssertEqual(viewModel.currentAccount?.name, "alpha")
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "new@example.com" && $0.hasAuth }))
+        XCTAssertNil(viewModel.externalAuthImportCandidate)
+        XCTAssertEqual(viewModel.accountActionMessage, "Imported external login as new@example.com.")
+    }
+
+    func testImportExternalAuthCandidateDoesNotOverwriteExistingAccountName() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "new@example.com"),
+        ]
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
+                accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+                limits: service.stubbedLimits
+            )
+        )
+        viewModel.externalAuthImportCandidate = ExternalAuthImportCandidate(
+            accountName: "new@example.com",
+            email: "new@example.com"
+        )
+
+        viewModel.importExternalAuthCandidate()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.addCalls.contains("new@example.com-2")
+                && service.importCalls.contains("new@example.com-2")
+        }
+
+        XCTAssertFalse(service.importCalls.contains("new@example.com"))
+        XCTAssertEqual(viewModel.currentAccount?.name, "alpha")
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "new@example.com" }))
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "new@example.com-2" && $0.hasAuth }))
+        XCTAssertEqual(viewModel.accountActionMessage, "Imported external login as new@example.com-2.")
+    }
+
+    func testRefreshWarningCompressesVerboseFallbackErrors() {
+        let service = MockCodexAccountService()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+
+        let warning = viewModel.refreshController.formatRefreshWarning(
+            from: [
+                LimitsErrorEntry(
+                    account: "account-0fffff",
+                    message: "Managed API failed: Usage request failed: The request timed out.; serial fallback failed: API failed (Usage request failed: A TLS error caused the secure connection to fail.); RPC fallback failed (Codex RPC error: failed to fetch codex rate limits: error sending request for url (https://chatgpt.com/backend-api/wham/usage))"
+                ),
+            ]
+        )
+
+        XCTAssertEqual(warning, "Some accounts could not refresh usage. account-0fffff: Timed out")
+    }
+
+    func testRefreshWarningShowsCountForHiddenErrors() {
+        let service = MockCodexAccountService()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+
+        let warning = viewModel.refreshController.formatRefreshWarning(
+            from: [
+                LimitsErrorEntry(account: "alpha", message: "Managed refresh timed out."),
+                LimitsErrorEntry(account: "beta", message: "API failed (Usage request failed: A TLS error caused the secure connection to fail.)"),
+                LimitsErrorEntry(account: "gamma", message: "Codex RPC error: upstream unavailable"),
+            ]
+        )
+
+        XCTAssertEqual(warning, "Some accounts could not refresh usage. alpha: Timed out | beta: Secure connection failed (+1 more)")
+    }
+
     func testSelectSettingsSectionPersistsSelection() {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
@@ -129,9 +320,9 @@ final class AccountsMenuViewModelTests: XCTestCase {
             AccountUsageMergeService.mergeAccounts(
                 accounts: AccountsListPayload(
                     accounts: [
-                        AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-                        AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-                        AccountEntry(name: "gamma", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+                        makeAccountEntry(name: "alpha", isCurrent: true),
+                        makeAccountEntry(name: "beta"),
+                        makeAccountEntry(name: "gamma"),
                     ],
                     currentAccount: "alpha"
                 ),
@@ -420,7 +611,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         service.fetchAccountsError = nil
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [LimitsResult(account: "alpha", source: "live-api", snapshot: nil, ageSec: nil)],
@@ -446,11 +637,43 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.accounts.first?.usage.fiveHour.percentText, previousFiveHour)
     }
 
+    func testStartPaintsCachedUsageBeforeSlowLiveRefreshCompletes() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.fetchCachedLimitsResult = LimitsPayload(
+            results: [
+                LimitsResult(
+                    account: "alpha",
+                    source: "cached",
+                    snapshot: RateLimitSnapshot(
+                        primary: RateLimitWindow(usedPercent: 25, windowDurationMins: 300, resetsAt: nil),
+                        secondary: RateLimitWindow(usedPercent: 50, windowDurationMins: 10080, resetsAt: nil),
+                        credits: nil
+                    ),
+                    ageSec: 120
+                )
+            ],
+            errors: []
+        )
+        service.fetchLimitsDelayNanoseconds = 500_000_000
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: true)
+
+        await waitUntil(timeoutSeconds: 0.3) {
+            viewModel.accounts.first?.usage.fiveHour.usedPercent == 25
+        }
+
+        XCTAssertEqual(service.fetchCachedLimitsCalls, 1)
+        XCTAssertTrue(viewModel.isRefreshing)
+    }
+
     func testPerformRefreshPublishesAccountsBeforeSlowLimitsComplete() async throws {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [LimitsResult(account: "alpha", source: "live-api", snapshot: nil, ageSec: nil)],
@@ -478,12 +701,42 @@ final class AccountsMenuViewModelTests: XCTestCase {
         }
     }
 
+    func testRefreshDoesNotWarnForStoredMultiCodexAccountWithoutRowEmailHint() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [LimitsResult(account: "alpha", source: "live-api", snapshot: nil, ageSec: nil)],
+            errors: []
+        )
+        service.stubbedResolvedIdentityByAccount["alpha"] = ResolvedAccountIdentity(
+            email: "judevelin@atomicmail.io",
+            plan: nil,
+            accountId: nil,
+            authMethod: .oauth
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { MockAutoSwitchNotifier() },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        await viewModel.refreshController.performRefresh(refreshLive: true)
+
+        XCTAssertNil(viewModel.refreshWarningMessage)
+    }
+
     func testManualStrategyDoesNotAutoSwitch() async {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: "expired"),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastLoginStatus: "expired"),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -519,8 +772,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let service = MockCodexAccountService()
         let notifier = MockAutoSwitchNotifier()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: "expired"),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastLoginStatus: "expired"),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -556,8 +809,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -624,8 +877,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let service = MockCodexAccountService()
         let notifier = MockAutoSwitchNotifier()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -677,8 +930,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let notifier = MockAutoSwitchNotifier()
         notifier.sendResult = .permissionDenied
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -762,8 +1015,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let service = MockCodexAccountService()
         let notifier = MockAutoSwitchNotifier()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -825,7 +1078,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
 
@@ -869,7 +1122,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
         service.loginHomeStatusExitCode = 1
@@ -905,11 +1158,95 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertTrue(service.importFromHomeCalls.isEmpty)
     }
 
+    func testReloginKeepsExistingPendingSessionWhenPreviousSessionIsStillWaiting() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.openLoginInTerminal(for: "alpha")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.openLoginCalls.count == 1
+                && viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion
+        }
+
+        let firstSandbox = viewModel.pendingInteractiveLoginSession?.loginSandboxHome
+        viewModel.openLoginInTerminal(for: "alpha")
+
+        XCTAssertEqual(service.openLoginCalls, ["alpha"])
+        XCTAssertEqual(viewModel.pendingInteractiveLoginSession?.loginSandboxHome, firstSandbox)
+        XCTAssertEqual(
+            viewModel.accountActionMessage,
+            "Login already in progress for alpha. Continue in the existing browser or Terminal window."
+        )
+        if let firstSandbox {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: firstSandbox))
+        }
+    }
+
+    func testAbortPendingLoginClearsSessionAndDeletesSandbox() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.openLoginInTerminal(for: "alpha")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.openLoginCalls.count == 1
+                && viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion
+        }
+
+        let sandbox = viewModel.pendingInteractiveLoginSession?.loginSandboxHome
+        XCTAssertTrue(viewModel.canAbortPendingLogin)
+
+        viewModel.abortPendingLogin()
+
+        XCTAssertNil(viewModel.pendingInteractiveLoginSession)
+        XCTAssertFalse(viewModel.canAbortPendingLogin)
+        XCTAssertEqual(viewModel.accountActionMessage, "Aborted login for alpha.")
+        if let sandbox {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox))
+        }
+    }
+
+    func testAbortPendingLoginDoesNothingWithoutPendingSession() {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.abortPendingLogin()
+
+        XCTAssertNil(viewModel.pendingInteractiveLoginSession)
+        XCTAssertNil(viewModel.accountActionMessage)
+        XCTAssertNil(viewModel.accountActionError)
+    }
+
     func testStartNewAccountLoginStoresAuthWithoutAutoSwitching() async {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -934,7 +1271,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedInferredEmailFromLoginHome = "personal-fresh@example.com"
 
@@ -960,7 +1297,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -988,7 +1325,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1020,7 +1357,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1042,7 +1379,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1089,7 +1426,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
 
         let notifier = MockAutoSwitchNotifier()
@@ -1113,7 +1450,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.loginInAppDelayNanoseconds = 300_000_000
 
@@ -1150,12 +1487,129 @@ final class AccountsMenuViewModelTests: XCTestCase {
         )
     }
 
+    func testSwitchCanStartWhileNewAccountLoginIsRunning() async {
+        let service = MockCodexAccountService()
+        service.loginInAppDelayNanoseconds = 500_000_000
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.updateAccounts([
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
+        ])
+
+        viewModel.startNewAccountLogin()
+
+        await waitUntil(timeoutSeconds: 0.2) {
+            viewModel.loginInFlightName != nil
+        }
+
+        viewModel.switchToAccount(named: "beta")
+
+        await waitUntil(timeoutSeconds: 0.3) {
+            viewModel.currentAccount?.name == "beta"
+        }
+
+        XCTAssertNotNil(viewModel.loginInFlightName)
+    }
+
+    func testSwitchCanStartWhileRefreshIsRunning() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
+        ]
+        service.fetchLimitsDelayNanoseconds = 500_000_000
+
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.updateAccounts([
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
+        ])
+
+        viewModel.refreshLive()
+        await waitUntil(timeoutSeconds: 0.2) {
+            viewModel.isRefreshing
+        }
+
+        viewModel.switchToAccount(named: "beta")
+
+        await waitUntil(timeoutSeconds: 0.3) {
+            viewModel.switchingAccountName == "beta" || viewModel.currentAccount?.name == "beta"
+        }
+    }
+
+    func testRefreshAppliesPartialUsageBeforeFullLimitsReturn() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.partialLimitsPayloads = [
+            LimitsPayload(
+                results: [
+                    LimitsResult(
+                        account: "alpha",
+                        source: "live-api",
+                        snapshot: RateLimitSnapshot(
+                            primary: RateLimitWindow(usedPercent: 10, windowDurationMins: 300, resetsAt: nil),
+                            secondary: RateLimitWindow(usedPercent: 20, windowDurationMins: 10080, resetsAt: nil),
+                            credits: nil
+                        ),
+                        ageSec: nil
+                    ),
+                ],
+                errors: []
+            ),
+        ]
+        service.fetchLimitsDelayNanoseconds = 500_000_000
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.refreshLive()
+
+        await waitUntil(timeoutSeconds: 0.2) {
+            viewModel.accounts.first?.usage.fiveHour.usedPercent == 10
+        }
+    }
+
+    func testSwitchCancelsActiveRefreshToken() async throws {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
+        ]
+        service.fetchLimitsDelayNanoseconds = 500_000_000
+
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.updateAccounts([
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
+        ])
+
+        viewModel.refreshLive()
+        await waitUntil(timeoutSeconds: 0.2) {
+            service.receivedCancellationTokens.count == 1
+        }
+        let token = try XCTUnwrap(service.receivedCancellationTokens.first)
+
+        viewModel.switchToAccount(named: "beta")
+
+        await waitUntil(timeoutSeconds: 0.2) {
+            token.isCancelled
+        }
+        XCTAssertTrue(token.isCancelled)
+    }
+
     func testSwitchToAccountCompletesBeforeBackgroundRefreshFinishes() async throws {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1200,8 +1654,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1253,8 +1707,8 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
-            AccountEntry(name: "beta", isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1299,7 +1753,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true, hasAuth: false),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1343,7 +1797,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1387,7 +1841,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         service.stubbedLimits = LimitsPayload(
             results: [
@@ -1454,7 +1908,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         let needsLoginService = MockCodexAccountService()
         needsLoginService.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: false, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true, hasAuth: false),
         ]
         let needsLoginNotifier = MockAutoSwitchNotifier()
         let needsLogin = AccountsMenuViewModel(
@@ -1472,7 +1926,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
 
         let completeService = MockCodexAccountService()
         completeService.stubbedAccounts = [
-            AccountEntry(name: "alpha", isCurrent: true, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil),
+            makeAccountEntry(name: "alpha", isCurrent: true),
         ]
         let completeNotifier = MockAutoSwitchNotifier()
         let complete = AccountsMenuViewModel(
@@ -1576,6 +2030,99 @@ final class AccountsMenuViewModelTests: XCTestCase {
         }
         return String(format: "%.1f%%", value)
     }
+
+    // MARK: - Action Availability
+
+    func testActionAvailabilityAllowsSwitchDuringRefreshAndLogin() {
+        let viewModel = AccountsMenuViewModel(accountService: MockCodexAccountService(), startImmediately: false)
+
+        viewModel.isRefreshing = true
+        XCTAssertTrue(viewModel.canStartSwitchAction)
+
+        viewModel.loginInFlightName = "new-account"
+        XCTAssertTrue(viewModel.canStartSwitchAction)
+        XCTAssertFalse(viewModel.canStartLoginAction)
+
+        viewModel.authMutationInFlightName = "alpha"
+        XCTAssertFalse(viewModel.canStartSwitchAction)
+        XCTAssertFalse(viewModel.canStartLoginAction)
+    }
+
+    func testActionAvailabilityKeepsMaintenanceActionsConservative() {
+        let viewModel = AccountsMenuViewModel(accountService: MockCodexAccountService(), startImmediately: false)
+
+        XCTAssertTrue(viewModel.canStartMaintenanceAccountAction)
+
+        viewModel.accountActionInFlightName = "alpha"
+        XCTAssertFalse(viewModel.canStartMaintenanceAccountAction)
+
+        viewModel.accountActionInFlightName = nil
+        viewModel.sequentialLoginState = SequentialLoginState(items: [SequentialLoginItem(accountName: "beta")])
+        viewModel.sequentialLoginState?.isRunning = true
+        XCTAssertFalse(viewModel.canStartMaintenanceAccountAction)
+    }
+
+    func testApplyAutomaticSwitchSkipsWhenStrategyIsManual() {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
+        ]
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.accountSwitchingStrategy = .manual
+        viewModel.updateAccounts([
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
+        ])
+
+        let recommendation = AccountSwitchRecommendation(
+            previousAccountName: "alpha",
+            accountName: "beta",
+            reason: "Test bypass"
+        )
+        viewModel.refreshController.applyAutomaticSwitch(recommendation: recommendation)
+
+        // Switch should be skipped because strategy is .manual
+        XCTAssertTrue(service.switchCalls.isEmpty)
+    }
+
+    func testManualStrategyDoesNotWarnWhenSystemAuthNotExternallyModified() {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "beta"),
+        ]
+        service.stubbedLimits = LimitsPayload(
+            results: [
+                LimitsResult(account: "alpha", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 10, weeklyUsed: 10), ageSec: nil),
+                LimitsResult(account: "beta", source: "live-api", snapshot: makeSnapshot(fiveHourUsed: 20, weeklyUsed: 20), ageSec: nil),
+            ],
+            errors: []
+        )
+        // Simulate copy-paste: config says alpha is current, system auth says beta,
+        // but system auth was NOT recently modified (timestamps match).
+        service.stubbedResolvedIdentityByAccount = [
+            "alpha": ResolvedAccountIdentity(email: "alpha@test.com", plan: nil, accountId: "a1", authMethod: .oauth),
+            "beta": ResolvedAccountIdentity(email: "beta@test.com", plan: nil, accountId: "b1", authMethod: .oauth),
+        ]
+
+        let viewModel = AccountsMenuViewModel(accountService: service, startImmediately: false)
+        viewModel.accountSwitchingStrategy = .manual
+        viewModel.updateAccounts([
+            UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true),
+            UsageFixtures.makeAccountUsage(name: "beta"),
+        ])
+
+        let expectation = expectation(description: "Refresh completes")
+        Task { @MainActor in
+            await viewModel.refreshController.performRefresh(refreshLive: false, allowAutoSwitch: false)
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
+
+        // No warning because system auth wasn't externally modified
+        XCTAssertNil(viewModel.refreshWarningMessage)
+    }
 }
 
 private final class MockCodexAccountService: CodexAccountServicing {
@@ -1613,9 +2160,13 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var loginHomeStatusOutput = "ok"
     var probeRuntimeResult = RuntimeProbe(isAvailable: true, summary: "ok")
     var stubbedDefaultWorkspaceEmailByAccount: [String: String] = [:]
+    var stubbedResolvedIdentityByAccount: [String: ResolvedAccountIdentity] = [:]
     var stubbedInferredEmailFromLoginHome: String?
+    var stubbedStoredAuthModifiedDate: Date?
+    var pathContext = CodexAccountService.PathContext(homeDir: "/tmp", multicodexHome: "/tmp/multicodex")
 
     private(set) var switchCalls: [String] = []
+    private(set) var addCalls: [String] = []
     private(set) var removeCalls: [RemoveCall] = []
     private(set) var renameCalls: [(from: String, to: String)] = []
     private(set) var importCalls: [String] = []
@@ -1626,6 +2177,13 @@ private final class MockCodexAccountService: CodexAccountServicing {
     private(set) var openNewLoginCalls: [String] = []
     private(set) var loginInAppCalls: [LoginCall] = []
     private(set) var fetchLimitsRefreshLiveCalls: [Bool] = []
+    private(set) var persistedCurrentAccountNames: [String] = []
+    var fetchCachedLimitsResult = LimitsPayload(results: [], errors: [])
+    var fetchCachedLimitsDelayNanoseconds: UInt64 = 0
+    private(set) var fetchCachedLimitsCalls = 0
+    var onFetchLimitsStarted: (() -> Void)?
+    var partialLimitsPayloads: [LimitsPayload] = []
+    private(set) var receivedCancellationTokens: [RefreshCancellationToken] = []
 
     func fetchAccounts() async throws -> AccountsListPayload {
         if let fetchAccountsError {
@@ -1650,10 +2208,45 @@ private final class MockCodexAccountService: CodexAccountServicing {
             throw fetchLimitsError
         }
         fetchLimitsRefreshLiveCalls.append(refreshLive)
+        onFetchLimitsStarted?()
         if fetchLimitsDelayNanoseconds > 0 {
             try? await Task.sleep(nanoseconds: fetchLimitsDelayNanoseconds)
         }
         return stubbedLimits
+    }
+
+    func fetchLimits(
+        refreshLive: Bool,
+        cancellationToken: RefreshCancellationToken,
+        onPartialResult: @escaping @Sendable (LimitsPayload) -> Void
+    ) async throws -> LimitsPayload {
+        if let fetchLimitsError {
+            throw fetchLimitsError
+        }
+        fetchLimitsRefreshLiveCalls.append(refreshLive)
+        receivedCancellationTokens.append(cancellationToken)
+        onFetchLimitsStarted?()
+        for payload in partialLimitsPayloads {
+            if cancellationToken.isCancelled {
+                throw CancellationError()
+            }
+            onPartialResult(payload)
+        }
+        if fetchLimitsDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: fetchLimitsDelayNanoseconds)
+        }
+        if cancellationToken.isCancelled {
+            throw CancellationError()
+        }
+        return stubbedLimits
+    }
+
+    func fetchCachedLimits() async throws -> LimitsPayload {
+        fetchCachedLimitsCalls += 1
+        if fetchCachedLimitsDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: fetchCachedLimitsDelayNanoseconds)
+        }
+        return fetchCachedLimitsResult
     }
 
     func switchAccount(name: String) async throws {
@@ -1670,6 +2263,17 @@ private final class MockCodexAccountService: CodexAccountServicing {
                 lastLoginStatus: account.lastLoginStatus
             )
         }
+    }
+
+    func addAccount(name: String) async throws -> AddAccountPayload {
+        addCalls.append(name)
+        if !stubbedAccounts.contains(where: { $0.name == name }) {
+            stubbedAccounts.append(makeAccountEntry(name: name))
+        }
+        return AddAccountPayload(
+            account: name,
+            currentAccount: stubbedAccounts.first(where: \.isCurrent)?.name
+        )
     }
 
     func removeAccount(name: String, deleteData: Bool) async throws -> RemoveAccountPayload {
@@ -1755,7 +2359,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
             }
         } else {
             stubbedAccounts.append(
-                AccountEntry(name: name, isCurrent: false, hasAuth: true, lastUsedAt: nil, lastLoginStatus: nil)
+                makeAccountEntry(name: name)
             )
         }
         return ImportAccountPayload(account: name)
@@ -1839,6 +2443,33 @@ private final class MockCodexAccountService: CodexAccountServicing {
 
     func probeRuntime() -> RuntimeProbe {
         probeRuntimeResult
+    }
+
+    func refreshStaleTokens() async -> [String: Error] {
+        [:]
+    }
+
+    func persistCurrentAccountIfKnown(_ name: String) throws {
+        persistedCurrentAccountNames.append(name)
+    }
+
+    func storedAuthModifiedDate(for account: String, paths: CodexAccountService.PathContext) -> Date? {
+        stubbedStoredAuthModifiedDate
+    }
+
+    func resolveFromAuthPayload(_ authPayload: [String: Any]) -> ResolvedAccountIdentity? {
+        guard let email = authPayload["email"] as? String else {
+            return nil
+        }
+        return ResolvedAccountIdentity(email: email, plan: nil, accountId: nil, authMethod: .oauth)
+    }
+
+    func resolvedIdentityForAccount(name: String) -> ResolvedAccountIdentity? {
+        stubbedResolvedIdentityByAccount[name]
+    }
+
+    func currentPaths(loginHome: String?) -> CodexAccountService.PathContext {
+        pathContext
     }
 }
 

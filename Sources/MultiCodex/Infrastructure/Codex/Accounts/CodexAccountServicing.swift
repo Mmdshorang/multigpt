@@ -7,7 +7,14 @@ protocol CodexAccountServicing: AnyObject {
 
     func fetchAccounts() async throws -> AccountsListPayload
     func fetchLimits(refreshLive: Bool) async throws -> LimitsPayload
+    func fetchLimits(
+        refreshLive: Bool,
+        cancellationToken: RefreshCancellationToken,
+        onPartialResult: @escaping @Sendable (LimitsPayload) -> Void
+    ) async throws -> LimitsPayload
+    func fetchCachedLimits() async throws -> LimitsPayload
     func switchAccount(name: String) async throws
+    func addAccount(name: String) async throws -> AddAccountPayload
     func removeAccount(name: String, deleteData: Bool) async throws -> RemoveAccountPayload
     func renameAccount(from oldName: String, to newName: String) async throws -> RenameAccountPayload
     func importDefaultAuth(into name: String) async throws -> ImportAccountPayload
@@ -20,6 +27,43 @@ protocol CodexAccountServicing: AnyObject {
     func inferDefaultWorkspaceEmail(fromLoginHome homePath: String) -> String?
     func effectiveMulticodexHomePath() -> String
     func probeRuntime() -> RuntimeProbe
+    func refreshStaleTokens() async -> [String: Error]
+    func persistCurrentAccountIfKnown(_ name: String) throws
+    func storedAuthModifiedDate(for account: String, paths: CodexAccountService.PathContext) -> Date?
+    func resolveFromAuthPayload(_ authPayload: [String: Any]) -> ResolvedAccountIdentity?
+    func resolvedIdentityForAccount(name: String) -> ResolvedAccountIdentity?
+    func currentPaths(loginHome: String?) -> CodexAccountService.PathContext
 }
 
 extension CodexAccountService: CodexAccountServicing {}
+
+/// Crosses the async-to-blocking boundary used by the limits fetcher.
+/// Cancelling the Swift task alone cannot stop detached legacy auth work.
+final class RefreshCancellationToken: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    func checkCancellation() throws {
+        if isCancelled {
+            throw CancellationError()
+        }
+    }
+}
+
+extension CodexAccountServicing {
+    func currentPaths() -> CodexAccountService.PathContext {
+        currentPaths(loginHome: nil)
+    }
+}

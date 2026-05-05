@@ -88,10 +88,16 @@ extension SettingsContentView {
         )
     }
 
+    var isSwitchActionRunning: Bool {
+        !viewModel.canStartSwitchAction
+    }
+
+    var isLoginActionRunning: Bool {
+        !viewModel.canStartLoginAction
+    }
+
     var isAccountActionRunning: Bool {
-        viewModel.accountActionInFlightName != nil
-            || viewModel.switchingAccountName != nil
-            || viewModel.sequentialLoginState?.isRunning == true
+        !viewModel.canStartMaintenanceAccountAction
     }
 
     var runtimeStatus: RuntimeStatusPresentation {

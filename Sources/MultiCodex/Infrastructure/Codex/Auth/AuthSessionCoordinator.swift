@@ -204,10 +204,18 @@ extension CodexAccountService {
     func applyAccountAuthToDefault(account: String, forceLock: Bool, paths: PathContext) throws {
         let lock = try acquireAuthLock(account: account, force: forceLock, paths: paths)
         defer { lock.release() }
-        try setDefaultAuthFromAccount(account: account, paths: paths)
+        try AuthSwapService.switchToAccount(
+            named: account,
+            previousAccountName: nil,
+            paths: paths
+        )
     }
 
     func setDefaultAuthFromAccount(account: String, paths: PathContext) throws {
+        if let managedAuthPath = managedAuthPath(for: account, paths: paths) {
+            try syncAuthFile(from: managedAuthPath, to: paths.defaultCodexAuthPath)
+            return
+        }
         try syncAuthFile(from: paths.accountAuthPath(account), to: paths.defaultCodexAuthPath)
     }
 
@@ -217,6 +225,11 @@ extension CodexAccountService {
             to: paths.accountAuthPath(account),
             destinationDirectory: paths.accountDir(account)
         )
+        if let managedHome = managedHomeForMutatingAuth(account: account, paths: paths),
+           let authData = readFileIfExists(paths.defaultCodexAuthPath)
+        {
+            try ManagedCodexHomeFactory.writeAuthData(authData, to: managedHome)
+        }
     }
 
     func restoreDefaultAuth(_ previousAuth: Data?, defaultAuthPath: String) throws {
@@ -243,6 +256,27 @@ extension CodexAccountService {
                 try self.createDirectory(path: path, mode: mode)
             }
         )
+    }
+
+    func isManagedHomeMigrationComplete(paths: PathContext) -> Bool {
+        let markerURL = URL(fileURLWithPath: paths.multicodexHome)
+            .appendingPathComponent(".managed-migration-complete")
+        return fileManager.fileExists(atPath: markerURL.path)
+    }
+
+    func managedHomeForMutatingAuth(account: String, paths: PathContext) -> URL? {
+        guard isManagedHomeMigrationComplete(paths: paths) else { return nil }
+        return try? ManagedCodexHomeFactory.createHome(for: account, multicodexHome: paths.multicodexHome)
+    }
+
+    func managedAuthPath(for account: String, paths: PathContext) -> String? {
+        guard isManagedHomeMigrationComplete(paths: paths),
+              let home = ManagedCodexHomeFactory.homeURL(for: account, multicodexHome: paths.multicodexHome),
+              fileManager.fileExists(atPath: home.appendingPathComponent("auth.json").path)
+        else {
+            return nil
+        }
+        return home.appendingPathComponent("auth.json").path
     }
 
     // MARK: - Limits cache
@@ -285,6 +319,72 @@ extension CodexAccountService {
 
     static func nowISO() -> String {
         nowFormatter.string(from: Date())
+    }
+
+    /// Proactively refresh tokens for all accounts with aging auth.
+    /// Called during background refresh cycles, before fetching usage.
+    func refreshStaleTokensNow() -> [String: Error] {
+        let paths = currentPaths()
+        guard let config = try? loadConfig(paths: paths) else {
+            return [:]
+        }
+
+        var errors: [String: Error] = [:]
+        for account in config.accounts {
+            let legacyAuthPath = paths.accountAuthPath(account)
+            let authPath = managedAuthPath(for: account, paths: paths) ?? legacyAuthPath
+            guard var payload = try? loadAuthPayload(from: authPath) else {
+                continue
+            }
+            guard shouldRefreshToken(payload) else {
+                continue
+            }
+
+            MultiCodexLog.log(
+                .auth,
+                level: .debug,
+                "Proactively refreshing token for \(account)"
+            )
+
+            do {
+                if try refreshAccessToken(authPayload: &payload, authPath: authPath) != nil {
+                    if authPath != legacyAuthPath,
+                       let refreshedData = readFileIfExists(authPath)
+                    {
+                        try writeFileAtomic(data: refreshedData, path: legacyAuthPath, mode: 0o600)
+                    }
+                    MultiCodexLog.log(
+                        .auth,
+                        level: .info,
+                        "Token refreshed for \(account)",
+                        metadata: ["refreshed": "yes"]
+                    )
+                }
+            } catch {
+                errors[account] = error
+                MultiCodexLog.log(
+                    .auth,
+                    level: .error,
+                    "Token refresh failed for \(account): \(error.localizedDescription)"
+                )
+            }
+        }
+        return errors
+    }
+
+    func refreshStaleTokens() async -> [String: Error] {
+        await Task.detached(priority: .utility) { [self] in
+            refreshStaleTokensNow()
+        }.value
+    }
+
+    func refreshStaleTokens() -> [String: Error] {
+        refreshStaleTokensNow()
+    }
+
+    func storedAuthModifiedDate(for account: String, paths: PathContext) -> Date? {
+        let authPath = managedAuthPath(for: account, paths: paths) ?? paths.accountAuthPath(account)
+        return try? fileManager.attributesOfItem(atPath: authPath)[.modificationDate] as? Date
     }
 
     func validatedAccountName(_ name: String) throws -> String {

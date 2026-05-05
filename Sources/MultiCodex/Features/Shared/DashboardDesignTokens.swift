@@ -204,6 +204,10 @@ enum DashboardTokens {
             reduceMotion ? nil : .easeInOut(duration: 0.20)
         }
 
+        static func disclosure(reduceMotion: Bool) -> Animation? {
+            reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.88, blendDuration: 0.08)
+        }
+
         static func springPress(reduceMotion: Bool) -> Animation? {
             reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.78)
         }

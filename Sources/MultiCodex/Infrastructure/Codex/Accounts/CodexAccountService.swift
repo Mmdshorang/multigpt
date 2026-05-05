@@ -152,15 +152,48 @@ final class CodexAccountService {
     }
 
     func fetchAccounts() async throws -> AccountsListPayload {
-        try fetchAccountsNow()
+        try await Task.detached(priority: .userInitiated) { [self] in
+            try fetchAccountsNow()
+        }.value
     }
 
     func fetchLimits(refreshLive: Bool) async throws -> LimitsPayload {
-        try fetchLimitsNow(refreshLive: refreshLive)
+        try await fetchLimits(
+            refreshLive: refreshLive,
+            cancellationToken: RefreshCancellationToken(),
+            onPartialResult: { _ in }
+        )
+    }
+
+    func fetchLimits(
+        refreshLive: Bool,
+        cancellationToken: RefreshCancellationToken,
+        onPartialResult: @escaping @Sendable (LimitsPayload) -> Void
+    ) async throws -> LimitsPayload {
+        let worker = Task.detached(priority: .userInitiated) { [self] in
+            try fetchLimitsNow(
+                refreshLive: refreshLive,
+                cancellationToken: cancellationToken,
+                onPartialResult: onPartialResult
+            )
+        }
+        return try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            cancellationToken.cancel()
+            worker.cancel()
+        }
+    }
+
+    func fetchCachedLimits() async throws -> LimitsPayload {
+        try await Task.detached(priority: .userInitiated) { [self] in
+            try fetchCachedLimitsNow()
+        }.value
     }
 
     func switchAccount(name: String) async throws {
         _ = try switchAccountNow(name: name)
+        await CodexRPCSession.shared.shutdown()
     }
 
     func addAccount(name: String) async throws -> AddAccountPayload {

@@ -173,11 +173,43 @@ final class CodexAccountServiceTests: XCTestCase {
         XCTAssertTrue(limits.errors[0].message.contains("RPC fallback failed"))
     }
 
+    func testManagedFetchFallsBackToSerialRpcWhenApiFails() async throws {
+        let service = makeSandboxedService()
+        service.customCodexPath = "/not/a/real/codex/path"
+
+        _ = try await service.addAccount(name: "alpha")
+
+        let accountAuthPath = (service.effectiveMulticodexHomePath() as NSString)
+            .appendingPathComponent("accounts/alpha/auth.json")
+        try writeText(
+            """
+            {
+              "tokens": {
+                "access_token": "invalid-token",
+                "refresh_token": "invalid-refresh"
+              },
+              "last_refresh": "2001-01-01T00:00:00Z"
+            }
+            """,
+            to: accountAuthPath
+        )
+        _ = try ManagedAccountMigrator.migrateIfNeeded(paths: service.currentPaths())
+
+        let limits = try await service.fetchLimits(refreshLive: true)
+
+        XCTAssertEqual(limits.results.count, 0)
+        XCTAssertEqual(limits.errors.count, 1)
+        XCTAssertTrue(limits.errors[0].message.contains("Managed API failed"))
+        XCTAssertTrue(limits.errors[0].message.contains("API failed"))
+        XCTAssertTrue(limits.errors[0].message.contains("RPC fallback failed"))
+    }
+
     func testSwitchRenameRemoveUpdateConfigAndMeta() async throws {
         let service = makeSandboxedService()
 
         _ = try await service.addAccount(name: "alpha")
         _ = try await service.addAccount(name: "beta")
+        try writeText("{\"tokens\":{\"access_token\":\"beta-token\"}}\n", to: service.currentPaths().accountAuthPath("beta"))
         try await service.switchAccount(name: "beta")
         _ = try await service.renameAccount(from: "beta", to: "gamma")
         _ = try await service.removeAccount(name: "alpha", deleteData: true)
@@ -203,6 +235,7 @@ final class CodexAccountServiceTests: XCTestCase {
 
         _ = try await service.addAccount(name: "alpha")
         _ = try await service.addAccount(name: "beta")
+        try writeText("{\"tokens\":{\"access_token\":\"alpha-token\"}}\n", to: service.currentPaths().accountAuthPath("alpha"))
         try await service.switchAccount(name: "alpha")
 
         let defaultAuthPath = (sandbox as NSString).appendingPathComponent(".codex/auth.json")
@@ -228,6 +261,7 @@ final class CodexAccountServiceTests: XCTestCase {
         let sandbox = try XCTUnwrap(service.sandboxHomeDirectory)
 
         _ = try await service.addAccount(name: "alpha")
+        try writeText("{\"tokens\":{\"access_token\":\"alpha-token\"}}\n", to: service.currentPaths().accountAuthPath("alpha"))
         try await service.switchAccount(name: "alpha")
 
         let defaultAuthPath = (sandbox as NSString).appendingPathComponent(".codex/auth.json")
@@ -242,6 +276,62 @@ final class CodexAccountServiceTests: XCTestCase {
         let config = try AccountConfigStore.decodeConfig(from: configData)
         XCTAssertNil(config.currentAccount)
         XCTAssertTrue(config.accounts.isEmpty)
+    }
+
+    func testImportAuthUpdatesManagedHomeAfterMigration() async throws {
+        let service = makeSandboxedService()
+
+        _ = try await service.addAccount(name: "alpha")
+        try writeText("{\"tokens\":{\"access_token\":\"old\"}}\n", to: service.currentPaths().accountAuthPath("alpha"))
+        _ = try ManagedAccountMigrator.migrateIfNeeded(paths: service.currentPaths())
+
+        let loginHome = makeSandboxDirectory()
+        let loginAuthPath = (loginHome as NSString).appendingPathComponent(".codex/auth.json")
+        try writeText("{\"tokens\":{\"access_token\":\"new\"}}\n", to: loginAuthPath)
+
+        _ = try await service.importAuth(fromHome: loginHome, into: "alpha")
+
+        let managedHome = try XCTUnwrap(ManagedCodexHomeFactory.homeURL(
+            for: "alpha",
+            multicodexHome: service.effectiveMulticodexHomePath()
+        ))
+        let managedAuth = String(data: try XCTUnwrap(ManagedCodexHomeFactory.readAuthData(from: managedHome)), encoding: .utf8)
+        XCTAssertTrue(managedAuth?.contains("new") == true)
+    }
+
+    func testSwitchAccountUsesScopedManagedHomeAfterMigration() async throws {
+        let service = makeSandboxedService()
+        let sandbox = try XCTUnwrap(service.sandboxHomeDirectory)
+
+        _ = try await service.addAccount(name: "alpha")
+        _ = try await service.addAccount(name: "beta")
+        try writeText("{\"tokens\":{\"access_token\":\"legacy-beta\"}}\n", to: service.currentPaths().accountAuthPath("beta"))
+        _ = try ManagedAccountMigrator.migrateIfNeeded(paths: service.currentPaths())
+
+        let betaHome = try XCTUnwrap(ManagedCodexHomeFactory.homeURL(
+            for: "beta",
+            multicodexHome: service.effectiveMulticodexHomePath()
+        ))
+        try ManagedCodexHomeFactory.writeAuthData(Data("{\"tokens\":{\"access_token\":\"managed-beta\"}}\n".utf8), to: betaHome)
+
+        try await service.switchAccount(name: "beta")
+
+        let defaultAuthPath = (sandbox as NSString).appendingPathComponent(".codex/auth.json")
+        let defaultAfter = try String(contentsOfFile: defaultAuthPath, encoding: .utf8)
+        XCTAssertTrue(defaultAfter.contains("managed-beta"))
+    }
+
+    func testPersistCurrentAccountIfKnownUpdatesConfig() throws {
+        let service = makeSandboxedService()
+        _ = try service.addAccountNow(name: "alpha")
+        try service.persistCurrentAccountIfKnown("alpha")
+        let config = try service.loadConfig(paths: service.currentPaths())
+        XCTAssertEqual(config.currentAccount, "alpha")
+    }
+
+    func testPersistCurrentAccountIfKnownThrowsForUnknownAccount() throws {
+        let service = makeSandboxedService()
+        XCTAssertThrowsError(try service.persistCurrentAccountIfKnown("ghost"))
     }
 
     func testFetchStatusRestoresDefaultAuthAfterCommandFailure() async throws {

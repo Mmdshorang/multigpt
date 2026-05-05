@@ -13,6 +13,7 @@ struct DashboardAccountRow: View {
     let onActivate: () -> Void
     let onRowTap: () -> Void
     let onToggleExpanded: () -> Void
+    @State private var disclosureProgress: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - Derived State
@@ -141,24 +142,13 @@ struct DashboardAccountRow: View {
                     Image(systemName: "chevron.down")
                         .font(DashboardTokens.Font.chevron())
                         .foregroundStyle(DashboardTokens.textTertiary)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        .animation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion), value: isExpanded)
+                        .rotationEffect(.degrees(180 * disclosureProgress))
                 }
                 .contentShape(Rectangle())
                 .help(primaryAreaHelpText)
             }
 
-            // ── Expanded Detail ──
-            if isExpanded {
-                expandedContent
-                    .padding(.top, 12)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .top)),
-                            removal: .move(edge: .top)
-                        )
-                    )
-            }
+            expandedDisclosure
         }
         .padding(.horizontal, DashboardTokens.Spacing.rowHPadding)
         .padding(.vertical, DashboardTokens.Spacing.rowVPadding)
@@ -172,15 +162,19 @@ struct DashboardAccountRow: View {
         )
         .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous))
         .onTapGesture {
-            withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
-                onRowTap()
-            }
+            onRowTap()
         }
         .accessibilityElement(children: .contain)
         .accessibilityHint("Use the primary action button to switch or re-login. Use row action to expand details.")
         .accessibilityAction(named: Text(isExpanded ? "Collapse details" : "Expand details")) {
-            withAnimation(DashboardTokens.Motion.emphasis(reduceMotion: reduceMotion)) {
-                onToggleExpanded()
+            onToggleExpanded()
+        }
+        .onAppear {
+            disclosureProgress = isExpanded ? 1 : 0
+        }
+        .onChange(of: isExpanded) { expanded in
+            withAnimation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion)) {
+                disclosureProgress = expanded ? 1 : 0
             }
         }
     }
@@ -229,48 +223,47 @@ struct DashboardAccountRow: View {
 
     // MARK: - Expanded Content
 
+    private var expandedDisclosure: some View {
+        Group {
+            if isExpanded {
+                expandedContent
+                    .padding(.top, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
     private var expandedContent: some View {
-        HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 8) {
                 expandedMetricBar(
                     label: "5H",
                     valueText: fiveHourPercentText,
+                    resetText: row.resetText,
                     progress: fiveHourProgressValue,
                     color: DashboardTokens.ringFiveHour
                 )
                 expandedMetricBar(
                     label: "WEEK",
                     valueText: weeklyPercentText,
+                    resetText: row.account.usage.weekly.resetText(mode: row.resetDisplayMode),
                     progress: weeklyProgressValue,
                     color: DashboardTokens.ringWeekly
                 )
             }
 
-            Spacer(minLength: 8)
-
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(row.resetText)
-                    .font(DashboardTokens.Font.metadata())
-                    .foregroundStyle(DashboardTokens.textSecondary)
-                    .multilineTextAlignment(.trailing)
-
-                if let email = row.workspaceEmailHint {
-                    Text(email)
-                        .font(DashboardTokens.Font.metadata())
-                        .foregroundStyle(DashboardTokens.textTertiary)
-                        .lineLimit(1)
-                }
-            }
+            expandedDetailFooter
         }
     }
 
     private func expandedMetricBar(
         label: String,
         valueText: String,
+        resetText: String,
         progress: Double,
         color: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 Text(label)
                     .font(DashboardTokens.Font.caption())
@@ -280,18 +273,75 @@ struct DashboardAccountRow: View {
                     .font(DashboardTokens.Font.metadata().weight(.semibold))
                     .foregroundStyle(DashboardTokens.textPrimary)
                     .monospacedDigit()
+
+                Spacer(minLength: 8)
+
+                Text(resetText)
+                    .font(DashboardTokens.Font.metadata())
+                    .foregroundStyle(DashboardTokens.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
 
-            let barWidth: CGFloat = 118
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Color.white.opacity(0.07))
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
 
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(color)
-                    .frame(width: barWidth * CGFloat(min(1, max(0, progress))))
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(color)
+                        .frame(width: proxy.size.width * CGFloat(min(1, max(0, progress))))
+                }
             }
-            .frame(width: barWidth, height: 3.5)
+            .frame(height: 4)
+        }
+    }
+
+    private var expandedDetailFooter: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let paceText = row.account.paceSummary {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Circle()
+                        .fill(paceColor(row.account.fiveHourPace?.stage))
+                        .frame(width: 6, height: 6)
+                    Text(paceText)
+                        .font(DashboardTokens.Font.caption())
+                        .foregroundStyle(DashboardTokens.textSecondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if let email = row.workspaceEmailHint {
+                    Label(email, systemImage: "person.crop.circle")
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer(minLength: 6)
+
+                if let cost = row.account.costReport, cost.totalCostUSD > 0 {
+                    Label("\(cost.formattedToday) today", systemImage: "dollarsign.circle")
+                        .font(DashboardTokens.Font.metadata())
+                        .foregroundStyle(DashboardTokens.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private func paceColor(_ stage: UsagePace.Stage?) -> Color {
+        guard let stage else { return DashboardTokens.textTertiary }
+        switch stage {
+        case .onTrack, .slightlyBehind, .behind, .farBehind:
+            return DashboardTokens.accent
+        case .slightlyAhead:
+            return DashboardTokens.statusOrange
+        case .ahead, .farAhead:
+            return DashboardTokens.statusRed
         }
     }
 }

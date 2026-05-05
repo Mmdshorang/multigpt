@@ -24,7 +24,7 @@ enum AccountPresentation {
             return DashboardTokens.statusOrange
         case .refreshError:
             return DashboardTokens.statusRed
-        case .authRequired:
+        case .authRequired, .externalAuth:
             return DashboardTokens.statusOrange
         }
     }
@@ -37,6 +37,8 @@ enum AccountPresentation {
             return "exclamationmark.triangle.fill"
         case .authRequired:
             return "person.crop.circle.badge.exclamationmark"
+        case .externalAuth:
+            return "person.crop.circle.badge.plus"
         }
     }
 

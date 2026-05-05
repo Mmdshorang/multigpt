@@ -11,8 +11,11 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var switchingAccountName: String?
     @Published var cliResolutionHint: String?
     @Published var accountActionInFlightName: String?
+    @Published var loginInFlightName: String?
+    @Published var authMutationInFlightName: String?
     @Published var accountActionMessage: String?
     @Published var accountActionError: String?
+    @Published var externalAuthImportCandidate: ExternalAuthImportCandidate?
     @Published var runtimeProbeSummary: String?
     @Published var isCodexRuntimeAvailable = false
     @Published var focusedAccountName: String?
@@ -38,8 +41,10 @@ final class AccountsMenuViewModel: ObservableObject {
     var preferences: AppPreferencesStore
 
     var refreshLoopTask: Task<Void, Never>?
+    var activeRefreshTask: Task<Void, Never>?
+    var refreshGeneration = 0
     var didBecomeActiveObserver: NSObjectProtocol?
-    var pendingInteractiveLoginSession: PendingInteractiveLoginSession?
+    @Published var pendingInteractiveLoginSession: PendingInteractiveLoginSession?
     var feedbackAutoClearTask: Task<Void, Never>?
     var sequentialLoginTask: Task<Void, Never>?
     lazy var autoSwitchNotifier: any AutoSwitchNotificationSending = autoSwitchNotifierFactory()
@@ -101,10 +106,30 @@ final class AccountsMenuViewModel: ObservableObject {
         feedbackAutoClearTask?.cancel()
         sequentialLoginTask?.cancel()
         refreshLoopTask?.cancel()
+        activeRefreshTask?.cancel()
     }
 
     var currentAccount: AccountUsage? {
         accounts.first(where: { $0.isCurrent })
+    }
+
+    var canStartSwitchAction: Bool {
+        switchingAccountName == nil && authMutationInFlightName == nil
+    }
+
+    var canStartLoginAction: Bool {
+        loginInFlightName == nil && authMutationInFlightName == nil
+    }
+
+    var canAbortPendingLogin: Bool {
+        pendingInteractiveLoginSession != nil && loginInFlightName == nil
+    }
+
+    var canStartMaintenanceAccountAction: Bool {
+        accountActionInFlightName == nil
+            && switchingAccountName == nil
+            && authMutationInFlightName == nil
+            && sequentialLoginState?.isRunning != true
     }
 
     var menuBarTitle: String {
@@ -197,12 +222,26 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     var prioritizedMenuAlert: MenuAlertState? {
-        MenuAlertPolicy.prioritizedAlert(
+        let policyAlert = MenuAlertPolicy.prioritizedAlert(
             isRuntimeAvailable: isCodexRuntimeAvailable,
             runtimeSummary: runtimeProbeSummary,
             lastRefreshError: lastRefreshError,
             accountsNeedingLogin: accountsNeedingLogin
         )
+        if policyAlert?.severity == .runtimeUnavailable || policyAlert?.severity == .refreshError {
+            return policyAlert
+        }
+        if let externalAuthImportCandidate {
+            return MenuAlertState(
+                severity: .externalAuth,
+                title: "External login detected",
+                message: "\(externalAuthImportCandidate.email) is logged in outside MultiCodex. Import it as a new account?",
+                actionTitle: "Import Account",
+                action: .importExternalAuth
+            )
+        }
+
+        return policyAlert
     }
 
     var preferredMenuAccountCount: Int {
@@ -235,10 +274,7 @@ final class AccountsMenuViewModel: ObservableObject {
         }
 
         Task { @MainActor in
-            await refreshController.performRefresh(refreshLive: false)
-            if shouldPreferLiveRefreshForAutoSwitching {
-                await refreshController.performRefresh(refreshLive: true)
-            }
+            await refreshController.performStartupRefresh()
         }
         startRefreshLoop()
     }
@@ -250,7 +286,7 @@ final class AccountsMenuViewModel: ObservableObject {
                 if Task.isCancelled {
                     break
                 }
-                await refreshController.performRefresh(refreshLive: shouldPreferLiveRefreshForAutoSwitching)
+                refreshController.triggerRefresh(refreshLive: shouldPreferLiveRefreshForAutoSwitching)
             }
         }
     }
@@ -263,6 +299,25 @@ final class AccountsMenuViewModel: ObservableObject {
         refreshController.triggerRefresh(refreshLive: true)
     }
 
+    func reloadPreferencesFromStore() {
+        customCodexPath = preferences.customCodexPath
+        resetDisplayMode = preferences.resetDisplayMode
+        selectedSettingsSection = preferences.selectedSettingsSection
+        selectedSettingsAccountName = preferences.selectedSettingsAccountName
+        menuDensity = preferences.menuDensity
+        usageBarStyle = preferences.usageBarStyle
+        accountSortCriterion = preferences.accountSortCriterion
+        accountSortWindow = preferences.accountSortWindow
+        accountSortDirection = preferences.accountSortDirection
+        showAllAccountsInMenu = preferences.showAllAccountsInMenu
+        accountSwitchingStrategy = preferences.accountSwitchingStrategy
+        autoSwitchNotificationsEnabled = preferences.autoSwitchNotificationsEnabled
+        limitsCacheTTLSeconds = CodexAccountService.normalizedLimitsCacheTTLSeconds(preferences.limitsCacheTTLSeconds)
+        accountService.customCodexPath = customCodexPath.isEmpty ? nil : customCodexPath
+        accountService.limitsCacheTTLSeconds = limitsCacheTTLSeconds
+        resortAccounts()
+    }
+
     func performMenuAlertAction(_ action: MenuAlertState.Action) {
         switch action {
         case .openRuntimeSettings:
@@ -271,6 +326,8 @@ final class AccountsMenuViewModel: ObservableObject {
             refreshLive()
         case let .relogin(accountName):
             openLoginInTerminal(for: accountName)
+        case .importExternalAuth:
+            importExternalAuthCandidate()
         }
     }
 
@@ -426,11 +483,15 @@ final class AccountsMenuViewModel: ObservableObject {
 
     func importCurrentAuth(into name: String) { accountManagement.importCurrentAuth(into: name) }
 
+    func importExternalAuthCandidate() { accountManagement.importExternalAuthCandidate() }
+
     func checkLoginStatus(for name: String) { accountManagement.checkLoginStatus(for: name) }
 
     func startLoginFlow(accountName: String, createIfNeeded: Bool) { accountActions.startLoginFlow(accountName: accountName, createIfNeeded: createIfNeeded) }
 
     func openLoginInTerminal(for name: String) { accountManagement.openLoginInTerminal(for: name) }
+
+    func abortPendingLogin() { accountActions.abortPendingLogin() }
 
     func prepareSequentialNewAccountLogin(count: Int) {
         accountManagement.prepareSequentialNewAccountLogin(count: count)
@@ -449,6 +510,19 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     func clearAccountActionFeedback() { accountManagement.clearAccountActionFeedback() }
+
+    func runAuthMutation<T>(
+        named name: String,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        while authMutationInFlightName != nil {
+            try Task.checkCancellation()
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        authMutationInFlightName = name
+        defer { authMutationInFlightName = nil }
+        return try await operation()
+    }
 
     func runSwitchAction(
         named name: String,
@@ -469,6 +543,13 @@ final class AccountsMenuViewModel: ObservableObject {
                 cliResolutionHint = accountService.resolutionHint
             }
         }
+    }
+
+    func cancelActiveRefreshForUserSwitch() {
+        activeRefreshTask?.cancel()
+        activeRefreshTask = nil
+        refreshGeneration += 1
+        isRefreshing = false
     }
 
     func clearFocusedAccountIfMissing() {

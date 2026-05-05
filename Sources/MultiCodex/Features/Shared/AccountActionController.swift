@@ -40,14 +40,27 @@ final class AccountActionController {
 
     func startLoginFlow(accountName: String, createIfNeeded: Bool) {
         let viewModel = viewModel
-        guard viewModel.accountActionInFlightName == nil,
-              viewModel.pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
-        else {
+        guard viewModel.loginInFlightName == nil else {
             return
+        }
+        if let pendingSession = viewModel.pendingInteractiveLoginSession,
+           pendingSession.phase == .waitingForExternalCompletion
+        {
+            guard pendingSession.accountName == accountName,
+                  pendingSession.createIfNeeded == createIfNeeded
+            else {
+                setAccountFeedback(
+                    message: nil,
+                    error: "Finish login for \(pendingSession.accountName) before starting another login."
+                )
+                return
+            }
+            removeLoginSandboxIfPossible(pendingSession.loginSandboxHome)
+            viewModel.pendingInteractiveLoginSession = nil
         }
 
         Task {
-            viewModel.accountActionInFlightName = accountName
+            viewModel.loginInFlightName = accountName
             viewModel.focusedAccountName = accountName
             viewModel.feedbackAutoClearTask?.cancel()
             viewModel.feedbackAutoClearTask = nil
@@ -55,7 +68,7 @@ final class AccountActionController {
             viewModel.accountActionError = nil
 
             defer {
-                viewModel.accountActionInFlightName = nil
+                viewModel.loginInFlightName = nil
             }
 
             do {
@@ -86,6 +99,36 @@ final class AccountActionController {
     }
 
     func launchTerminalLoginFallback(accountName: String, createIfNeeded: Bool, rootError: Error) {
+        beginTerminalLoginFlow(accountName: accountName, createIfNeeded: createIfNeeded, rootError: rootError)
+    }
+
+    func startTerminalLoginFlow(accountName: String, createIfNeeded: Bool) {
+        let viewModel = viewModel
+        guard viewModel.loginInFlightName == nil else {
+            return
+        }
+        if let pendingSession = viewModel.pendingInteractiveLoginSession,
+           pendingSession.phase == .waitingForExternalCompletion
+        {
+            guard pendingSession.accountName == accountName,
+                  pendingSession.createIfNeeded == createIfNeeded
+            else {
+                setAccountFeedback(
+                    message: nil,
+                    error: "Finish login for \(pendingSession.accountName) before starting another login."
+                )
+                return
+            }
+            setAccountFeedback(
+                message: "Login already in progress for \(accountName). Continue in the existing browser or Terminal window.",
+                error: nil
+            )
+            return
+        }
+        beginTerminalLoginFlow(accountName: accountName, createIfNeeded: createIfNeeded, rootError: nil)
+    }
+
+    private func beginTerminalLoginFlow(accountName: String, createIfNeeded: Bool, rootError: Error?) {
         var sessionHomeToCleanup: String?
         do {
             let session = try makeInteractiveLoginSession(accountName: accountName, createIfNeeded: createIfNeeded)
@@ -107,26 +150,42 @@ final class AccountActionController {
             if let sessionHomeToCleanup {
                 removeLoginSandboxIfPossible(sessionHomeToCleanup)
             }
-            setAccountFeedback(
-                message: nil,
-                error: "\(rootError.localizedDescription) (Fallback failed: \(error.localizedDescription))"
-            )
+            if let rootError {
+                setAccountFeedback(
+                    message: nil,
+                    error: "\(rootError.localizedDescription) (Fallback failed: \(error.localizedDescription))"
+                )
+            } else {
+                setAccountFeedback(message: nil, error: error.localizedDescription)
+            }
         }
     }
 
     func resumePendingInteractiveLogin(_ session: PendingInteractiveLoginSession) {
         let viewModel = viewModel
-        guard viewModel.accountActionInFlightName == nil else {
+        guard viewModel.loginInFlightName == nil else {
             return
         }
 
         Task {
-            viewModel.accountActionInFlightName = session.accountName
+            viewModel.loginInFlightName = session.accountName
             viewModel.focusedAccountName = session.accountName
-            defer { viewModel.accountActionInFlightName = nil }
+            defer { viewModel.loginInFlightName = nil }
 
             _ = await self.completeInteractiveLogin(session: session, preserveFailedSession: true)
         }
+    }
+
+    func abortPendingLogin() {
+        guard let session = viewModel.pendingInteractiveLoginSession,
+              viewModel.loginInFlightName == nil
+        else {
+            return
+        }
+
+        viewModel.pendingInteractiveLoginSession = nil
+        removeLoginSandboxIfPossible(session.loginSandboxHome)
+        setAccountFeedback(message: "Aborted login for \(session.accountName).", error: nil)
     }
 
     func prepareSequentialNewAccountLogin(accountNames: [String]) {
@@ -152,7 +211,7 @@ final class AccountActionController {
         guard var state = viewModel.sequentialLoginState,
               !state.items.isEmpty,
               !state.isRunning,
-              viewModel.accountActionInFlightName == nil,
+              viewModel.loginInFlightName == nil,
               viewModel.switchingAccountName == nil,
               viewModel.pendingInteractiveLoginSession?.phase != .waitingForExternalCompletion
         else {
@@ -255,9 +314,11 @@ final class AccountActionController {
                 )
             }
 
-            _ = try await viewModel.accountService.importAuth(fromHome: session.loginSandboxHome, into: session.accountName)
-            if session.shouldApplyAccountAuthOnSuccess {
-                try await viewModel.accountService.switchAccount(name: session.accountName)
+            try await viewModel.runAuthMutation(named: session.accountName) { [self] in
+                _ = try await viewModel.accountService.importAuth(fromHome: session.loginSandboxHome, into: session.accountName)
+                if session.shouldApplyAccountAuthOnSuccess {
+                    try await viewModel.accountService.switchAccount(name: session.accountName)
+                }
             }
 
             var effectiveAccountName = session.accountName
@@ -311,9 +372,7 @@ final class AccountActionController {
                     setAccountFeedback(message: message, error: nil)
                 }
 
-                Task { @MainActor in
-                    await viewModel.refreshController.performRefresh(refreshLive: true, allowAutoSwitch: false)
-                }
+                viewModel.refreshController.triggerRefresh(refreshLive: true, allowAutoSwitch: false)
 
                 return InteractiveLoginOutcome(
                     success: true,
@@ -410,9 +469,7 @@ final class AccountActionController {
             viewModel.accountActionInFlightName = nil
 
             if shouldRefresh {
-                Task { @MainActor in
-                    await viewModel.refreshController.performRefresh(refreshLive: false)
-                }
+                viewModel.refreshController.triggerRefresh(refreshLive: false)
             }
         }
     }

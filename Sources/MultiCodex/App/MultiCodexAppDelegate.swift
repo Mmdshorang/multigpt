@@ -5,6 +5,7 @@ final class MultiCodexAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AutoSwitchNotificationCenter.shared.requestAuthorizationIfNeeded()
+        performManagedHomeMigration()
         observeWindowLifecycle()
         DispatchQueue.main.async { [weak self] in
             self?.updateActivationPolicyForVisibleWindows()
@@ -44,6 +45,19 @@ final class MultiCodexAppDelegate: NSObject, NSApplicationDelegate {
         let target: NSApplication.ActivationPolicy = hasRegularWindow ? .regular : .accessory
         if NSApp.activationPolicy() != target {
             NSApp.setActivationPolicy(target)
+        }
+    }
+
+    private func performManagedHomeMigration() {
+        let service = CodexAccountService()
+        let paths = service.currentPaths()
+        do {
+            let count = try ManagedAccountMigrator.migrateIfNeeded(paths: paths)
+            if count > 0 {
+                MultiCodexLog.log(.config, level: .info, "App startup: migrated \(count) accounts to managed homes")
+            }
+        } catch {
+            MultiCodexLog.log(.config, level: .error, "App startup: managed home migration failed: \(error.localizedDescription)")
         }
     }
 }

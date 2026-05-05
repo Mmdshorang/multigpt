@@ -4,6 +4,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case accounts
     case system
+    case data
     case about
 
     var id: String { rawValue }
@@ -16,6 +17,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return "Accounts"
         case .system:
             return "System"
+        case .data:
+            return "Data"
         case .about:
             return "About"
         }
@@ -29,6 +32,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return "person.2"
         case .system:
             return "cpu"
+        case .data:
+            return "externaldrive"
         case .about:
             return "info.circle"
         }
@@ -150,12 +155,14 @@ struct MenuAlertState {
         case runtimeUnavailable
         case refreshError
         case authRequired
+        case externalAuth
     }
 
     enum Action: Equatable {
         case openRuntimeSettings
         case refreshLive
         case relogin(accountName: String)
+        case importExternalAuth
     }
 
     let severity: Severity
@@ -163,6 +170,11 @@ struct MenuAlertState {
     let message: String
     let actionTitle: String
     let action: Action
+}
+
+struct ExternalAuthImportCandidate: Equatable {
+    let accountName: String
+    let email: String
 }
 
 struct AccountRowState: Identifiable {

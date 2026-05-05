@@ -214,6 +214,15 @@ extension SettingsContentView {
 
             Spacer(minLength: 10)
 
+            if viewModel.canAbortPendingLogin {
+                Button("Abort Login") {
+                    viewModel.abortPendingLogin()
+                }
+                .buttonStyle(.plain)
+                .font(DashboardTokens.Font.metadata().weight(.semibold))
+                .foregroundStyle(DashboardTokens.statusOrange)
+            }
+
             Button("Dismiss") {
                 viewModel.clearAccountActionFeedback()
             }

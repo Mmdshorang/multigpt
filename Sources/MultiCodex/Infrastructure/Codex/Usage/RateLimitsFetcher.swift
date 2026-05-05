@@ -46,35 +46,231 @@ extension CodexAccountService {
         )
     }
 
+    func fetchCachedLimitsNow() throws -> LimitsPayload {
+        let paths = currentPaths()
+        let config = try loadConfig(paths: paths)
+        let targets = config.accounts.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        let ttlSeconds = Self.normalizedLimitsCacheTTLSeconds(limitsCacheTTLSeconds)
+        var results: [LimitsResult] = []
+
+        for account in targets {
+            if let cached = try getCachedLimits(account: account, ttlMs: Double(ttlSeconds * 1000), paths: paths) {
+                let ageSec = Int((cached.ageMs / 1000.0).rounded())
+                results.append(LimitsResult(account: account, source: "cached", snapshot: cached.snapshot, ageSec: ageSec))
+            }
+        }
+
+        return LimitsPayload(results: results, errors: [])
+    }
+
     func fetchLimitsNow(refreshLive: Bool) throws -> LimitsPayload {
+        try fetchLimitsNow(
+            refreshLive: refreshLive,
+            cancellationToken: RefreshCancellationToken(),
+            onPartialResult: nil
+        )
+    }
+
+    func fetchLimitsNow(
+        refreshLive: Bool,
+        cancellationToken: RefreshCancellationToken,
+        onPartialResult: (@Sendable (LimitsPayload) -> Void)?
+    ) throws -> LimitsPayload {
         let paths = currentPaths()
         let config = try loadConfig(paths: paths)
         let targets = config.accounts.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
 
+        let ttlSeconds = Self.normalizedLimitsCacheTTLSeconds(limitsCacheTTLSeconds)
+        var results: [LimitsResult] = []
+        var errors: [LimitsErrorEntry] = []
+        var needsLive: [String] = []
+
+        func emitPartial() {
+            onPartialResult?(LimitsPayload(results: results, errors: errors))
+        }
+
+        for account in targets {
+            try cancellationToken.checkCancellation()
+            if !refreshLive, let cached = try getCachedLimits(account: account, ttlMs: Double(ttlSeconds * 1000), paths: paths) {
+                let ageSec = Int((cached.ageMs / 1000.0).rounded())
+                results.append(LimitsResult(account: account, source: "cached", snapshot: cached.snapshot, ageSec: ageSec))
+                emitPartial()
+            } else {
+                needsLive.append(account)
+            }
+        }
+
+        guard !needsLive.isEmpty else {
+            return LimitsPayload(results: results, errors: [])
+        }
+
+        // Split accounts into managed-home (parallel-safe) and legacy (must be serial).
+        // Only treat accounts as managed if the managed-home migration has been completed
+        // for THIS config directory. This prevents stale global managed homes from
+        // interfering with sandbox/legacy service instances.
+        let migrationMarker = URL(fileURLWithPath: paths.multicodexHome)
+            .appendingPathComponent(".managed-migration-complete")
+        let migrationCompleted = FileManager.default.fileExists(atPath: migrationMarker.path)
+
+        let managedAccounts: [String]
+        let legacyAccounts: [String]
+        if migrationCompleted {
+            managedAccounts = needsLive.filter { account in
+                guard let homeURL = ManagedCodexHomeFactory.homeURL(for: account, multicodexHome: paths.multicodexHome) else { return false }
+                return (try? ManagedCodexHomeFactory.readAuthData(from: homeURL)) != nil
+            }
+            legacyAccounts = needsLive.filter { !managedAccounts.contains($0) }
+        } else {
+            managedAccounts = []
+            legacyAccounts = needsLive
+        }
+
+        // Parallel fetch for isolated managed-home accounts only. Direct managed API
+        // is an optimization; failed accounts still fall back to the serial
+        // auth-swap/RPC path below because the API can fail independently of Codex.
+        var managedFallbackReasons: [String: String] = [:]
+        if !managedAccounts.isEmpty {
+            try cancellationToken.checkCancellation()
+            let parallelResults = fetchManagedLimitsParallel(accounts: managedAccounts, paths: paths)
+            results.append(contentsOf: parallelResults.results)
+            managedFallbackReasons = Dictionary(
+                uniqueKeysWithValues: parallelResults.errors.map { ($0.account, $0.message) }
+            )
+            emitPartial()
+            if !managedFallbackReasons.isEmpty {
+                MultiCodexLog.log(
+                    .refresh,
+                    level: .info,
+                    "Managed API fetch failed; falling back to serial RPC",
+                    metadata: ["accounts": managedFallbackReasons.keys.sorted().joined(separator: ",")]
+                )
+            }
+        }
+
+        // Serial fetch for legacy accounts that require auth swapping
+        let serialTargets = legacyAccounts + managedFallbackReasons.keys.sorted()
+        if !serialTargets.isEmpty {
+            let serialResults = try fetchLimitsSerial(
+                targets: serialTargets,
+                paths: paths,
+                cancellationToken: cancellationToken
+            ) { partial in
+                let mappedErrors = partial.errors.map { mergeManagedFallbackReason(into: $0, managedReasons: managedFallbackReasons) }
+                let merged = LimitsPayload(
+                    results: results + partial.results,
+                    errors: errors + mappedErrors
+                )
+                onPartialResult?(merged)
+            }
+            results.append(contentsOf: serialResults.results)
+            errors.append(contentsOf: serialResults.errors.map { mergeManagedFallbackReason(into: $0, managedReasons: managedFallbackReasons) })
+        }
+
+        return LimitsPayload(results: results, errors: errors)
+    }
+
+    /// Parallel fetch ONLY for accounts with managed homes.
+    /// These accounts read auth from their isolated directory — no global auth swap needed.
+    private func fetchManagedLimitsParallel(accounts: [String], paths: PathContext) -> (results: [LimitsResult], errors: [LimitsErrorEntry]) {
+        var results: [LimitsResult] = []
+        var errors: [LimitsErrorEntry] = []
+
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var completed = Set<String>()
+        var timedOut = false
+
+        for account in accounts {
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                let (result, error) = self.fetchManagedAccountLimits(account, paths: paths)
+                lock.lock()
+                guard !timedOut else {
+                    lock.unlock()
+                    group.leave()
+                    return
+                }
+                if let result { results.append(result) }
+                if let error { errors.append(error) }
+                completed.insert(account)
+                lock.unlock()
+                group.leave()
+            }
+        }
+
+        let waitResult = group.wait(timeout: .now() + 60)
+        if waitResult == .timedOut {
+            lock.lock()
+            timedOut = true
+            let missing = accounts.filter { !completed.contains($0) }
+            for account in missing {
+                errors.append(LimitsErrorEntry(account: account, message: "Managed refresh timed out."))
+            }
+            lock.unlock()
+        }
+
+        MultiCodexLog.log(
+            .refresh,
+            level: .info,
+            "Managed parallel fetch completed",
+            metadata: ["accounts": "\(accounts.count)", "results": "\(results.count)", "errors": "\(errors.count)"]
+        )
+
+        return (results: results, errors: errors)
+    }
+
+    /// Fetch limits for a single managed-home account in isolation.
+    /// Does NOT touch global auth. Uses the managed home's auth.json directly.
+    private func fetchManagedAccountLimits(_ account: String, paths: PathContext) -> (LimitsResult?, LimitsErrorEntry?) {
+        guard let homeURL = ManagedCodexHomeFactory.homeURL(for: account, multicodexHome: paths.multicodexHome) else {
+            return (nil, LimitsErrorEntry(account: account, message: "No managed home found"))
+        }
+
+        let managedAuthPath = homeURL.appendingPathComponent("auth.json").path
+
+        // Try API fetch with managed auth
+        do {
+            let snapshot = try fetchRateLimitsViaApiForAuthPath(managedAuthPath)
+            try? setCachedLimits(account: account, snapshot: snapshot, provider: "managed-api", paths: paths)
+            return (LimitsResult(account: account, source: "live-managed", snapshot: snapshot, ageSec: nil), nil)
+        } catch {
+            let message = "Managed API failed: \(error.localizedDescription)"
+            MultiCodexLog.log(.refresh, level: .debug, "Managed API fetch failed for \(account): \(error.localizedDescription)")
+            return (nil, LimitsErrorEntry(account: account, message: message))
+        }
+    }
+
+    private func mergeManagedFallbackReason(
+        into error: LimitsErrorEntry,
+        managedReasons: [String: String]
+    ) -> LimitsErrorEntry {
+        guard let managedReason = managedReasons[error.account] else {
+            return error
+        }
+        return LimitsErrorEntry(
+            account: error.account,
+            message: "\(managedReason); serial fallback failed: \(error.message)"
+        )
+    }
+
+    // Legacy auth-swap fetch must stay serial because it touches the shared system auth file.
+    private func fetchLimitsSerial(
+        targets: [String],
+        paths: PathContext,
+        cancellationToken: RefreshCancellationToken,
+        onSerialPartial: (LimitsPayload) -> Void
+    ) throws -> (results: [LimitsResult], errors: [LimitsErrorEntry]) {
         var results: [LimitsResult] = []
         var errors: [LimitsErrorEntry] = []
 
         for account in targets {
-            // 1. Check cache if not forcing live refresh
-            let ttlSeconds = Self.normalizedLimitsCacheTTLSeconds(limitsCacheTTLSeconds)
-            if !refreshLive, let cached = try getCachedLimits(account: account, ttlMs: Double(ttlSeconds * 1000), paths: paths) {
-                let ageSec = Int((cached.ageMs / 1000.0).rounded())
-                results.append(
-                    LimitsResult(
-                        account: account,
-                        source: "cached",
-                        snapshot: cached.snapshot,
-                        ageSec: ageSec
-                    )
-                )
-                continue
-            }
-
-            // 2. Try API fetch
+            try cancellationToken.checkCancellation()
+            // Legacy path: try API then RPC with auth swapping
+            let apiAuthPath = managedAuthPath(for: account, paths: paths) ?? paths.accountAuthPath(account)
             let apiResult: RateLimitSnapshot?
             let apiError: Error?
             do {
-                apiResult = try fetchRateLimitsViaApiForAuthPath(paths.accountAuthPath(account))
+                apiResult = try fetchRateLimitsViaApiForAuthPath(apiAuthPath)
                 apiError = nil
             } catch {
                 apiResult = nil
@@ -82,24 +278,18 @@ extension CodexAccountService {
             }
 
             if let snapshot = apiResult {
-                try setCachedLimits(account: account, snapshot: snapshot, provider: "api", paths: paths)
-                results.append(
-                    LimitsResult(
-                        account: account,
-                        source: "live-api",
-                        snapshot: snapshot,
-                        ageSec: nil
-                    )
-                )
+                try? setCachedLimits(account: account, snapshot: snapshot, provider: "api", paths: paths)
+                results.append(LimitsResult(account: account, source: "live-api", snapshot: snapshot, ageSec: nil))
+                onSerialPartial(LimitsPayload(results: results, errors: errors))
                 continue
             }
 
-            // 3. Fallback to RPC fetch
+            try cancellationToken.checkCancellation()
             let rpcResult: RateLimitSnapshot?
             let rpcError: Error?
             do {
                 rpcResult = try withAccountAuth(account: account, forceLock: false, restorePreviousAuth: true, paths: paths) {
-                    try fetchRateLimitsViaRpc()
+                    try self.fetchRateLimitsViaRpc()
                 }
                 rpcError = nil
             } catch {
@@ -108,33 +298,79 @@ extension CodexAccountService {
             }
 
             if let snapshot = rpcResult {
-                try setCachedLimits(account: account, snapshot: snapshot, provider: "rpc", paths: paths)
-                results.append(
-                    LimitsResult(
-                        account: account,
-                        source: "live-rpc",
-                        snapshot: snapshot,
-                        ageSec: nil
-                    )
-                )
+                try? setCachedLimits(account: account, snapshot: snapshot, provider: "rpc", paths: paths)
+                results.append(LimitsResult(account: account, source: "live-rpc", snapshot: snapshot, ageSec: nil))
+                onSerialPartial(LimitsPayload(results: results, errors: errors))
                 continue
             }
 
-            // 4. Record error if both API and RPC failed
             let apiMessage = apiError?.localizedDescription ?? "unknown"
             let rpcMessage = rpcError?.localizedDescription ?? "unknown"
-            errors.append(
-                LimitsErrorEntry(
-                    account: account,
-                    message: "API failed (\(apiMessage)); RPC fallback failed (\(rpcMessage))"
-                )
-            )
+            errors.append(LimitsErrorEntry(account: account, message: "API failed (\(apiMessage)); RPC fallback failed (\(rpcMessage))"))
+            onSerialPartial(LimitsPayload(results: results, errors: errors))
         }
 
-        return LimitsPayload(results: results, errors: errors)
+        return (results: results, errors: errors)
     }
 
     func fetchRateLimitsViaRpc() throws -> RateLimitSnapshot {
+        do {
+            return try fetchRateLimitsViaPersistentRpc()
+        } catch {
+            MultiCodexLog.log(.rpc, level: .debug, "Persistent RPC failed, falling back to one-shot RPC: \(error.localizedDescription)")
+            return try fetchRateLimitsViaOneShotRpc()
+        }
+    }
+
+    private func fetchRateLimitsViaPersistentRpc() throws -> RateLimitSnapshot {
+        let paths = currentPaths()
+        var environment = baseEnvironment()
+        if let fingerprint = authFingerprint(at: paths.defaultCodexAuthPath) {
+            environment["MULTICODEX_AUTH_FINGERPRINT"] = fingerprint
+        }
+        let semaphore = DispatchSemaphore(value: 0)
+        var response: Result<[String: Any], Error>?
+
+        Task {
+            do {
+                let payload = try await CodexRPCSession.shared.fetchRateLimits(
+                    scopedHomePath: paths.defaultCodexHome,
+                    customCodexPath: customCodexPath,
+                    environment: environment
+                )
+                response = .success(payload)
+            } catch {
+                response = .failure(error)
+            }
+            semaphore.signal()
+        }
+
+        guard semaphore.wait(timeout: .now() + 35) == .success else {
+            Task { await CodexRPCSession.shared.shutdown() }
+            throw CodexAccountServiceError(message: "Codex persistent RPC timed out while fetching rate limits.")
+        }
+
+        switch response {
+        case .success(let payload):
+            return try decodeRateLimitsRPCMessage(payload)
+        case .failure(let error):
+            throw error
+        case nil:
+            throw CodexAccountServiceError(message: "Codex persistent RPC returned no response.")
+        }
+    }
+
+    private func authFingerprint(at path: String) -> String? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
+            return "missing"
+        }
+
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        let modifiedAt = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(size):\(modifiedAt)"
+    }
+
+    private func fetchRateLimitsViaOneShotRpc() throws -> RateLimitSnapshot {
         let runtime = try resolveCodexRuntime()
         let process = Process()
         process.executableURL = runtime.executableURL
@@ -254,6 +490,10 @@ extension CodexAccountService {
         }
 
         if let responseError, !responseError.isEmpty {
+            if let recovered = recoverSnapshotFromRPCError(responseError) {
+                MultiCodexLog.log(.rpc, level: .info, "Recovered usage from RPC error body")
+                return recovered
+            }
             throw CodexAccountServiceError(message: "Codex RPC error: \(responseError)")
         }
 
@@ -265,6 +505,10 @@ extension CodexAccountService {
             throw CodexAccountServiceError(message: stderrText)
         }
 
+        return try decodeRateLimitsRPCMessage(message)
+    }
+
+    private func decodeRateLimitsRPCMessage(_ message: [String: Any]) throws -> RateLimitSnapshot {
         let result = message["result"] as? [String: Any]
         let rateLimitsValue = result?["rateLimits"]
 
@@ -278,6 +522,107 @@ extension CodexAccountService {
 
         let data = try JSONSerialization.data(withJSONObject: rateLimitsObject, options: [])
         return try decoder.decode(RateLimitSnapshot.self, from: data)
+    }
+
+    func recoverSnapshotFromRPCError(_ errorMessage: String) -> RateLimitSnapshot? {
+        guard let jsonString = extractJSONObject(after: "body=", in: errorMessage),
+              let jsonData = jsonString.data(using: .utf8),
+              let body = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any]
+        else {
+            return nil
+        }
+
+        let nowSec = Int(Date().timeIntervalSince1970)
+        let rateLimit = asObject(body["rate_limit"])
+        let primaryWindow = asObject(rateLimit?["primary_window"])
+        let secondaryWindow = asObject(rateLimit?["secondary_window"])
+        let reviewWindow = asObject(asObject(body["code_review_rate_limit"])?["primary_window"])
+
+        let primary = buildWindow(
+            usedPercent: readNumber(primaryWindow?["used_percent"]),
+            windowDurationMins: readDurationMins(window: primaryWindow, fallbackMins: 300),
+            resetsAt: readResetsAt(window: primaryWindow, nowSec: nowSec)
+        )
+
+        let secondaryCandidate = secondaryWindow ?? reviewWindow
+        let secondary = buildWindow(
+            usedPercent: readNumber(secondaryWindow?["used_percent"]) ?? readNumber(reviewWindow?["used_percent"]),
+            windowDurationMins: readDurationMins(window: secondaryCandidate, fallbackMins: 10_080),
+            resetsAt: readResetsAt(window: secondaryCandidate, nowSec: nowSec)
+        )
+
+        let creditsObject = asObject(body["credits"])
+        let hasCredits = readBoolean(creditsObject?["has_credits"])
+        let unlimited = readBoolean(creditsObject?["unlimited"])
+        let balance = readNumber(creditsObject?["balance"]).map(numberString)
+        let credits: CreditsSnapshot?
+        if hasCredits != nil || unlimited != nil || balance != nil {
+            credits = CreditsSnapshot(hasCredits: hasCredits, unlimited: unlimited, balance: balance)
+        } else {
+            credits = nil
+        }
+
+        guard primary != nil || secondary != nil || credits != nil else {
+            return nil
+        }
+
+        MultiCodexLog.log(
+            .rpc,
+            level: .info,
+            "Recovered rate limit data from RPC error body",
+            metadata: [
+                "primary": primary == nil ? "no" : "yes",
+                "secondary": secondary == nil ? "no" : "yes",
+                "credits": credits == nil ? "no" : "yes",
+            ]
+        )
+        return RateLimitSnapshot(primary: primary, secondary: secondary, credits: credits)
+    }
+
+    func extractJSONObject(after marker: String, in text: String) -> String? {
+        guard let markerRange = text.range(of: marker) else {
+            return nil
+        }
+
+        let suffix = text[markerRange.upperBound...]
+        guard let start = suffix.firstIndex(of: "{") else {
+            return nil
+        }
+
+        var depth = 0
+        var inString = false
+        var isEscaped = false
+
+        for index in suffix[start...].indices {
+            let character = suffix[index]
+
+            if inString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    inString = false
+                }
+                continue
+            }
+
+            switch character {
+            case "\"":
+                inString = true
+            case "{":
+                depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    return String(suffix[start...index])
+                }
+            default:
+                break
+            }
+        }
+
+        return nil
     }
 
 }

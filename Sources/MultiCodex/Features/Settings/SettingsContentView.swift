@@ -180,6 +180,8 @@ struct SettingsContentView: View {
                     accountsPage
                 case .system:
                     systemPage
+                case .data:
+                    dataPage
                 case .about:
                     aboutPage
                 }
@@ -192,11 +194,16 @@ struct SettingsContentView: View {
         .scrollIndicators(.never)
     }
 
+    private var dataPage: some View {
+        DataPane(viewModel: viewModel)
+    }
+
     private func selectedSectionSubtitle(for section: SettingsSection) -> String {
         switch section {
         case .general: return "Overview and behavior"
         case .accounts: return "Identity and usage"
         case .system: return "Runtime and diagnostics"
+        case .data: return "Backup and restore"
         case .about: return "Version and support"
         }
     }

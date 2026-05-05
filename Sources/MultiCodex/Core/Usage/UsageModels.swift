@@ -94,6 +94,9 @@ struct AccountUsage: Identifiable {
     let usage: UsageSummary
     let source: String
     let usageError: String?
+    let fiveHourPace: UsagePace?
+    let weeklyPace: UsagePace?
+    let costReport: CostReport?
 
     init(
         name: String,
@@ -104,7 +107,10 @@ struct AccountUsage: Identifiable {
         defaultWorkspaceEmail: String? = nil,
         usage: UsageSummary,
         source: String,
-        usageError: String?
+        usageError: String?,
+        fiveHourPace: UsagePace? = nil,
+        weeklyPace: UsagePace? = nil,
+        costReport: CostReport? = nil
     ) {
         self.name = name
         self.isCurrent = isCurrent
@@ -115,6 +121,9 @@ struct AccountUsage: Identifiable {
         self.usage = usage
         self.source = source
         self.usageError = usageError
+        self.fiveHourPace = fiveHourPace
+        self.weeklyPace = weeklyPace
+        self.costReport = costReport
     }
 
     var id: String { name }
@@ -170,6 +179,10 @@ struct AccountUsage: Identifiable {
             return .error
         }
         return .connected
+    }
+
+    var paceSummary: String? {
+        (fiveHourPace ?? weeklyPace)?.detailText
     }
 
     var connectionHint: String? {
