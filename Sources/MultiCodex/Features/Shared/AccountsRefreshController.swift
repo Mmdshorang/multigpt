@@ -355,6 +355,14 @@ final class AccountsRefreshController {
             accountIdentities: accountIdentities
         )
 
+        if result.isInSync {
+            viewModel.externalAuthImportCandidate = nil
+            if viewModel.refreshWarningMessage?.hasPrefix("Detected external login") == true {
+                viewModel.refreshWarningMessage = nil
+            }
+            return
+        }
+
         if !result.isInSync {
             MultiCodexLog.log(
                 .auth,
@@ -368,6 +376,16 @@ final class AccountsRefreshController {
                 ]
             )
 
+            if result.detectedAccountName == nil, let email = result.detectedEmail {
+                viewModel.externalAuthImportCandidate = ExternalAuthImportCandidate(
+                    accountName: email,
+                    email: email
+                )
+                viewModel.refreshWarningMessage = nil
+                return
+            }
+
+            viewModel.externalAuthImportCandidate = nil
             if viewModel.accountSwitchingStrategy == .manual {
                 if result.systemAuthChangedExternally, let detectedName = result.detectedAccountName {
                     viewModel.refreshWarningMessage = "Detected external login for \(detectedName). Auto-switching is off."

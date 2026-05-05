@@ -155,12 +155,14 @@ struct MenuAlertState {
         case runtimeUnavailable
         case refreshError
         case authRequired
+        case externalAuth
     }
 
     enum Action: Equatable {
         case openRuntimeSettings
         case refreshLive
         case relogin(accountName: String)
+        case importExternalAuth
     }
 
     let severity: Severity
@@ -168,6 +170,11 @@ struct MenuAlertState {
     let message: String
     let actionTitle: String
     let action: Action
+}
+
+struct ExternalAuthImportCandidate: Equatable {
+    let accountName: String
+    let email: String
 }
 
 struct AccountRowState: Identifiable {

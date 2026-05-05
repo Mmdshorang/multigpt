@@ -603,7 +603,7 @@ extension AccountsMenuContentView {
     }
 
     func toastView(text: String, color: Color) -> some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             Circle()
                 .fill(color)
                 .frame(width: 6, height: 6)
@@ -612,6 +612,17 @@ extension AccountsMenuContentView {
                 .font(DashboardTokens.Font.metadata().weight(.semibold))
                 .foregroundStyle(DashboardTokens.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if viewModel.canAbortPendingLogin {
+                ActionPillButton(
+                    title: "Abort Login",
+                    symbol: "xmark.circle",
+                    layout: .iconOnly
+                ) {
+                    viewModel.abortPendingLogin()
+                }
+                .help("Abort pending login")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

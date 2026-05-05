@@ -94,6 +94,23 @@ final class AccountManagementController {
         }
     }
 
+    func importExternalAuthCandidate() {
+        guard let candidate = viewModel.externalAuthImportCandidate else {
+            viewModel.accountActions.setAccountFeedback(message: nil, error: "No external login to import.")
+            return
+        }
+
+        let accountName = uniqueAccountName(base: candidate.accountName)
+        accountActions.runAccountAction(for: accountName) {
+            _ = try await self.viewModel.accountService.addAccount(name: accountName)
+            _ = try await self.viewModel.accountService.importDefaultAuth(into: accountName)
+            self.viewModel.externalAuthImportCandidate = nil
+            self.viewModel.refreshWarningMessage = nil
+            self.viewModel.upsertAuthenticatedAccountLocally(named: accountName)
+            return AccountActionOutcome.success("Imported external login as \(accountName).")
+        }
+    }
+
     func checkLoginStatus(for name: String) {
         let viewModel = viewModel
         accountActions.runAccountAction(for: name) {
@@ -111,7 +128,7 @@ final class AccountManagementController {
     }
 
     func openLoginInTerminal(for name: String) {
-        accountActions.startLoginFlow(accountName: name, createIfNeeded: false)
+        accountActions.startTerminalLoginFlow(accountName: name, createIfNeeded: false)
     }
 
     func clearAccountActionFeedback() {
@@ -205,5 +222,29 @@ final class AccountManagementController {
             }
         }
         return "account-\(Int(Date().timeIntervalSince1970))"
+    }
+
+    private func uniqueAccountName(base: String) -> String {
+        let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback = "external-account"
+        let seed = isValidAccountName(trimmed) ? trimmed : fallback
+        let existing = Set(viewModel.accounts.map(\.name))
+        if !existing.contains(seed) {
+            return seed
+        }
+
+        for index in 2...99 {
+            let candidate = "\(seed)-\(index)"
+            if !existing.contains(candidate) {
+                return candidate
+            }
+        }
+
+        return "\(fallback)-\(Int(Date().timeIntervalSince1970))"
+    }
+
+    private func isValidAccountName(_ name: String) -> Bool {
+        guard !name.isEmpty else { return false }
+        return name.range(of: "^[a-zA-Z0-9][a-zA-Z0-9_.@-]*$", options: .regularExpression) != nil
     }
 }

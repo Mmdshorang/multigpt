@@ -99,6 +99,36 @@ final class AccountActionController {
     }
 
     func launchTerminalLoginFallback(accountName: String, createIfNeeded: Bool, rootError: Error) {
+        beginTerminalLoginFlow(accountName: accountName, createIfNeeded: createIfNeeded, rootError: rootError)
+    }
+
+    func startTerminalLoginFlow(accountName: String, createIfNeeded: Bool) {
+        let viewModel = viewModel
+        guard viewModel.loginInFlightName == nil else {
+            return
+        }
+        if let pendingSession = viewModel.pendingInteractiveLoginSession,
+           pendingSession.phase == .waitingForExternalCompletion
+        {
+            guard pendingSession.accountName == accountName,
+                  pendingSession.createIfNeeded == createIfNeeded
+            else {
+                setAccountFeedback(
+                    message: nil,
+                    error: "Finish login for \(pendingSession.accountName) before starting another login."
+                )
+                return
+            }
+            setAccountFeedback(
+                message: "Login already in progress for \(accountName). Continue in the existing browser or Terminal window.",
+                error: nil
+            )
+            return
+        }
+        beginTerminalLoginFlow(accountName: accountName, createIfNeeded: createIfNeeded, rootError: nil)
+    }
+
+    private func beginTerminalLoginFlow(accountName: String, createIfNeeded: Bool, rootError: Error?) {
         var sessionHomeToCleanup: String?
         do {
             let session = try makeInteractiveLoginSession(accountName: accountName, createIfNeeded: createIfNeeded)
@@ -120,10 +150,14 @@ final class AccountActionController {
             if let sessionHomeToCleanup {
                 removeLoginSandboxIfPossible(sessionHomeToCleanup)
             }
-            setAccountFeedback(
-                message: nil,
-                error: "\(rootError.localizedDescription) (Fallback failed: \(error.localizedDescription))"
-            )
+            if let rootError {
+                setAccountFeedback(
+                    message: nil,
+                    error: "\(rootError.localizedDescription) (Fallback failed: \(error.localizedDescription))"
+                )
+            } else {
+                setAccountFeedback(message: nil, error: error.localizedDescription)
+            }
         }
     }
 
@@ -140,6 +174,18 @@ final class AccountActionController {
 
             _ = await self.completeInteractiveLogin(session: session, preserveFailedSession: true)
         }
+    }
+
+    func abortPendingLogin() {
+        guard let session = viewModel.pendingInteractiveLoginSession,
+              viewModel.loginInFlightName == nil
+        else {
+            return
+        }
+
+        viewModel.pendingInteractiveLoginSession = nil
+        removeLoginSandboxIfPossible(session.loginSandboxHome)
+        setAccountFeedback(message: "Aborted login for \(session.accountName).", error: nil)
     }
 
     func prepareSequentialNewAccountLogin(accountNames: [String]) {

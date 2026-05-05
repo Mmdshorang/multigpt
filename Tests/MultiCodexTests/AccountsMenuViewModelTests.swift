@@ -93,6 +93,118 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.refreshWarningMessage, "Detected external login for beta. Auto-switching is off.")
     }
 
+    func testUnknownExternalAuthShowsImportAlertWithoutAutoSwitching() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MultiCodexTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let codexHome = tempRoot.appendingPathComponent(".codex", isDirectory: true)
+        try FileManager.default.createDirectory(at: codexHome, withIntermediateDirectories: true)
+        try Data(#"{"email":"new@example.com"}"#.utf8)
+            .write(to: codexHome.appendingPathComponent("auth.json"))
+
+        let service = MockCodexAccountService()
+        service.pathContext = CodexAccountService.PathContext(
+            homeDir: tempRoot.path,
+            multicodexHome: tempRoot.appendingPathComponent("multicodex", isDirectory: true).path
+        )
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.stubbedResolvedIdentityByAccount = [
+            "alpha": ResolvedAccountIdentity(email: "alpha@example.com", plan: nil, accountId: nil, authMethod: .oauth),
+        ]
+        service.stubbedStoredAuthModifiedDate = Date().addingTimeInterval(-120)
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+        viewModel.setAccountSwitchingStrategy(.failover)
+
+        await viewModel.refreshController.performRefresh(refreshLive: false)
+
+        XCTAssertEqual(viewModel.currentAccount?.name, "alpha")
+        XCTAssertTrue(service.persistedCurrentAccountNames.isEmpty)
+        XCTAssertNil(viewModel.refreshWarningMessage)
+        XCTAssertEqual(
+            viewModel.externalAuthImportCandidate,
+            ExternalAuthImportCandidate(accountName: "new@example.com", email: "new@example.com")
+        )
+        XCTAssertEqual(viewModel.prioritizedMenuAlert?.action, .importExternalAuth)
+    }
+
+    func testImportExternalAuthCandidateAddsNewAccountWithoutChangingCurrent() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
+                accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+                limits: service.stubbedLimits
+            )
+        )
+        viewModel.externalAuthImportCandidate = ExternalAuthImportCandidate(
+            accountName: "new@example.com",
+            email: "new@example.com"
+        )
+
+        viewModel.importExternalAuthCandidate()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.addCalls.contains("new@example.com")
+                && service.importCalls.contains("new@example.com")
+        }
+
+        XCTAssertEqual(viewModel.currentAccount?.name, "alpha")
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "new@example.com" && $0.hasAuth }))
+        XCTAssertNil(viewModel.externalAuthImportCandidate)
+        XCTAssertEqual(viewModel.accountActionMessage, "Imported external login as new@example.com.")
+    }
+
+    func testImportExternalAuthCandidateDoesNotOverwriteExistingAccountName() async {
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+            makeAccountEntry(name: "new@example.com"),
+        ]
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: makeEphemeralDefaults()),
+            startImmediately: false
+        )
+        viewModel.updateAccounts(
+            AccountUsageMergeService.mergeAccounts(
+                accounts: AccountsListPayload(accounts: service.stubbedAccounts, currentAccount: "alpha"),
+                limits: service.stubbedLimits
+            )
+        )
+        viewModel.externalAuthImportCandidate = ExternalAuthImportCandidate(
+            accountName: "new@example.com",
+            email: "new@example.com"
+        )
+
+        viewModel.importExternalAuthCandidate()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.addCalls.contains("new@example.com-2")
+                && service.importCalls.contains("new@example.com-2")
+        }
+
+        XCTAssertFalse(service.importCalls.contains("new@example.com"))
+        XCTAssertEqual(viewModel.currentAccount?.name, "alpha")
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "new@example.com" }))
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "new@example.com-2" && $0.hasAuth }))
+        XCTAssertEqual(viewModel.accountActionMessage, "Imported external login as new@example.com-2.")
+    }
+
     func testRefreshWarningCompressesVerboseFallbackErrors() {
         let service = MockCodexAccountService()
         let viewModel = AccountsMenuViewModel(
@@ -1046,7 +1158,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertTrue(service.importFromHomeCalls.isEmpty)
     }
 
-    func testReloginReopensTerminalWhenPreviousSessionIsStillWaiting() async {
+    func testReloginKeepsExistingPendingSessionWhenPreviousSessionIsStillWaiting() async {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
         service.stubbedAccounts = [
@@ -1070,15 +1182,64 @@ final class AccountsMenuViewModelTests: XCTestCase {
         let firstSandbox = viewModel.pendingInteractiveLoginSession?.loginSandboxHome
         viewModel.openLoginInTerminal(for: "alpha")
 
+        XCTAssertEqual(service.openLoginCalls, ["alpha"])
+        XCTAssertEqual(viewModel.pendingInteractiveLoginSession?.loginSandboxHome, firstSandbox)
+        XCTAssertEqual(
+            viewModel.accountActionMessage,
+            "Login already in progress for alpha. Continue in the existing browser or Terminal window."
+        )
+        if let firstSandbox {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: firstSandbox))
+        }
+    }
+
+    func testAbortPendingLoginClearsSessionAndDeletesSandbox() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.openLoginInTerminal(for: "alpha")
+
         await waitUntil(timeoutSeconds: 1.0) {
-            service.openLoginCalls.count == 2
+            service.openLoginCalls.count == 1
+                && viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion
         }
 
-        XCTAssertEqual(service.openLoginCalls, ["alpha", "alpha"])
-        XCTAssertNotEqual(viewModel.pendingInteractiveLoginSession?.loginSandboxHome, firstSandbox)
-        if let firstSandbox {
-            XCTAssertFalse(FileManager.default.fileExists(atPath: firstSandbox))
+        let sandbox = viewModel.pendingInteractiveLoginSession?.loginSandboxHome
+        XCTAssertTrue(viewModel.canAbortPendingLogin)
+
+        viewModel.abortPendingLogin()
+
+        XCTAssertNil(viewModel.pendingInteractiveLoginSession)
+        XCTAssertFalse(viewModel.canAbortPendingLogin)
+        XCTAssertEqual(viewModel.accountActionMessage, "Aborted login for alpha.")
+        if let sandbox {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox))
         }
+    }
+
+    func testAbortPendingLoginDoesNothingWithoutPendingSession() {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.abortPendingLogin()
+
+        XCTAssertNil(viewModel.pendingInteractiveLoginSession)
+        XCTAssertNil(viewModel.accountActionMessage)
+        XCTAssertNil(viewModel.accountActionError)
     }
 
     func testStartNewAccountLoginStoresAuthWithoutAutoSwitching() async {
@@ -2005,6 +2166,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var pathContext = CodexAccountService.PathContext(homeDir: "/tmp", multicodexHome: "/tmp/multicodex")
 
     private(set) var switchCalls: [String] = []
+    private(set) var addCalls: [String] = []
     private(set) var removeCalls: [RemoveCall] = []
     private(set) var renameCalls: [(from: String, to: String)] = []
     private(set) var importCalls: [String] = []
@@ -2101,6 +2263,17 @@ private final class MockCodexAccountService: CodexAccountServicing {
                 lastLoginStatus: account.lastLoginStatus
             )
         }
+    }
+
+    func addAccount(name: String) async throws -> AddAccountPayload {
+        addCalls.append(name)
+        if !stubbedAccounts.contains(where: { $0.name == name }) {
+            stubbedAccounts.append(makeAccountEntry(name: name))
+        }
+        return AddAccountPayload(
+            account: name,
+            currentAccount: stubbedAccounts.first(where: \.isCurrent)?.name
+        )
     }
 
     func removeAccount(name: String, deleteData: Bool) async throws -> RemoveAccountPayload {

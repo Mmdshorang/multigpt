@@ -15,6 +15,7 @@ final class AccountsMenuViewModel: ObservableObject {
     @Published var authMutationInFlightName: String?
     @Published var accountActionMessage: String?
     @Published var accountActionError: String?
+    @Published var externalAuthImportCandidate: ExternalAuthImportCandidate?
     @Published var runtimeProbeSummary: String?
     @Published var isCodexRuntimeAvailable = false
     @Published var focusedAccountName: String?
@@ -43,7 +44,7 @@ final class AccountsMenuViewModel: ObservableObject {
     var activeRefreshTask: Task<Void, Never>?
     var refreshGeneration = 0
     var didBecomeActiveObserver: NSObjectProtocol?
-    var pendingInteractiveLoginSession: PendingInteractiveLoginSession?
+    @Published var pendingInteractiveLoginSession: PendingInteractiveLoginSession?
     var feedbackAutoClearTask: Task<Void, Never>?
     var sequentialLoginTask: Task<Void, Never>?
     lazy var autoSwitchNotifier: any AutoSwitchNotificationSending = autoSwitchNotifierFactory()
@@ -118,6 +119,10 @@ final class AccountsMenuViewModel: ObservableObject {
 
     var canStartLoginAction: Bool {
         loginInFlightName == nil && authMutationInFlightName == nil
+    }
+
+    var canAbortPendingLogin: Bool {
+        pendingInteractiveLoginSession != nil && loginInFlightName == nil
     }
 
     var canStartMaintenanceAccountAction: Bool {
@@ -217,12 +222,26 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     var prioritizedMenuAlert: MenuAlertState? {
-        MenuAlertPolicy.prioritizedAlert(
+        let policyAlert = MenuAlertPolicy.prioritizedAlert(
             isRuntimeAvailable: isCodexRuntimeAvailable,
             runtimeSummary: runtimeProbeSummary,
             lastRefreshError: lastRefreshError,
             accountsNeedingLogin: accountsNeedingLogin
         )
+        if policyAlert?.severity == .runtimeUnavailable || policyAlert?.severity == .refreshError {
+            return policyAlert
+        }
+        if let externalAuthImportCandidate {
+            return MenuAlertState(
+                severity: .externalAuth,
+                title: "External login detected",
+                message: "\(externalAuthImportCandidate.email) is logged in outside MultiCodex. Import it as a new account?",
+                actionTitle: "Import Account",
+                action: .importExternalAuth
+            )
+        }
+
+        return policyAlert
     }
 
     var preferredMenuAccountCount: Int {
@@ -307,6 +326,8 @@ final class AccountsMenuViewModel: ObservableObject {
             refreshLive()
         case let .relogin(accountName):
             openLoginInTerminal(for: accountName)
+        case .importExternalAuth:
+            importExternalAuthCandidate()
         }
     }
 
@@ -462,11 +483,15 @@ final class AccountsMenuViewModel: ObservableObject {
 
     func importCurrentAuth(into name: String) { accountManagement.importCurrentAuth(into: name) }
 
+    func importExternalAuthCandidate() { accountManagement.importExternalAuthCandidate() }
+
     func checkLoginStatus(for name: String) { accountManagement.checkLoginStatus(for: name) }
 
     func startLoginFlow(accountName: String, createIfNeeded: Bool) { accountActions.startLoginFlow(accountName: accountName, createIfNeeded: createIfNeeded) }
 
     func openLoginInTerminal(for name: String) { accountManagement.openLoginInTerminal(for: name) }
+
+    func abortPendingLogin() { accountActions.abortPendingLogin() }
 
     func prepareSequentialNewAccountLogin(count: Int) {
         accountManagement.prepareSequentialNewAccountLogin(count: count)
