@@ -51,15 +51,26 @@ extension CodexAccountService {
         }
         try fileManager.setAttributes([.posixPermissions: NSNumber(value: mode)], ofItemAtPath: tmp)
 
-        if fileManager.fileExists(atPath: path) {
-            try fileManager.removeItem(atPath: path)
+        // Use POSIX rename() for true atomic replacement. Unlike FileManager's
+        // removeItem + moveItem sequence, rename() is a single atomic syscall
+        // that replaces the destination without a window where the file is absent.
+        let result = tmp.withCString { src in
+            path.withCString { dst in
+                Darwin.rename(src, dst)
+            }
         }
-        try fileManager.moveItem(atPath: tmp, toPath: path)
+        if result != 0 {
+            // Fallback: remove + move (for cross-device scenarios, though unusual)
+            try? fileManager.removeItem(atPath: tmp)
+            throw CodexAccountServiceError(message: "Atomic rename failed for \(path) (errno \(errno)).")
+        }
     }
 
     func deleteFileIfExists(_ path: String) throws {
-        if fileManager.fileExists(atPath: path) {
+        do {
             try fileManager.removeItem(atPath: path)
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileNoSuchFileError {
+            // Already absent — not an error.
         }
     }
 
@@ -114,7 +125,18 @@ extension CodexAccountService {
         let lockDir = paths.authLockDir
         let owner = AuthLockOwner(pid: getpid(), startedAt: Self.nowISO(), account: account)
 
-        while true {
+        MultiCodexLog.log(
+            .auth,
+            level: .debug,
+            "Acquiring auth lock for \(account)",
+            metadata: ["force": force ? "yes" : "no"]
+        )
+
+        var retryCount = 0
+        let maxRetries = 50
+
+        while retryCount < maxRetries {
+            retryCount += 1
             let mkdirResult = lockDir.withCString { ptr in
                 mkdir(ptr, S_IRWXU)
             }
@@ -122,6 +144,11 @@ extension CodexAccountService {
             if mkdirResult == 0 {
                 let handle = AuthLockHandle(lockDir: lockDir)
                 try writeOwner(owner, lockDir: lockDir)
+                MultiCodexLog.log(
+                    .auth,
+                    level: .debug,
+                    "Auth lock acquired for \(account)"
+                )
                 return handle
             }
 
@@ -131,11 +158,27 @@ extension CodexAccountService {
 
             let existing = readOwner(lockDir: lockDir)
             if let existing, !isPidRunning(existing.pid) {
+                MultiCodexLog.log(
+                    .auth,
+                    level: .info,
+                    "Removing stale auth lock from dead process",
+                    metadata: [
+                        "stalePid": "\(existing.pid)",
+                        "staleAccount": existing.account,
+                        "staleStartedAt": existing.startedAt,
+                    ]
+                )
                 try? fileManager.removeItem(atPath: lockDir)
                 continue
             }
 
             if force {
+                MultiCodexLog.log(
+                    .auth,
+                    level: .info,
+                    "Force-removing auth lock held by \(existing?.account ?? "unknown")",
+                    metadata: ["existingPid": existing.map { "\($0.pid)" } ?? "unknown"]
+                )
                 try? fileManager.removeItem(atPath: lockDir)
                 continue
             }
@@ -149,6 +192,8 @@ extension CodexAccountService {
 
             throw CodexAccountServiceError(message: "Auth swap is locked by \(who). Close the other session and retry.")
         }
+
+        throw CodexAccountServiceError(message: "Failed to acquire auth lock for \(account) after \(maxRetries) attempts.")
     }
 
     func readOwner(lockDir: String) -> AuthLockOwner? {
@@ -175,6 +220,13 @@ extension CodexAccountService {
         paths: PathContext,
         body: () throws -> T
     ) throws -> T {
+        MultiCodexLog.log(
+            .auth,
+            level: .debug,
+            "withAccountAuth: swapping auth for \(account)",
+            metadata: ["restorePrevious": restorePreviousAuth ? "yes" : "no"]
+        )
+
         let lock = try acquireAuthLock(account: account, force: forceLock, paths: paths)
         defer { lock.release() }
 
@@ -198,8 +250,18 @@ extension CodexAccountService {
             if restorePreviousAuth {
                 try restoreDefaultAuth()
             }
+            MultiCodexLog.log(
+                .auth,
+                level: .debug,
+                "withAccountAuth: completed for \(account)"
+            )
             return result
         } catch {
+            MultiCodexLog.log(
+                .auth,
+                level: .error,
+                "withAccountAuth: failed for \(account): \(error.localizedDescription)"
+            )
             if restorePreviousAuth {
                 try? restoreDefaultAuth()
             }

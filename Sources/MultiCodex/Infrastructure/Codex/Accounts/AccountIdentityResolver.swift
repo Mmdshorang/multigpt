@@ -132,40 +132,6 @@ extension CodexAccountService {
         return trimmed
     }
 
-    private func decodeJWTPayload(_ token: String) -> [String: Any]? {
-        let segments = token.split(separator: ".", omittingEmptySubsequences: false)
-        guard segments.count >= 2 else {
-            return nil
-        }
-
-        let payloadSegment = String(segments[1])
-            .replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-        let paddingCount = (4 - payloadSegment.count % 4) % 4
-        let padded = payloadSegment + String(repeating: "=", count: paddingCount)
-
-        guard let payloadData = Data(base64Encoded: padded),
-              let object = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
-        else {
-            return nil
-        }
-
-        return object
-    }
-
-    private func resolveEmail(idClaims: [String: Any]?, accessClaims: [String: Any]?) -> String? {
-        if let email = idClaims?["email"] as? String, !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return email
-        }
-        if let profile = accessClaims?["https://api.openai.com/profile"] as? [String: Any],
-           let email = profile["email"] as? String,
-           !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        {
-            return email
-        }
-        return nil
-    }
-
     private func sanitizeIdentitySegment(
         _ rawValue: String,
         allowAtSymbol: Bool,

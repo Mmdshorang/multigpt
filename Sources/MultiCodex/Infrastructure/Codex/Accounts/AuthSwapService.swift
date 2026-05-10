@@ -17,12 +17,14 @@ enum AuthSwapService {
     ) throws {
         let systemAuthURL = URL(fileURLWithPath: paths.defaultCodexAuthPath)
 
-        // Step 1: Displaced account preservation — only if system auth actually matches the previous account
+        // Step 1: Displaced account preservation — only write system auth back to
+        // the previous account if it actually belongs to that account.
         if let previousName = previousAccountName,
            let currentSystemAuth = try? Data(contentsOf: URL(fileURLWithPath: paths.defaultCodexAuthPath))
         {
+            let previousAccountAuth = try? readAuthData(account: previousName, paths: paths)
+
             if !force {
-                let previousAccountAuth = try? readAuthData(account: previousName, paths: paths)
                 if let previousAccountAuth,
                    !authDataMatches(currentSystemAuth, previousAccountAuth)
                 {
@@ -35,12 +37,43 @@ enum AuthSwapService {
                     )
                 }
             }
-            try writeAuthData(currentSystemAuth, account: previousName, paths: paths)
-            MultiCodexLog.log(
-                .auth,
-                level: .info,
-                "Preserved displaced auth to \(previousName)'s account storage"
-            )
+
+            // Even in the force path, verify that system auth actually belongs to
+            // the previous account before writing it back. This prevents account
+            // data corruption when the system auth was modified externally.
+            let shouldPreserve: Bool
+            if let previousAccountAuth {
+                shouldPreserve = identityBelongsToAccount(
+                    systemAuth: currentSystemAuth,
+                    storedAuth: previousAccountAuth
+                )
+            } else {
+                // No stored auth for the previous account — safe to write (first-time setup).
+                shouldPreserve = true
+            }
+
+            if shouldPreserve {
+                try writeAuthData(currentSystemAuth, account: previousName, paths: paths)
+                MultiCodexLog.log(
+                    .auth,
+                    level: .info,
+                    "Preserved displaced auth to \(previousName)'s account storage"
+                )
+            } else {
+                let systemIdentity = resolveIdentity(from: currentSystemAuth)
+                let previousIdentity = previousAccountAuth.flatMap { resolveIdentity(from: $0) }
+                MultiCodexLog.log(
+                    .auth,
+                    level: .error,
+                    "Skipped displaced auth preservation: system auth identity does not match \(previousName)",
+                    metadata: [
+                        "systemEmail": systemIdentity?.email ?? "nil",
+                        "systemAccountId": systemIdentity?.accountId ?? "nil",
+                        "previousEmail": previousIdentity?.email ?? "nil",
+                        "previousAccountId": previousIdentity?.accountId ?? "nil",
+                    ]
+                )
+            }
         }
 
         // Step 2: Read target account's auth, preferring scoped managed homes.
@@ -80,14 +113,71 @@ enum AuthSwapService {
         else {
             return lhs == rhs
         }
+
+        // Check API key identity
+        let leftAPIKey = leftPayload["OPENAI_API_KEY"] as? String
+        let rightAPIKey = rightPayload["OPENAI_API_KEY"] as? String
+        if let leftAPIKey, let rightAPIKey {
+            return leftAPIKey == rightAPIKey
+        }
+        if (leftAPIKey != nil) != (rightAPIKey != nil) {
+            return false // Different auth methods
+        }
+
         let leftTokens = leftPayload["tokens"] as? [String: Any]
         let rightTokens = rightPayload["tokens"] as? [String: Any]
+
+        // Check account_id first
         let leftID = leftTokens?["account_id"] as? String
         let rightID = rightTokens?["account_id"] as? String
         if let leftID, let rightID {
+            // Also check email if available to differentiate users in the same org
+            let leftEmail = parseJWTEmail(leftTokens?["access_token"] as? String ?? "")
+            let rightEmail = parseJWTEmail(rightTokens?["access_token"] as? String ?? "")
+            if let leftEmail, let rightEmail {
+                return leftID == rightID && leftEmail.lowercased() == rightEmail.lowercased()
+            }
             return leftID == rightID
         }
+
+        // Fallback: check email alone
+        let leftEmail = parseJWTEmail(leftTokens?["access_token"] as? String ?? "")
+        let rightEmail = parseJWTEmail(rightTokens?["access_token"] as? String ?? "")
+        if let leftEmail, let rightEmail {
+            return leftEmail.lowercased() == rightEmail.lowercased()
+        }
+
         return lhs == rhs
+    }
+
+    /// Determines whether system auth data belongs to the same identity as stored account auth.
+    /// More permissive than `authDataMatches` — returns true if identities overlap or if we can't determine.
+    private static func identityBelongsToAccount(systemAuth: Data, storedAuth: Data) -> Bool {
+        let systemIdentity = resolveIdentity(from: systemAuth)
+        let storedIdentity = resolveIdentity(from: storedAuth)
+
+        // If we can't resolve either identity, fall back to byte comparison
+        guard let systemIdentity, let storedIdentity else {
+            return systemAuth == storedAuth
+        }
+
+        // Different auth methods means definitely different accounts
+        if systemIdentity.authMethod != storedIdentity.authMethod {
+            return false
+        }
+
+        // Check email match (most reliable identifier)
+        if let sysEmail = systemIdentity.email, let storedEmail = storedIdentity.email {
+            return sysEmail.lowercased() == storedEmail.lowercased()
+        }
+
+        // Check account_id match
+        if let sysId = systemIdentity.accountId, let storedId = storedIdentity.accountId {
+            return sysId == storedId
+        }
+
+        // Cannot determine — be conservative, don't overwrite
+        return false
     }
 
     private static func resolveIdentity(from data: Data) -> ResolvedAccountIdentity? {
