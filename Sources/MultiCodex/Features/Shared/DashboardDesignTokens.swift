@@ -83,9 +83,22 @@ enum DashboardTokens {
     static let sidebarSelectedBackground = accent.opacity(0.12)
     static let sidebarHoverBackground = Color.white.opacity(0.044)
 
+    // MARK: - Hover
+
+    static let hoverOverlay = Color.white.opacity(0.048)
+    static let hoverBorder = Color.white.opacity(0.12)
+
+    // MARK: - Glow
+
+    static let ringGlow = accent.opacity(0.28)
+    static let ringGlowCritical = statusRed.opacity(0.28)
+    static let ringGlowWarning = statusOrange.opacity(0.28)
+
     // MARK: - Shadow
 
     static let shadowColor = Color.black.opacity(0.30)
+    static let shadowSubtle = Color.black.opacity(0.16)
+    static let shadowMedium = Color.black.opacity(0.22)
 
     // MARK: - Gradients
 
@@ -102,6 +115,14 @@ enum DashboardTokens {
             colors: [Color.white.opacity(0.070), Color.white.opacity(0.010)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
+        )
+    }
+
+    static var glassHighlight: LinearGradient {
+        LinearGradient(
+            colors: [Color.white.opacity(0.058), Color.white.opacity(0.008)],
+            startPoint: .top,
+            endPoint: .bottom
         )
     }
 
