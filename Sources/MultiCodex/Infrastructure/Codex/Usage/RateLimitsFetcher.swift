@@ -293,8 +293,12 @@ extension CodexAccountService {
             let rpcResult: RateLimitSnapshot?
             let rpcError: Error?
             do {
+                // Use one-shot RPC only in the serial auth-swap path. The persistent
+                // RPC session is a singleton whose running process reads auth at launch
+                // and won't pick up the swapped auth file reliably. One-shot spawns a
+                // fresh process that reads the current auth from disk.
                 rpcResult = try withAccountAuth(account: account, forceLock: false, restorePreviousAuth: true, paths: paths) {
-                    try self.fetchRateLimitsViaRpc()
+                    try self.fetchRateLimitsViaOneShotRpc()
                 }
                 rpcError = nil
             } catch {
