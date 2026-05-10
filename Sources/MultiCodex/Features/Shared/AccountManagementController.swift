@@ -14,6 +14,8 @@ final class AccountManagementController {
         viewModel.cancelActiveRefreshForUserSwitch()
         viewModel.pendingForceSwitchTarget = nil
 
+        MultiCodexLog.log(.switching, level: .info, "User initiated switch to \(name)")
+
         viewModel.runSwitchAction(named: name) {
             do {
                 try await viewModel.runAuthMutation(named: name) {
@@ -48,6 +50,8 @@ final class AccountManagementController {
     func forceSwitchToAccount(named name: String) {
         let viewModel = viewModel
         viewModel.pendingForceSwitchTarget = nil
+
+        MultiCodexLog.log(.switching, level: .info, "User initiated force-switch to \(name)")
 
         viewModel.runSwitchAction(named: name) {
             try await viewModel.runAuthMutation(named: name) {

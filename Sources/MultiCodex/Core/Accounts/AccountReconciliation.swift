@@ -30,10 +30,14 @@ enum AccountReconciliation {
                 detectedIdentity = .unresolved
             }
 
-            // Match by provider account ID first, then email
+            // Match by provider account ID first, then email.
+            // Sort keys for deterministic matching when multiple accounts
+            // share the same identity (e.g., same email with different names).
             if detectedIdentity != .unresolved {
-                for (name, knownIdentity) in accountIdentities {
-                    if AccountIdentityMatcher.matches(detectedIdentity, knownIdentity) {
+                for name in accountIdentities.keys.sorted() {
+                    if let knownIdentity = accountIdentities[name],
+                       AccountIdentityMatcher.matches(detectedIdentity, knownIdentity)
+                    {
                         detectedAccountName = name
                         break
                     }
