@@ -29,13 +29,6 @@ extension AccountsMenuContentView {
                 ) {
                     viewModel.refreshLive()
                 }
-                .rotationEffect(.degrees(viewModel.isRefreshing ? 360 : 0))
-                .animation(
-                    viewModel.isRefreshing
-                        ? .linear(duration: 1).repeatForever(autoreverses: false)
-                        : .default,
-                    value: viewModel.isRefreshing
-                )
                 .keyboardShortcut("r", modifiers: [.command])
                 .help("Refresh usage (Cmd+R)")
 
@@ -299,7 +292,6 @@ extension AccountsMenuContentView {
                     accountsRowsList
                 }
                 .frame(height: accountsListScrollHeight)
-                .animation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion), value: accountsListScrollHeight)
             } else {
                 accountsRowsList
             }
@@ -726,12 +718,10 @@ extension AccountsMenuContentView {
 
     func toggleAllAccountsExpanded() {
         let visibleNames = Set(visibleRows.map(\.name))
-        withAnimation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion)) {
-            if areAllAccountsExpanded {
-                expandedAccountNames.subtract(visibleNames)
-            } else {
-                expandedAccountNames.formUnion(visibleNames)
-            }
+        if areAllAccountsExpanded {
+            expandedAccountNames.subtract(visibleNames)
+        } else {
+            expandedAccountNames.formUnion(visibleNames)
         }
     }
 

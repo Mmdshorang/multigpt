@@ -13,7 +13,6 @@ struct DashboardAccountRow: View {
     let onActivate: () -> Void
     let onRowTap: () -> Void
     let onToggleExpanded: () -> Void
-    @State private var disclosureProgress: CGFloat = 0
     @State private var isHovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -156,10 +155,9 @@ struct DashboardAccountRow: View {
 
                     Spacer(minLength: 4)
 
-                    Image(systemName: "chevron.down")
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(DashboardTokens.Font.chevron())
                         .foregroundStyle(DashboardTokens.textTertiary)
-                        .rotationEffect(.degrees(180 * disclosureProgress))
                 }
                 .contentShape(Rectangle())
                 .help(primaryAreaHelpText)
@@ -179,9 +177,7 @@ struct DashboardAccountRow: View {
         )
         .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous))
         .onHover { hovering in
-            withAnimation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion)) {
-                isHovered = hovering
-            }
+            isHovered = hovering
         }
         .onTapGesture {
             onRowTap()
@@ -190,14 +186,6 @@ struct DashboardAccountRow: View {
         .accessibilityHint("Use the primary action button to switch or re-login. Use row action to expand details.")
         .accessibilityAction(named: Text(isExpanded ? "Collapse details" : "Expand details")) {
             onToggleExpanded()
-        }
-        .onAppear {
-            disclosureProgress = isExpanded ? 1 : 0
-        }
-        .onChange(of: isExpanded) { expanded in
-            withAnimation(DashboardTokens.Motion.disclosure(reduceMotion: reduceMotion)) {
-                disclosureProgress = expanded ? 1 : 0
-            }
         }
     }
 
@@ -273,7 +261,6 @@ struct DashboardAccountRow: View {
             if isExpanded {
                 expandedContent
                     .padding(.top, 12)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
