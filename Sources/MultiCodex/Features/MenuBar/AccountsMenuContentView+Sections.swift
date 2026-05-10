@@ -29,6 +29,13 @@ extension AccountsMenuContentView {
                 ) {
                     viewModel.refreshLive()
                 }
+                .rotationEffect(.degrees(viewModel.isRefreshing ? 360 : 0))
+                .animation(
+                    viewModel.isRefreshing
+                        ? .linear(duration: 1).repeatForever(autoreverses: false)
+                        : .default,
+                    value: viewModel.isRefreshing
+                )
                 .keyboardShortcut("r", modifiers: [.command])
                 .help("Refresh usage (Cmd+R)")
 
@@ -44,7 +51,7 @@ extension AccountsMenuContentView {
                 .help("Open Settings (Cmd+,)")
             }
         }
-        .cardStyle(fill: DashboardTokens.cardBackgroundSubtle)
+        .cardStyle(fill: DashboardTokens.cardBackgroundSubtle, hasGlass: true)
     }
 }
 
@@ -129,7 +136,7 @@ extension AccountsMenuContentView {
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
+                .stroke(DashboardTokens.cardBorder, lineWidth: 0.5)
         )
     }
 
@@ -223,7 +230,7 @@ extension AccountsMenuContentView {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
+        .cardStyle(fill: DashboardTokens.cardBackgroundElevated, hasGlass: true)
     }
 
 }
@@ -252,7 +259,7 @@ extension AccountsMenuContentView {
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                .stroke(runtimeStatus.color.opacity(0.14), lineWidth: 1)
+                .stroke(runtimeStatus.color.opacity(0.14), lineWidth: 0.5)
         )
     }
 }
@@ -297,7 +304,7 @@ extension AccountsMenuContentView {
                 accountsRowsList
             }
         }
-        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
+        .cardStyle(fill: DashboardTokens.cardBackgroundElevated, hasGlass: true)
     }
 
     private var accountsRowsList: some View {
@@ -398,7 +405,7 @@ extension AccountsMenuContentView {
                 }
             }
         }
-        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
+        .cardStyle(fill: DashboardTokens.cardBackgroundElevated, hasGlass: true)
     }
 }
 
@@ -437,7 +444,7 @@ extension AccountsMenuContentView {
             }
             .accessibilityHidden(true)
         }
-        .cardStyle(fill: DashboardTokens.cardBackgroundElevated)
+        .cardStyle(fill: DashboardTokens.cardBackgroundElevated, hasGlass: true)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Loading account data")
         .accessibilityValue("Refreshing accounts and usage")
@@ -609,6 +616,7 @@ extension AccountsMenuContentView {
             Circle()
                 .fill(color)
                 .frame(width: 6, height: 6)
+                .shadow(color: color.opacity(0.40), radius: 3, y: 0)
 
             Text(text)
                 .font(DashboardTokens.Font.metadata().weight(.semibold))
@@ -629,13 +637,18 @@ extension AccountsMenuContentView {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                .fill(DashboardTokens.cardBackgroundElevated)
+            ZStack {
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                    .fill(DashboardTokens.cardBackgroundElevated)
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                    .fill(DashboardTokens.glassHighlight)
+            }
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                .stroke(color.opacity(0.28), lineWidth: 1)
+                .stroke(color.opacity(0.28), lineWidth: 0.5)
         )
+        .shadow(color: DashboardTokens.shadowSubtle, radius: 8, y: 4)
     }
 
     var isSwitchBusy: Bool {

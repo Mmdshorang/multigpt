@@ -147,12 +147,16 @@ extension SettingsContentView {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(DashboardTokens.Spacing.compactCardPadding)
         .background(
-            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .fill(DashboardTokens.cardBackgroundSubtle)
+            ZStack {
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                    .fill(DashboardTokens.cardBackgroundSubtle)
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
+                    .fill(DashboardTokens.glassHighlight)
+            }
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.cardRadius, style: .continuous)
-                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
+                .stroke(DashboardTokens.cardBorder, lineWidth: 0.5)
         )
     }
 
@@ -194,7 +198,7 @@ extension SettingsContentView {
         )
         .overlay(
             Capsule()
-                .stroke(color.opacity(0.20), lineWidth: 1)
+                .stroke(color.opacity(0.20), lineWidth: 0.5)
         )
     }
 
@@ -238,7 +242,7 @@ extension SettingsContentView {
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                .stroke(color.opacity(0.16), lineWidth: 1)
+                .stroke(color.opacity(0.16), lineWidth: 0.5)
         )
     }
 }

@@ -14,6 +14,7 @@ struct DashboardAccountRow: View {
     let onRowTap: () -> Void
     let onToggleExpanded: () -> Void
     @State private var disclosureProgress: CGFloat = 0
+    @State private var isHovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - Derived State
@@ -72,22 +73,22 @@ struct DashboardAccountRow: View {
 
     private var rowBackgroundColor: Color {
         if row.isCurrent {
-            return DashboardTokens.accentBackground.opacity(0.40)
+            return DashboardTokens.accentBackground.opacity(isHovered ? 0.52 : 0.40)
         }
         if row.primaryAction == .relogin {
-            return DashboardTokens.statusOrange.opacity(0.08)
+            return DashboardTokens.statusOrange.opacity(isHovered ? 0.12 : 0.08)
         }
-        return DashboardTokens.cardBackgroundSubtle
+        return isHovered ? DashboardTokens.hoverOverlay : DashboardTokens.cardBackgroundSubtle
     }
 
     private var rowBorderColor: Color {
         if row.isCurrent {
-            return DashboardTokens.accent.opacity(0.26)
+            return DashboardTokens.accent.opacity(isHovered ? 0.34 : 0.26)
         }
         if row.primaryAction == .relogin {
-            return DashboardTokens.statusOrange.opacity(0.20)
+            return DashboardTokens.statusOrange.opacity(isHovered ? 0.28 : 0.20)
         }
-        return DashboardTokens.cardBorder
+        return isHovered ? DashboardTokens.hoverBorder : DashboardTokens.cardBorder
     }
 
     private var statusColor: Color {
@@ -105,6 +106,13 @@ struct DashboardAccountRow: View {
         case .switchAccount: return nil
         case .none: return row.account.connectionState.label
         }
+    }
+
+    /// Inline micro usage bar color for the 5h metric in collapsed state
+    private var microBarColor: Color {
+        if fiveHourProgressValue > 0.80 { return DashboardTokens.statusRed }
+        if fiveHourProgressValue > 0.60 { return DashboardTokens.statusOrange }
+        return DashboardTokens.accent
     }
 
     // MARK: - Body
@@ -131,13 +139,22 @@ struct DashboardAccountRow: View {
                             }
                         }
 
-                        Text(row.workspaceEmailHint ?? row.resetText)
-                            .font(DashboardTokens.Font.metadata())
-                            .foregroundStyle(DashboardTokens.textSecondary)
-                            .lineLimit(1)
+                        HStack(spacing: 6) {
+                            Text(row.workspaceEmailHint ?? row.resetText)
+                                .font(DashboardTokens.Font.metadata())
+                                .foregroundStyle(DashboardTokens.textSecondary)
+                                .lineLimit(1)
+
+                            Spacer(minLength: 4)
+
+                            // Inline micro usage bar (collapsed only)
+                            if !isExpanded, row.account.connectionState == .connected {
+                                microUsageBar
+                            }
+                        }
                     }
 
-                    Spacer(minLength: 8)
+                    Spacer(minLength: 4)
 
                     Image(systemName: "chevron.down")
                         .font(DashboardTokens.Font.chevron())
@@ -158,9 +175,14 @@ struct DashboardAccountRow: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous)
-                .stroke(rowBorderColor, lineWidth: 1)
+                .stroke(rowBorderColor, lineWidth: 0.5)
         )
         .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.rowRadius, style: .continuous))
+        .onHover { hovering in
+            withAnimation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion)) {
+                isHovered = hovering
+            }
+        }
         .onTapGesture {
             onRowTap()
         }
@@ -177,6 +199,24 @@ struct DashboardAccountRow: View {
                 disclosureProgress = expanded ? 1 : 0
             }
         }
+    }
+
+    // MARK: - Micro Usage Bar (collapsed inline)
+
+    private var microUsageBar: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.06))
+
+                Capsule()
+                    .fill(microBarColor.opacity(0.72))
+                    .frame(width: proxy.size.width * CGFloat(min(1, max(0, fiveHourProgressValue))))
+            }
+        }
+        .frame(width: 36, height: 3)
+        .accessibilityLabel("5h usage")
+        .accessibilityValue(fiveHourPercentText)
     }
 
     // MARK: - Activation Button
@@ -198,7 +238,7 @@ struct DashboardAccountRow: View {
                 Circle()
                     .fill(activationBackgroundColor)
                 Circle()
-                    .stroke(activationBorderColor, lineWidth: 1)
+                    .stroke(activationBorderColor, lineWidth: 0.5)
 
                 if isPrimaryActionInProgress {
                     ProgressView()
@@ -211,6 +251,11 @@ struct DashboardAccountRow: View {
                 }
             }
             .frame(width: 24, height: 24)
+            .shadow(
+                color: row.primaryAction == .none ? DashboardTokens.accent.opacity(0.18) : .clear,
+                radius: row.primaryAction == .none ? 4 : 0,
+                y: 0
+            )
         }
         .buttonStyle(.plain)
         .disabled(isActivationDisabled)
@@ -285,12 +330,19 @@ struct DashboardAccountRow: View {
 
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                    Capsule()
+                        .fill(Color.white.opacity(0.06))
 
-                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                        .fill(color)
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [color.opacity(0.70), color],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .frame(width: proxy.size.width * CGFloat(min(1, max(0, progress))))
+                        .shadow(color: color.opacity(0.30), radius: 3, y: 0)
                 }
             }
             .frame(height: 4)

@@ -85,7 +85,7 @@ struct AccountStatusPill: View {
             )
             .overlay(
                 Capsule()
-                    .stroke(color.opacity(0.26), lineWidth: 1)
+                    .stroke(color.opacity(0.26), lineWidth: 0.5)
             )
             .foregroundStyle(color)
     }
@@ -118,7 +118,7 @@ struct SubtleWarningRow: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                .stroke(DashboardTokens.statusOrange.opacity(0.14), lineWidth: 1)
+                .stroke(DashboardTokens.statusOrange.opacity(0.14), lineWidth: 0.5)
         )
     }
 }
