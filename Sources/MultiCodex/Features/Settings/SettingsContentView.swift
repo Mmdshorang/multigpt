@@ -154,7 +154,7 @@ struct SettingsContentView: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isSelected ? DashboardTokens.accent.opacity(0.16) : Color.clear, lineWidth: 1)
+                    .stroke(isSelected ? DashboardTokens.accent.opacity(0.16) : Color.clear, lineWidth: 0.5)
             )
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }

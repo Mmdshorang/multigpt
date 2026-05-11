@@ -39,7 +39,7 @@ private struct SettingsToggleStyle: ToggleStyle {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .stroke(configuration.isOn ? DashboardTokens.accent.opacity(0.42) : DashboardTokens.cardBorder, lineWidth: 1)
+                            .stroke(configuration.isOn ? DashboardTokens.accent.opacity(0.42) : DashboardTokens.cardBorder, lineWidth: 0.5)
                     )
             }
             .frame(minHeight: 28)

@@ -398,8 +398,22 @@ final class AccountsRefreshController {
                 do {
                     try service.persistCurrentAccountIfKnown(detectedName)
                     viewModel.applyCurrentAccountLocally(named: detectedName)
+                    MultiCodexLog.log(
+                        .switching,
+                        level: .info,
+                        "Reconciliation: auto-corrected current account to match system auth",
+                        metadata: [
+                            "previousCurrent": result.configCurrentAccount ?? "none",
+                            "correctedTo": detectedName,
+                        ]
+                    )
                 } catch {
                     viewModel.refreshWarningMessage = "Detected account \(detectedName), but failed to persist reconciliation."
+                    MultiCodexLog.log(
+                        .switching,
+                        level: .error,
+                        "Reconciliation: failed to persist corrected account: \(error.localizedDescription)"
+                    )
                 }
             } else if result.systemAuthChangedExternally, let email = result.detectedEmail {
                 viewModel.refreshWarningMessage = "Detected external login for \(email). This account is not in MultiCodex."

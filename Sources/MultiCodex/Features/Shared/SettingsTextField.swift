@@ -21,7 +21,7 @@ struct SettingsTextField: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                    .stroke(isFocused ? DashboardTokens.inputBorderFocused : DashboardTokens.inputBorder, lineWidth: 1)
+                    .stroke(isFocused ? DashboardTokens.inputBorderFocused : DashboardTokens.inputBorder, lineWidth: 0.5)
             )
             .shadow(
                 color: DashboardTokens.shadowColor.opacity(isFocused ? 0.16 : 0),

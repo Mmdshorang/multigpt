@@ -134,7 +134,9 @@ struct AppPreferencesStore {
 
     var limitsCacheTTLSeconds: Int {
         get {
-            defaults.integer(forKey: Keys.limitsCacheTTLSeconds)
+            let value = defaults.integer(forKey: Keys.limitsCacheTTLSeconds)
+            // UserDefaults.integer returns 0 for unset keys; treat as "use default"
+            return value > 0 ? value : CodexAccountService.defaultLimitsCacheTTLSeconds
         }
         set {
             defaults.set(newValue, forKey: Keys.limitsCacheTTLSeconds)

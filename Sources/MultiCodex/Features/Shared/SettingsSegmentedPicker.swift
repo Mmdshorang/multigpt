@@ -30,7 +30,7 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.smallRadius, style: .continuous)
-                                .stroke(isSelected ? DashboardTokens.segmentedActiveBorder : Color.clear, lineWidth: 1)
+                                .stroke(isSelected ? DashboardTokens.segmentedActiveBorder : Color.clear, lineWidth: 0.5)
                         )
                 }
                 .buttonStyle(.plain)
@@ -47,7 +47,7 @@ struct SettingsSegmentedPicker<T: Hashable>: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                .stroke(DashboardTokens.cardBorder, lineWidth: 1)
+                .stroke(DashboardTokens.cardBorder, lineWidth: 0.5)
         )
     }
 }

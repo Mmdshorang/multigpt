@@ -19,6 +19,7 @@ struct ActionPillButton: View {
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovered = false
 
     var body: some View {
         Group {
@@ -37,6 +38,12 @@ struct ActionPillButton: View {
         .buttonStyle(ActionPillPressStyle(reduceMotion: reduceMotion))
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.40 : 1)
+        .onHover { hovering in
+            guard !isDisabled else { return }
+            withAnimation(DashboardTokens.Motion.hover(reduceMotion: reduceMotion)) {
+                isHovered = hovering
+            }
+        }
         .accessibilityLabel(title)
         .accessibilityHint(accessibilityHint)
         .contentShape(RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous))
@@ -68,20 +75,32 @@ struct ActionPillButton: View {
     }
 
     private var backgroundShape: some View {
-        RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-            .fill(role == .primary ? primaryBackground : secondaryBackground)
+        ZStack {
+            RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                .fill(role == .primary ? primaryBackground : secondaryBackground)
+
+            if isHovered {
+                RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
+                    .fill(Color.white.opacity(role == .primary ? 0.08 : 0.04))
+            }
+        }
     }
 
     private var borderShape: some View {
         RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-            .stroke(role == .primary ? DashboardTokens.accent.opacity(0.42) : borderColor, lineWidth: 1)
+            .stroke(
+                role == .primary
+                    ? DashboardTokens.accent.opacity(isHovered ? 0.56 : 0.42)
+                    : (isHovered ? DashboardTokens.hoverBorder : borderColor),
+                lineWidth: 0.5
+            )
     }
 
     private var primaryBackground: LinearGradient {
         LinearGradient(
             colors: [
                 DashboardTokens.accent.opacity(0.96),
-                DashboardTokens.accent.opacity(0.86)
+                DashboardTokens.accent.opacity(0.86),
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -92,7 +111,7 @@ struct ActionPillButton: View {
         LinearGradient(
             colors: [
                 DashboardTokens.cardBackgroundSubtle,
-                DashboardTokens.cardBackgroundSubtle
+                DashboardTokens.cardBackgroundSubtle,
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -104,11 +123,14 @@ struct ActionPillButton: View {
     }
 
     private var foregroundColor: Color {
-        role == .primary ? .white : DashboardTokens.textPrimary
+        if isHovered, role == .secondary {
+            return DashboardTokens.textPrimary.opacity(1)
+        }
+        return role == .primary ? .white : DashboardTokens.textPrimary
     }
 
     private var shadowColor: Color {
-        role == .primary ? DashboardTokens.accent.opacity(0.20) : .clear
+        role == .primary ? DashboardTokens.accent.opacity(isHovered ? 0.28 : 0.20) : .clear
     }
 
     private var accessibilityHint: String {
@@ -121,7 +143,7 @@ private struct ActionPillPressStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.970 : 1)
+            .scaleEffect(configuration.isPressed ? 0.960 : 1)
             .offset(y: configuration.isPressed ? 0.5 : 0)
             .animation(
                 DashboardTokens.Motion.springPress(reduceMotion: reduceMotion),

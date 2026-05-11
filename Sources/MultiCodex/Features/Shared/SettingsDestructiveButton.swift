@@ -18,7 +18,7 @@ struct SettingsDestructiveButton: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: DashboardTokens.Spacing.controlRadius, style: .continuous)
-                        .stroke(isDisabled ? DashboardTokens.cardBorder : DashboardTokens.destructiveBorder, lineWidth: 1)
+                        .stroke(isDisabled ? DashboardTokens.cardBorder : DashboardTokens.destructiveBorder, lineWidth: 0.5)
                 )
         }
         .buttonStyle(.plain)

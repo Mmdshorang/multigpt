@@ -28,10 +28,13 @@ enum CodexCommandRunner {
             throw CodexAccountServiceError(message: "Could not run \(runtime.display): \(error.localizedDescription)")
         }
 
-        process.waitUntilExit()
-
+        // Read pipe data BEFORE waitUntilExit to avoid pipe buffer deadlock.
+        // If the child writes more than the pipe buffer size (~64KB), it will
+        // block waiting for the reader. Reading first prevents this.
         let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+        process.waitUntilExit()
 
         let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
         let stderr = String(data: stderrData, encoding: .utf8) ?? ""

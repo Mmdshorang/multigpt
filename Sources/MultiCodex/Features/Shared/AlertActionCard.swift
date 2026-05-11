@@ -111,7 +111,7 @@ struct AlertActionCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(tone.opacity(borderOpacity), lineWidth: 1)
+                .stroke(tone.opacity(borderOpacity), lineWidth: 0.5)
         )
         .accessibilityElement(children: .contain)
     }

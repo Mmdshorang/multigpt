@@ -70,6 +70,16 @@ extension CodexAccountService {
             throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
 
+        MultiCodexLog.log(
+            .switching,
+            level: .info,
+            "Switching account",
+            metadata: [
+                "from": config.currentAccount ?? "none",
+                "to": account,
+            ]
+        )
+
         let lock = try acquireAuthLock(account: account, force: false, paths: paths)
         defer { lock.release() }
         try AuthSwapService.switchToAccount(
@@ -83,6 +93,13 @@ extension CodexAccountService {
             meta.lastUsedAt = Self.nowISO()
         }
 
+        MultiCodexLog.log(
+            .switching,
+            level: .info,
+            "Account switch completed",
+            metadata: ["currentAccount": account]
+        )
+
         return SwitchAccountPayload(currentAccount: account)
     }
 
@@ -94,6 +111,16 @@ extension CodexAccountService {
         guard config.accounts.contains(account) else {
             throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
+
+        MultiCodexLog.log(
+            .switching,
+            level: .info,
+            "Force-switching account",
+            metadata: [
+                "from": config.currentAccount ?? "none",
+                "to": account,
+            ]
+        )
 
         let lock = try acquireAuthLock(account: account, force: true, paths: paths)
         defer { lock.release() }
@@ -109,6 +136,13 @@ extension CodexAccountService {
             meta.lastUsedAt = Self.nowISO()
         }
 
+        MultiCodexLog.log(
+            .switching,
+            level: .info,
+            "Force switch completed",
+            metadata: ["currentAccount": account]
+        )
+
         return SwitchAccountPayload(currentAccount: account)
     }
 
@@ -120,6 +154,13 @@ extension CodexAccountService {
         guard config.accounts.contains(account) else {
             throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
+
+        MultiCodexLog.log(
+            .config,
+            level: .info,
+            "Removing account",
+            metadata: ["account": account, "deleteData": deleteData ? "yes" : "no"]
+        )
 
         let removedCurrentAccount = config.currentAccount == account
         config.accounts.remove(account)
@@ -148,6 +189,13 @@ extension CodexAccountService {
     func renameAccountNow(from oldName: String, to newName: String) throws -> RenameAccountPayload {
         let source = normalizeAccountName(oldName)
         let target = try validatedAccountName(newName)
+
+        MultiCodexLog.log(
+            .config,
+            level: .info,
+            "Renaming account",
+            metadata: ["from": source, "to": target]
+        )
 
         let paths = currentPaths()
         var config = try loadConfig(paths: paths)
@@ -231,6 +279,13 @@ extension CodexAccountService {
             throw CodexAccountServiceError(message: "Unknown account: \(account)")
         }
 
+        MultiCodexLog.log(
+            .auth,
+            level: .info,
+            "Importing default auth into account",
+            metadata: ["account": account]
+        )
+
         let lock = try acquireAuthLock(account: account, force: false, paths: paths)
         defer { lock.release() }
 
@@ -254,6 +309,13 @@ extension CodexAccountService {
         guard let authData = fileManager.contents(atPath: sourceAuthPath), !authData.isEmpty else {
             throw CodexAccountServiceError(message: "Login did not produce a usable auth session.")
         }
+
+        MultiCodexLog.log(
+            .auth,
+            level: .info,
+            "Importing auth from login home into account",
+            metadata: ["account": account]
+        )
 
         let lock = try acquireAuthLock(account: account, force: false, paths: paths)
         defer { lock.release() }
