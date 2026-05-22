@@ -32,6 +32,11 @@ enum AccountExportService {
         let conflicts: [String]
     }
 
+    struct AuthFilesExportResult: Equatable {
+        let exported: Int
+        let skippedAccounts: [String]
+    }
+
     enum ImportMergeStrategy {
         case skipExisting
         case overwrite
@@ -96,6 +101,46 @@ enum AccountExportService {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return try encoder.encode(payload)
+    }
+
+    static func exportAuthFiles(
+        to directoryURL: URL,
+        accountService: CodexAccountService
+    ) throws -> AuthFilesExportResult {
+        let paths = accountService.currentPaths()
+        let config = try accountService.loadConfig(paths: paths)
+
+        guard !config.accounts.isEmpty else {
+            throw ExportError.noAccounts
+        }
+
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+
+        var exported = 0
+        var skippedAccounts: [String] = []
+        for accountName in config.accounts {
+            let authPath = accountService.managedAuthPath(for: accountName, paths: paths)
+                ?? paths.accountAuthPath(accountName)
+            guard let authData = try? Data(contentsOf: URL(fileURLWithPath: authPath)) else {
+                skippedAccounts.append(accountName)
+                MultiCodexLog.log(.config, level: .debug, "Skipping account \(accountName) — auth data missing")
+                continue
+            }
+
+            let accountDirectoryURL = directoryURL.appendingPathComponent(accountName, isDirectory: true)
+            try FileManager.default.createDirectory(at: accountDirectoryURL, withIntermediateDirectories: true)
+            try writeAuthFileData(
+                authData,
+                to: accountDirectoryURL.appendingPathComponent("auth.json")
+            )
+            exported += 1
+        }
+
+        guard exported > 0 else {
+            throw ExportError.noAccounts
+        }
+
+        return AuthFilesExportResult(exported: exported, skippedAccounts: skippedAccounts)
     }
 
     // MARK: - Import
@@ -178,6 +223,14 @@ enum AccountExportService {
     }
 
     static func writeBackupData(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: Int16(0o600))],
+            ofItemAtPath: url.path
+        )
+    }
+
+    private static func writeAuthFileData(_ data: Data, to url: URL) throws {
         try data.write(to: url, options: .atomic)
         try FileManager.default.setAttributes(
             [.posixPermissions: NSNumber(value: Int16(0o600))],

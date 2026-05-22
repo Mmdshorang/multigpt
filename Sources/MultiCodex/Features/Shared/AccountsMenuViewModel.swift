@@ -291,7 +291,7 @@ final class AccountsMenuViewModel: ObservableObject {
     }
 
     var settingsSections: [SettingsSection] {
-        [.general, .accounts, .system, .about]
+        [.general, .accounts, .system, .data, .about]
     }
 
     func menuAccountRows(limit: Int? = nil) -> [AccountRowState] {

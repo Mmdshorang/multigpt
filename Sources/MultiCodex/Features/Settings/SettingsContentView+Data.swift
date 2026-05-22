@@ -4,9 +4,11 @@ extension SettingsContentView {
     struct DataPane: View {
         @ObservedObject var viewModel: AccountsMenuViewModel
         @State private var isExporting = false
+        @State private var isExportingAuthFiles = false
         @State private var isImporting = false
         @State private var importResult: AccountExportService.ImportResult?
         @State private var exportError: String?
+        @State private var authFilesExportStatus: String?
         @State private var importError: String?
 
         var body: some View {
@@ -23,9 +25,16 @@ extension SettingsContentView {
                         Button {
                             performExport()
                         } label: {
-                            Label("Export Accounts", systemImage: "square.and.arrow.up")
+                            Label("Export Backup", systemImage: "square.and.arrow.up")
                         }
                         .disabled(isExporting)
+
+                        Button {
+                            performAuthFilesExport()
+                        } label: {
+                            Label("Export Auth Files", systemImage: "folder.badge.plus")
+                        }
+                        .disabled(isExportingAuthFiles)
 
                         Button {
                             isImporting = true
@@ -45,6 +54,12 @@ extension SettingsContentView {
                         Text("Export failed: \(error)")
                             .font(.caption)
                             .foregroundStyle(.red)
+                    }
+
+                    if let status = authFilesExportStatus {
+                        Text(status)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
 
                     if let error = importError {
@@ -85,6 +100,7 @@ extension SettingsContentView {
         private func performExport() {
             isExporting = true
             exportError = nil
+            authFilesExportStatus = nil
             importResult = nil
 
             guard let service = viewModel.accountService as? CodexAccountService else {
@@ -115,6 +131,43 @@ extension SettingsContentView {
             } catch {
                 exportError = error.localizedDescription
                 isExporting = false
+            }
+        }
+
+        private func performAuthFilesExport() {
+            isExportingAuthFiles = true
+            exportError = nil
+            authFilesExportStatus = nil
+            importResult = nil
+
+            guard let service = viewModel.accountService as? CodexAccountService else {
+                exportError = "Service unavailable"
+                isExportingAuthFiles = false
+                return
+            }
+
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.canCreateDirectories = true
+            panel.allowsMultipleSelection = false
+            panel.prompt = "Export"
+            panel.message = "Choose a folder for per-account auth.json files."
+            panel.begin { response in
+                defer { isExportingAuthFiles = false }
+                guard response == .OK, let url = panel.url else { return }
+
+                do {
+                    let result = try AccountExportService.exportAuthFiles(to: url, accountService: service)
+                    if result.skippedAccounts.isEmpty {
+                        authFilesExportStatus = "Exported \(result.exported) auth files."
+                    } else {
+                        authFilesExportStatus = "Exported \(result.exported) auth files. " +
+                            "Skipped missing auth: \(result.skippedAccounts.joined(separator: ", "))"
+                    }
+                } catch {
+                    exportError = error.localizedDescription
+                }
             }
         }
 
