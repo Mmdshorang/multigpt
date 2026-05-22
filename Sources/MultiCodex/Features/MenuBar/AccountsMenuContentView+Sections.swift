@@ -311,8 +311,16 @@ extension AccountsMenuContentView {
                     weeklyPercentText: viewModel.displayPercentText(for: row.account.usage.weekly),
                     isBusy: isActionBusy,
                     isSwitching: viewModel.switchingAccountName == row.name,
-                    isAuthRunning: viewModel.accountActionInFlightName == row.name,
+                    isAuthRunning: viewModel.accountActionInFlightName == row.name || viewModel.loginInFlightName == row.name,
+                    canCancelLogin: viewModel.canCancelLogin(for: row.name),
+                    canRemovePendingLogin: viewModel.canRemovePendingLogin(for: row.name),
                     onActivate: { performPrimaryAction(for: row) },
+                    onCancelLogin: {
+                        viewModel.cancelLogin(
+                            for: row.name,
+                            removeCreatedAccount: viewModel.canRemovePendingLogin(for: row.name)
+                        )
+                    },
                     onRowTap: { toggleAccountDisclosure(row.name) },
                     onToggleExpanded: { toggleAccountDisclosure(row.name) }
                 )
@@ -615,15 +623,15 @@ extension AccountsMenuContentView {
                 .foregroundStyle(DashboardTokens.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if viewModel.canAbortPendingLogin {
+            if viewModel.canCancelLogin {
                 ActionPillButton(
-                    title: "Abort Login",
+                    title: "Cancel Login",
                     symbol: "xmark.circle",
                     layout: .iconOnly
                 ) {
-                    viewModel.abortPendingLogin()
+                    viewModel.cancelLogin()
                 }
-                .help("Abort pending login")
+                .help("Cancel login")
             }
         }
         .padding(.horizontal, 12)

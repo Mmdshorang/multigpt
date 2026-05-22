@@ -218,9 +218,9 @@ extension SettingsContentView {
 
             Spacer(minLength: 10)
 
-            if viewModel.canAbortPendingLogin {
-                Button("Abort Login") {
-                    viewModel.abortPendingLogin()
+            if viewModel.canCancelLogin {
+                Button("Cancel Login") {
+                    viewModel.cancelLogin()
                 }
                 .buttonStyle(.plain)
                 .font(DashboardTokens.Font.metadata().weight(.semibold))

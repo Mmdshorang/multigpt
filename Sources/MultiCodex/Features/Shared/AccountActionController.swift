@@ -59,7 +59,7 @@ final class AccountActionController {
             viewModel.pendingInteractiveLoginSession = nil
         }
 
-        Task {
+        let loginTask = Task {
             viewModel.loginInFlightName = accountName
             viewModel.focusedAccountName = accountName
             viewModel.feedbackAutoClearTask?.cancel()
@@ -67,12 +67,20 @@ final class AccountActionController {
             viewModel.accountActionMessage = "Opening browser login for \(accountName)..."
             viewModel.accountActionError = nil
 
+            var sessionToCleanup: PendingInteractiveLoginSession?
             defer {
+                viewModel.activeLoginTask = nil
+                viewModel.activeLoginSession = nil
                 viewModel.loginInFlightName = nil
+                if let sessionToCleanup {
+                    self.removeLoginSandboxIfPossible(sessionToCleanup.loginSandboxHome)
+                }
             }
 
             do {
                 let session = try self.makeInteractiveLoginSession(accountName: accountName, createIfNeeded: createIfNeeded)
+                sessionToCleanup = session
+                viewModel.activeLoginSession = session
                 viewModel.pendingInteractiveLoginSession = nil
                 _ = try await viewModel.accountService.loginInApp(
                     account: accountName,
@@ -80,6 +88,13 @@ final class AccountActionController {
                     loginHome: session.loginSandboxHome
                 )
                 _ = await self.completeInteractiveLogin(session: session, preserveFailedSession: false)
+                sessionToCleanup = nil
+            } catch is CancellationError {
+                viewModel.pendingInteractiveLoginSession = nil
+                if let session = sessionToCleanup, session.createIfNeeded {
+                    await self.removeCreatedLoginAccount(session)
+                }
+                self.setAccountFeedback(message: "Cancelled login for \(accountName).", error: nil)
             } catch {
                 if self.shouldFallbackToTerminal(error) {
                     self.launchTerminalLoginFallback(accountName: accountName, createIfNeeded: createIfNeeded, rootError: error)
@@ -88,6 +103,7 @@ final class AccountActionController {
                 }
             }
         }
+        viewModel.activeLoginTask = loginTask
     }
 
     func shouldFallbackToTerminal(_ error: Error) -> Bool {
@@ -186,6 +202,45 @@ final class AccountActionController {
         viewModel.pendingInteractiveLoginSession = nil
         removeLoginSandboxIfPossible(session.loginSandboxHome)
         setAccountFeedback(message: "Aborted login for \(session.accountName).", error: nil)
+    }
+
+    func cancelLogin() {
+        if viewModel.loginInFlightName != nil {
+            viewModel.activeLoginTask?.cancel()
+            return
+        }
+
+        abortPendingLogin()
+    }
+
+    func cancelLogin(for accountName: String, removeCreatedAccount: Bool) {
+        if viewModel.activeLoginSession?.accountName == accountName {
+            viewModel.activeLoginTask?.cancel()
+            return
+        }
+
+        guard let session = viewModel.pendingInteractiveLoginSession,
+              session.accountName == accountName,
+              viewModel.loginInFlightName == nil
+        else {
+            return
+        }
+
+        viewModel.pendingInteractiveLoginSession = nil
+        removeLoginSandboxIfPossible(session.loginSandboxHome)
+
+        guard removeCreatedAccount, session.createIfNeeded else {
+            setAccountFeedback(message: "Cancelled login for \(session.accountName).", error: nil)
+            return
+        }
+
+        Task {
+            await removeCreatedLoginAccount(session)
+            setAccountFeedback(
+                message: "Cancelled login for \(session.accountName) and removed the account.",
+                error: nil
+            )
+        }
     }
 
     func prepareSequentialNewAccountLogin(accountNames: [String]) {
@@ -440,6 +495,19 @@ final class AccountActionController {
         }
 
         return "\(base)-\(Int(Date().timeIntervalSince1970))"
+    }
+
+    private func removeCreatedLoginAccount(_ session: PendingInteractiveLoginSession) async {
+        guard session.createIfNeeded else {
+            return
+        }
+
+        do {
+            let payload = try await viewModel.accountService.removeAccount(name: session.accountName, deleteData: true)
+            viewModel.removeAccountLocally(named: session.accountName, currentAccountName: payload.currentAccount)
+        } catch {
+            setAccountFeedback(message: nil, error: "Cancelled login, but removing \(session.accountName) failed: \(error.localizedDescription)")
+        }
     }
 
     func runAccountAction(

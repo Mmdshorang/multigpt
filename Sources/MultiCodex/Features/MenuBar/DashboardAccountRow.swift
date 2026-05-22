@@ -10,7 +10,10 @@ struct DashboardAccountRow: View {
     let isBusy: Bool
     let isSwitching: Bool
     let isAuthRunning: Bool
+    let canCancelLogin: Bool
+    let canRemovePendingLogin: Bool
     let onActivate: () -> Void
+    let onCancelLogin: () -> Void
     let onRowTap: () -> Void
     let onToggleExpanded: () -> Void
     @State private var isHovered = false
@@ -155,6 +158,10 @@ struct DashboardAccountRow: View {
 
                     Spacer(minLength: 4)
 
+                    if canCancelLogin {
+                        cancelLoginButton
+                    }
+
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(DashboardTokens.Font.chevron())
                         .foregroundStyle(DashboardTokens.textTertiary)
@@ -251,6 +258,28 @@ struct DashboardAccountRow: View {
         .accessibilityLabel(activationHelpText)
         .accessibilityValue(isPrimaryActionInProgress ? "In progress" : "Ready")
         .help(activationHelpText)
+        .contentShape(Circle())
+    }
+
+    private var cancelLoginButton: some View {
+        Button(action: onCancelLogin) {
+            Label(canRemovePendingLogin ? "Cancel and Remove" : "Cancel Login", systemImage: canRemovePendingLogin ? "trash.circle.fill" : "xmark.circle.fill")
+                .labelStyle(.iconOnly)
+                .font(DashboardTokens.Font.metadataBold())
+                .foregroundStyle(DashboardTokens.statusRed)
+                .frame(width: 24, height: 24)
+                .background(
+                    Circle()
+                        .fill(DashboardTokens.statusRed.opacity(0.12))
+                )
+                .overlay(
+                    Circle()
+                        .stroke(DashboardTokens.statusRed.opacity(0.34), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(canRemovePendingLogin ? "Cancel login and remove this account" : "Cancel login")
+        .accessibilityLabel(canRemovePendingLogin ? "Cancel login and remove account" : "Cancel login")
         .contentShape(Circle())
     }
 

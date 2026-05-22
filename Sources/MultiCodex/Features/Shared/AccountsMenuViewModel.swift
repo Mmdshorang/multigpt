@@ -46,7 +46,9 @@ final class AccountsMenuViewModel: ObservableObject {
     var refreshGeneration = 0
     var didBecomeActiveObserver: NSObjectProtocol?
     @Published var pendingInteractiveLoginSession: PendingInteractiveLoginSession?
+    var activeLoginSession: PendingInteractiveLoginSession?
     var feedbackAutoClearTask: Task<Void, Never>?
+    var activeLoginTask: Task<Void, Never>?
     var sequentialLoginTask: Task<Void, Never>?
     lazy var autoSwitchNotifier: any AutoSwitchNotificationSending = autoSwitchNotifierFactory()
     lazy var refreshController = AccountsRefreshController(viewModel: self)
@@ -105,6 +107,7 @@ final class AccountsMenuViewModel: ObservableObject {
             NotificationCenter.default.removeObserver(didBecomeActiveObserver)
         }
         feedbackAutoClearTask?.cancel()
+        activeLoginTask?.cancel()
         sequentialLoginTask?.cancel()
         refreshLoopTask?.cancel()
         activeRefreshTask?.cancel()
@@ -124,6 +127,22 @@ final class AccountsMenuViewModel: ObservableObject {
 
     var canAbortPendingLogin: Bool {
         pendingInteractiveLoginSession != nil && loginInFlightName == nil
+    }
+
+    var canCancelLogin: Bool {
+        loginInFlightName != nil || canAbortPendingLogin
+    }
+
+    func canCancelLogin(for accountName: String) -> Bool {
+        activeLoginSession?.accountName == accountName
+            || pendingInteractiveLoginSession?.accountName == accountName
+    }
+
+    func canRemovePendingLogin(for accountName: String) -> Bool {
+        let session = activeLoginSession?.accountName == accountName
+            ? activeLoginSession
+            : pendingInteractiveLoginSession?.accountName == accountName ? pendingInteractiveLoginSession : nil
+        return session?.createIfNeeded == true
     }
 
     var canStartMaintenanceAccountAction: Bool {
@@ -509,6 +528,12 @@ final class AccountsMenuViewModel: ObservableObject {
     func openLoginInTerminal(for name: String) { accountManagement.openLoginInTerminal(for: name) }
 
     func abortPendingLogin() { accountActions.abortPendingLogin() }
+
+    func cancelLogin() { accountActions.cancelLogin() }
+
+    func cancelLogin(for accountName: String, removeCreatedAccount: Bool) {
+        accountActions.cancelLogin(for: accountName, removeCreatedAccount: removeCreatedAccount)
+    }
 
     func prepareSequentialNewAccountLogin(count: Int) {
         accountManagement.prepareSequentialNewAccountLogin(count: count)

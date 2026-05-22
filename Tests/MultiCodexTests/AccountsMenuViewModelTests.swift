@@ -1164,7 +1164,6 @@ final class AccountsMenuViewModelTests: XCTestCase {
         service.stubbedAccounts = [
             makeAccountEntry(name: "alpha", isCurrent: true),
         ]
-        service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
 
         let viewModel = AccountsMenuViewModel(
             accountService: service,
@@ -1199,6 +1198,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         service.stubbedAccounts = [
             makeAccountEntry(name: "alpha", isCurrent: true),
         ]
+        service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
 
         let viewModel = AccountsMenuViewModel(
             accountService: service,
@@ -1226,6 +1226,77 @@ final class AccountsMenuViewModelTests: XCTestCase {
         }
     }
 
+    func testCancelPendingNewAccountLoginRemovesCreatedAccount() async throws {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.loginInAppError = NSError(
+            domain: "test",
+            code: 42,
+            userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"]
+        )
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.startNewAccountLogin()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            viewModel.loginInFlightName == nil
+                && viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion
+        }
+
+        let pendingName = try XCTUnwrap(viewModel.pendingInteractiveLoginSession?.accountName)
+        viewModel.upsertAuthenticatedAccountLocally(named: pendingName)
+        XCTAssertTrue(viewModel.canCancelLogin(for: pendingName))
+        XCTAssertTrue(viewModel.canRemovePendingLogin(for: pendingName))
+
+        viewModel.cancelLogin(for: pendingName, removeCreatedAccount: true)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            viewModel.pendingInteractiveLoginSession == nil
+                && service.removeCalls.contains(where: { $0.name == pendingName && $0.deleteData })
+        }
+
+        XCTAssertFalse(viewModel.accounts.contains(where: { $0.name == pendingName }))
+        XCTAssertEqual(viewModel.accountActionMessage, "Cancelled login for \(pendingName) and removed the account.")
+    }
+
+    func testCancelPendingReloginDoesNotRemoveExistingAccount() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+        viewModel.updateAccounts([UsageFixtures.makeAccountUsage(name: "alpha", isCurrent: true)])
+
+        viewModel.openLoginInTerminal(for: "alpha")
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            viewModel.pendingInteractiveLoginSession?.phase == .waitingForExternalCompletion
+        }
+
+        XCTAssertTrue(viewModel.canCancelLogin(for: "alpha"))
+        XCTAssertFalse(viewModel.canRemovePendingLogin(for: "alpha"))
+
+        viewModel.cancelLogin(for: "alpha", removeCreatedAccount: true)
+
+        XCTAssertTrue(service.removeCalls.isEmpty)
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "alpha" }))
+        XCTAssertEqual(viewModel.accountActionMessage, "Cancelled login for alpha.")
+    }
+
     func testAbortPendingLoginDoesNothingWithoutPendingSession() {
         let defaults = makeEphemeralDefaults()
         let service = MockCodexAccountService()
@@ -1240,6 +1311,44 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.pendingInteractiveLoginSession)
         XCTAssertNil(viewModel.accountActionMessage)
         XCTAssertNil(viewModel.accountActionError)
+    }
+
+    func testCancelInFlightLoginClearsStateDeletesSandboxAndSkipsImport() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.loginInAppDelayNanoseconds = 500_000_000
+
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.startLoginFlow(accountName: "alpha", createIfNeeded: false)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            viewModel.loginInFlightName == "alpha" && !service.loginInAppCalls.isEmpty
+        }
+
+        let sandbox = service.loginInAppCalls.first?.loginHome
+        XCTAssertTrue(viewModel.canCancelLogin)
+
+        viewModel.cancelLogin()
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            viewModel.loginInFlightName == nil
+        }
+
+        XCTAssertFalse(viewModel.canCancelLogin)
+        XCTAssertEqual(viewModel.accountActionMessage, "Cancelled login for alpha.")
+        XCTAssertTrue(service.loginInAppWasCancelled)
+        XCTAssertTrue(service.importFromHomeCalls.isEmpty)
+        if let sandbox {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox))
+        }
     }
 
     func testStartNewAccountLoginStoresAuthWithoutAutoSwitching() async {
@@ -2154,6 +2263,7 @@ private final class MockCodexAccountService: CodexAccountServicing {
     var loginInAppError: Error?
     var loginInAppErrorByAccount: [String: Error] = [:]
     var loginInAppDelayNanoseconds: UInt64 = 0
+    var loginInAppWasCancelled = false
     var fetchLimitsDelayNanoseconds: UInt64 = 0
     var loginHomeStatusError: Error?
     var loginHomeStatusExitCode = 0
@@ -2440,7 +2550,12 @@ private final class MockCodexAccountService: CodexAccountServicing {
     func loginInApp(account name: String, createIfNeeded: Bool, loginHome: String?) async throws -> String {
         loginInAppCalls.append(LoginCall(account: name, createIfNeeded: createIfNeeded, loginHome: loginHome))
         if loginInAppDelayNanoseconds > 0 {
-            try? await Task.sleep(nanoseconds: loginInAppDelayNanoseconds)
+            do {
+                try await Task.sleep(nanoseconds: loginInAppDelayNanoseconds)
+            } catch {
+                loginInAppWasCancelled = true
+                throw error
+            }
         }
         if let accountSpecificError = loginInAppErrorByAccount[name] {
             throw accountSpecificError
