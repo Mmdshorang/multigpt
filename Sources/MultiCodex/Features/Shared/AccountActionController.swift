@@ -339,6 +339,13 @@ final class AccountActionController {
             )
 
             guard status.exitCode == 0 else {
+                if let preservedOutcome = await preserveAuthenticatedLoginAfterFailedStatus(
+                    session: session,
+                    status: status
+                ) {
+                    return preservedOutcome
+                }
+
                 if preserveFailedSession {
                     viewModel.pendingInteractiveLoginSession = session.withPhase(.needsRetry)
                     retainSandboxHome = true
@@ -463,6 +470,87 @@ final class AccountActionController {
                 error: error.localizedDescription
             )
         }
+    }
+
+    private func preserveAuthenticatedLoginAfterFailedStatus(
+        session: PendingInteractiveLoginSession,
+        status: AccountStatusPayload
+    ) async -> InteractiveLoginOutcome? {
+        let summary = status.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let statusMessage = summary.isEmpty ? "login status check failed" : summary
+
+        var didImport = false
+        var didSwitch = false
+        var mutationError: Error?
+        do {
+            try await viewModel.runAuthMutation(named: session.accountName) { [self] in
+                _ = try await viewModel.accountService.importAuth(fromHome: session.loginSandboxHome, into: session.accountName)
+                didImport = true
+                if session.shouldApplyAccountAuthOnSuccess {
+                    try await viewModel.accountService.switchAccount(name: session.accountName)
+                    didSwitch = true
+                }
+            }
+        } catch {
+            mutationError = error
+        }
+
+        guard didImport else {
+            return nil
+        }
+
+        var effectiveAccountName = session.accountName
+        var renameNote: String?
+        if session.createIfNeeded,
+           let preferredName = await suggestedAccountNameForNewLogin(session: session),
+           preferredName != session.accountName
+        {
+            do {
+                _ = try await viewModel.accountService.renameAccount(from: session.accountName, to: preferredName)
+                viewModel.renameAccountLocally(from: session.accountName, to: preferredName)
+                if viewModel.selectedSettingsAccountName == session.accountName {
+                    viewModel.settingsController.selectSettingsAccount(named: preferredName)
+                }
+                effectiveAccountName = preferredName
+                renameNote = "Saved as \(preferredName)."
+            } catch {
+                renameNote = nil
+            }
+        }
+
+        viewModel.pendingInteractiveLoginSession = nil
+        viewModel.upsertAuthenticatedAccountLocally(
+            named: effectiveAccountName,
+            currentAccountName: didSwitch ? effectiveAccountName : nil,
+            lastLoginStatus: statusMessage
+        )
+
+        let savedMessage: String
+        if session.shouldApplyAccountAuthOnSuccess {
+            savedMessage = didSwitch ? "Login synced to \(effectiveAccountName)." : "Saved login to \(effectiveAccountName)."
+        } else if session.createIfNeeded {
+            savedMessage = "Saved login to \(effectiveAccountName). Switch when you want to use it."
+        } else {
+            savedMessage = "Updated stored login for \(effectiveAccountName)."
+        }
+
+        var feedback = "\(savedMessage) Login status still failed: \(statusMessage)."
+        if let renameNote {
+            feedback += " \(renameNote)"
+        }
+        if let mutationError, didImport {
+            feedback += " Switch/apply failed: \(mutationError.localizedDescription)"
+        }
+
+        setAccountFeedback(message: nil, error: feedback)
+        viewModel.refreshController.triggerRefresh(refreshLive: true, allowAutoSwitch: false)
+
+        return InteractiveLoginOutcome(
+            success: true,
+            effectiveAccountName: effectiveAccountName,
+            message: feedback,
+            error: statusMessage
+        )
     }
 
     private func suggestedAccountNameForNewLogin(session: PendingInteractiveLoginSession) async -> String? {
