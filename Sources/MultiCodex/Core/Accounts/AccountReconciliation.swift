@@ -7,6 +7,7 @@ enum AccountReconciliation {
         let configCurrentAccount: String?
         let detectedAccountName: String?
         let detectedEmail: String?
+        let isAmbiguous: Bool
         let isInSync: Bool
         let systemAuthChangedExternally: Bool
     }
@@ -19,6 +20,7 @@ enum AccountReconciliation {
         accountIdentities: [String: AccountIdentity]
     ) -> ReconciliationResult {
         var detectedAccountName: String?
+        var matchingAccountCount = 0
 
         if let systemID = systemIdentity {
             let detectedIdentity: AccountIdentity
@@ -30,20 +32,23 @@ enum AccountReconciliation {
                 detectedIdentity = .unresolved
             }
 
-            // Match by provider account ID first, then email.
-            // Sort keys for deterministic matching when multiple accounts
-            // share the same identity (e.g., same email with different names).
             if detectedIdentity != .unresolved {
+                var matches: [String] = []
                 for name in accountIdentities.keys.sorted() {
                     if let knownIdentity = accountIdentities[name],
                        AccountIdentityMatcher.matches(detectedIdentity, knownIdentity)
                     {
-                        detectedAccountName = name
-                        break
+                        matches.append(name)
                     }
+                }
+                matchingAccountCount = matches.count
+                if matches.count == 1 {
+                    detectedAccountName = matches[0]
                 }
             }
         }
+
+        let isAmbiguous = matchingAccountCount > 1
 
         let externallyModified: Bool
         if let systemModified = systemAuthLastModified,
@@ -55,7 +60,9 @@ enum AccountReconciliation {
         }
 
         let isInSync: Bool
-        if let configName = configCurrentAccount, let detected = detectedAccountName {
+        if isAmbiguous {
+            isInSync = false
+        } else if let configName = configCurrentAccount, let detected = detectedAccountName {
             isInSync = configName == detected
         } else if configCurrentAccount == nil, detectedAccountName == nil {
             isInSync = true
@@ -67,6 +74,7 @@ enum AccountReconciliation {
             configCurrentAccount: configCurrentAccount,
             detectedAccountName: detectedAccountName,
             detectedEmail: systemIdentity?.email,
+            isAmbiguous: isAmbiguous,
             isInSync: isInSync,
             systemAuthChangedExternally: externallyModified
         )

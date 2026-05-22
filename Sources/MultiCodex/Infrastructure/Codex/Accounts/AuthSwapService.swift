@@ -25,9 +25,16 @@ enum AuthSwapService {
             let previousAccountAuth = try? readAuthData(account: previousName, paths: paths)
 
             if !force {
-                if let previousAccountAuth,
-                   !authDataMatches(currentSystemAuth, previousAccountAuth)
-                {
+                guard let previousAccountAuth else {
+                    let systemIdentity = resolveIdentity(from: currentSystemAuth)
+                    throw AuthSwapError.externalAuthDetected(
+                        previousAccount: previousName,
+                        previousIdentity: nil,
+                        systemIdentity: systemIdentity
+                    )
+                }
+
+                if !authDataMatches(currentSystemAuth, previousAccountAuth) {
                     let systemIdentity = resolveIdentity(from: currentSystemAuth)
                     let previousIdentity = resolveIdentity(from: previousAccountAuth)
                     throw AuthSwapError.externalAuthDetected(
@@ -48,8 +55,7 @@ enum AuthSwapService {
                     storedAuth: previousAccountAuth
                 )
             } else {
-                // No stored auth for the previous account — safe to write (first-time setup).
-                shouldPreserve = true
+                shouldPreserve = false
             }
 
             if shouldPreserve {
@@ -108,57 +114,22 @@ enum AuthSwapService {
     }
 
     private static func authDataMatches(_ lhs: Data, _ rhs: Data) -> Bool {
-        guard let leftPayload = try? JSONSerialization.jsonObject(with: lhs) as? [String: Any],
-              let rightPayload = try? JSONSerialization.jsonObject(with: rhs) as? [String: Any]
-        else {
-            return lhs == rhs
-        }
-
-        // Check API key identity
-        let leftAPIKey = leftPayload["OPENAI_API_KEY"] as? String
-        let rightAPIKey = rightPayload["OPENAI_API_KEY"] as? String
-        if let leftAPIKey, let rightAPIKey {
-            return leftAPIKey == rightAPIKey
-        }
-        if (leftAPIKey != nil) != (rightAPIKey != nil) {
-            return false // Different auth methods
-        }
-
-        let leftTokens = leftPayload["tokens"] as? [String: Any]
-        let rightTokens = rightPayload["tokens"] as? [String: Any]
-
-        // Check account_id first
-        let leftID = leftTokens?["account_id"] as? String
-        let rightID = rightTokens?["account_id"] as? String
-        if let leftID, let rightID {
-            // Also check email if available to differentiate users in the same org
-            let leftEmail = parseJWTEmail(leftTokens?["access_token"] as? String ?? "")
-            let rightEmail = parseJWTEmail(rightTokens?["access_token"] as? String ?? "")
-            if let leftEmail, let rightEmail {
-                return leftID == rightID && leftEmail.lowercased() == rightEmail.lowercased()
-            }
-            return leftID == rightID
-        }
-
-        // Fallback: check email alone
-        let leftEmail = parseJWTEmail(leftTokens?["access_token"] as? String ?? "")
-        let rightEmail = parseJWTEmail(rightTokens?["access_token"] as? String ?? "")
-        if let leftEmail, let rightEmail {
-            return leftEmail.lowercased() == rightEmail.lowercased()
-        }
-
-        return lhs == rhs
+        identityBelongsToAccount(systemAuth: lhs, storedAuth: rhs)
     }
 
     /// Determines whether system auth data belongs to the same identity as stored account auth.
-    /// More permissive than `authDataMatches` — returns true if identities overlap or if we can't determine.
+    /// Conservative by design: unknown or partial identity does not overwrite stored auth.
     private static func identityBelongsToAccount(systemAuth: Data, storedAuth: Data) -> Bool {
+        if systemAuth == storedAuth {
+            return true
+        }
+
         let systemIdentity = resolveIdentity(from: systemAuth)
         let storedIdentity = resolveIdentity(from: storedAuth)
 
-        // If we can't resolve either identity, fall back to byte comparison
+        // If either identity is unresolved, do not overwrite stored auth.
         guard let systemIdentity, let storedIdentity else {
-            return systemAuth == storedAuth
+            return false
         }
 
         // Different auth methods means definitely different accounts
@@ -166,14 +137,23 @@ enum AuthSwapService {
             return false
         }
 
-        // Check email match (most reliable identifier)
-        if let sysEmail = systemIdentity.email, let storedEmail = storedIdentity.email {
-            return sysEmail.lowercased() == storedEmail.lowercased()
+        if systemIdentity.authMethod == .apiKey {
+            return apiKey(from: systemAuth) == apiKey(from: storedAuth)
         }
 
-        // Check account_id match
-        if let sysId = systemIdentity.accountId, let storedId = storedIdentity.accountId {
+        // Provider account ID is the strongest identity. A mismatch must not be
+        // papered over by a shared email address.
+        if systemIdentity.accountId != nil || storedIdentity.accountId != nil {
+            guard let sysId = systemIdentity.accountId,
+                  let storedId = storedIdentity.accountId
+            else {
+                return false
+            }
             return sysId == storedId
+        }
+
+        if let sysEmail = systemIdentity.email, let storedEmail = storedIdentity.email {
+            return sysEmail.lowercased() == storedEmail.lowercased()
         }
 
         // Cannot determine — be conservative, don't overwrite
@@ -190,14 +170,40 @@ enum AuthSwapService {
             return ResolvedAccountIdentity(email: nil, plan: "api-key", accountId: nil, authMethod: .apiKey)
         }
         guard let tokens = payload["tokens"] as? [String: Any] else { return nil }
-        let accountId = (tokens["account_id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let accessToken = tokens["access_token"] as? String
-        let email = accessToken.flatMap { parseJWTEmail($0) }
+
+        let idClaims = parseJWTClaims(tokens["id_token"] as? String)
+        let accessClaims = parseJWTClaims(tokens["access_token"] as? String)
+        let idProfile = idClaims?["https://api.openai.com/profile"] as? [String: Any]
+        let accessProfile = accessClaims?["https://api.openai.com/profile"] as? [String: Any]
+        let idAuth = idClaims?["https://api.openai.com/auth"] as? [String: Any]
+        let accessAuth = accessClaims?["https://api.openai.com/auth"] as? [String: Any]
+
+        let accountId = normalizedIdentityField(
+            tokens["account_id"] as? String
+                ?? idAuth?["chatgpt_account_id"] as? String
+                ?? accessAuth?["chatgpt_account_id"] as? String
+                ?? idClaims?["chatgpt_account_id"] as? String
+                ?? accessClaims?["chatgpt_account_id"] as? String
+        )
+        let email = normalizedIdentityField(
+            idClaims?["email"] as? String
+                ?? idProfile?["email"] as? String
+                ?? accessClaims?["email"] as? String
+                ?? accessProfile?["email"] as? String
+        )
         guard email != nil || accountId != nil else { return nil }
         return ResolvedAccountIdentity(email: email, plan: nil, accountId: accountId, authMethod: .oauth)
     }
 
-    private static func parseJWTEmail(_ token: String) -> String? {
+    private static func apiKey(from data: Data) -> String? {
+        guard let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return normalizedIdentityField(payload["OPENAI_API_KEY"] as? String)
+    }
+
+    private static func parseJWTClaims(_ token: String?) -> [String: Any]? {
+        guard let token else { return nil }
         let segments = token.split(separator: ".", omittingEmptySubsequences: false)
         guard segments.count >= 2 else { return nil }
         var payload = String(segments[1])
@@ -207,8 +213,14 @@ enum AuthSwapService {
         guard let data = Data(base64Encoded: payload),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
-        return (json["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            ?? ((json["https://api.openai.com/profile"] as? [String: Any])?["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return json
+    }
+
+    private static func normalizedIdentityField(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
     }
 
     private static func readAuthData(account: String, paths: CodexAccountService.PathContext) throws -> Data? {

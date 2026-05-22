@@ -377,6 +377,14 @@ final class AccountsRefreshController {
                 ]
             )
 
+            if result.isAmbiguous {
+                let identity = result.detectedEmail ?? "current auth"
+                viewModel.externalAuthImportCandidate = nil
+                viewModel.pendingForceSwitchTarget = nil
+                viewModel.refreshWarningMessage = "Detected \(identity), but it matches multiple MultiCodex accounts. Switch manually."
+                return
+            }
+
             if result.detectedAccountName == nil, let email = result.detectedEmail {
                 viewModel.externalAuthImportCandidate = ExternalAuthImportCandidate(
                     accountName: email,
