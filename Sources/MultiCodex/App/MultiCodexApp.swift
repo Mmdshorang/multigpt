@@ -9,8 +9,8 @@ struct MultiCodexApp: App {
         MenuBarExtra {
             AccountsMenuContentView(viewModel: viewModel)
                 .frame(
-                    minWidth: 380,
-                    idealWidth: 400
+                    minWidth: 460,
+                    idealWidth: 480
                 )
         } label: {
             let current = viewModel.accounts.first(where: { $0.isCurrent })
