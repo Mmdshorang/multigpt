@@ -22,12 +22,110 @@ extension CodexAccountService {
     }
 
     func loadConfig(paths: PathContext) throws -> NativeConfig {
-        try AccountConfigStore.decodeConfig(from: readFileIfExists(paths.configPath))
+        let data = readFileIfExists(paths.configPath)
+        do {
+            return try AccountConfigStore.decodeConfig(from: data)
+        } catch {
+            var recovered = recoverConfigFromAccountStorage(paths: paths)
+            let configMetadata = recoverConfigMetadata(from: data)
+            recovered.accounts.formUnion(configMetadata.accounts)
+            if let currentAccount = configMetadata.currentAccount,
+               recovered.accounts.contains(currentAccount)
+            {
+                recovered.currentAccount = currentAccount
+            }
+            guard !recovered.accounts.isEmpty else {
+                throw error
+            }
+            backupInvalidConfigIfPossible(paths: paths)
+            MultiCodexLog.log(
+                .config,
+                level: .error,
+                "Recovered account registry from stored account directories after config decode failed",
+                metadata: ["accounts": "\(recovered.accounts.count)"]
+            )
+            return recovered
+        }
     }
 
     func saveConfig(_ config: NativeConfig, paths: PathContext) throws {
         let data = try AccountConfigStore.encodeConfig(config)
         try writeFileAtomic(data: data + Data("\n".utf8), path: paths.configPath, mode: 0o600)
+    }
+
+    func withConfigMutationLock<T>(_ body: () throws -> T) rethrows -> T {
+        configMutationLock.lock()
+        defer { configMutationLock.unlock() }
+        return try body()
+    }
+
+    func recoverConfigFromAccountStorage(paths: PathContext) -> NativeConfig {
+        var accounts: Set<String> = []
+
+        appendValidAccountDirectories(atPath: paths.accountsDir, into: &accounts)
+        let managedHomesPath = ManagedCodexHomeFactory.scopedRootURL(multicodexHome: paths.multicodexHome).path
+        appendValidAccountDirectories(atPath: managedHomesPath, into: &accounts)
+
+        return AccountConfigRecord(currentAccount: nil, accounts: accounts)
+    }
+
+    private func recoverConfigMetadata(from data: Data?) -> NativeConfig {
+        var accounts: Set<String> = []
+        guard let data,
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return AccountConfigRecord(currentAccount: nil, accounts: [])
+        }
+
+        if let accountMap = object["accounts"] as? [String: Any] {
+            for name in accountMap.keys {
+                let normalized = normalizeAccountName(name)
+                guard isValidAccountName(normalized) else {
+                    continue
+                }
+                accounts.insert(normalized)
+            }
+        }
+
+        let currentAccount: String?
+        if let current = object["currentAccount"] as? String {
+            let normalized = normalizeAccountName(current)
+            currentAccount = isValidAccountName(normalized) ? normalized : nil
+        } else {
+            currentAccount = nil
+        }
+
+        return AccountConfigRecord(currentAccount: currentAccount, accounts: accounts)
+    }
+
+    private func appendValidAccountDirectories(atPath rootPath: String, into accounts: inout Set<String>) {
+        guard let names = try? fileManager.contentsOfDirectory(atPath: rootPath) else {
+            return
+        }
+
+        for name in names {
+            let path = (rootPath as NSString).appendingPathComponent(name)
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
+                  isDirectory.boolValue,
+                  isValidAccountName(name)
+            else {
+                continue
+            }
+            accounts.insert(name)
+        }
+    }
+
+    private func backupInvalidConfigIfPossible(paths: PathContext) {
+        guard fileManager.fileExists(atPath: paths.configPath) else {
+            return
+        }
+
+        let backupPath = "\(paths.configPath).invalid-\(Self.nowISO().replacingOccurrences(of: ":", with: "-"))"
+        guard !fileManager.fileExists(atPath: backupPath) else {
+            return
+        }
+        try? fileManager.copyItem(atPath: paths.configPath, toPath: backupPath)
     }
 
     func createDirectory(path: String, mode: Int16) throws {

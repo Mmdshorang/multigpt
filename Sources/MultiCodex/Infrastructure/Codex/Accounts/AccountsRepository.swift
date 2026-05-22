@@ -38,207 +38,219 @@ extension CodexAccountService {
     }
 
     func addAccountCore(name: String, onExisting: ExistingAccountBehavior, selectIfFirst: Bool) throws -> AddAccountPayload {
-        let account = try validatedAccountName(name)
-        let paths = currentPaths()
-        var config = try loadConfig(paths: paths)
+        try withConfigMutationLock {
+            let account = try validatedAccountName(name)
+            let paths = currentPaths()
+            var config = try loadConfig(paths: paths)
 
-        if config.accounts.contains(account) {
-            if onExisting == .fail {
-                throw CodexAccountServiceError(message: "Account already exists: \(account)")
+            if config.accounts.contains(account) {
+                if onExisting == .fail {
+                    throw CodexAccountServiceError(message: "Account already exists: \(account)")
+                }
+                return AddAccountPayload(account: account, currentAccount: config.currentAccount)
             }
+
+            try createDirectory(path: paths.accountDir(account), mode: 0o700)
+            _ = try ensureAccountMeta(account: account, paths: paths)
+
+            config.accounts.insert(account)
+            if config.currentAccount == nil, selectIfFirst {
+                config.currentAccount = account
+            }
+            try saveConfig(config, paths: paths)
+
             return AddAccountPayload(account: account, currentAccount: config.currentAccount)
         }
-
-        try createDirectory(path: paths.accountDir(account), mode: 0o700)
-        _ = try ensureAccountMeta(account: account, paths: paths)
-
-        config.accounts.insert(account)
-        if config.currentAccount == nil, selectIfFirst {
-            config.currentAccount = account
-        }
-        try saveConfig(config, paths: paths)
-
-        return AddAccountPayload(account: account, currentAccount: config.currentAccount)
     }
 
     func switchAccountNow(name: String) throws -> SwitchAccountPayload {
-        let account = normalizeAccountName(name)
-        let paths = currentPaths()
-        var config = try loadConfig(paths: paths)
+        try withConfigMutationLock {
+            let account = normalizeAccountName(name)
+            let paths = currentPaths()
+            var config = try loadConfig(paths: paths)
 
-        guard config.accounts.contains(account) else {
-            throw CodexAccountServiceError(message: "Unknown account: \(account)")
+            guard config.accounts.contains(account) else {
+                throw CodexAccountServiceError(message: "Unknown account: \(account)")
+            }
+
+            MultiCodexLog.log(
+                .switching,
+                level: .info,
+                "Switching account",
+                metadata: [
+                    "from": config.currentAccount ?? "none",
+                    "to": account,
+                ]
+            )
+
+            let lock = try acquireAuthLock(account: account, force: false, paths: paths)
+            defer { lock.release() }
+            try AuthSwapService.switchToAccount(
+                named: account,
+                previousAccountName: config.currentAccount,
+                paths: paths
+            )
+            config.currentAccount = account
+            try saveConfig(config, paths: paths)
+            _ = try updateAccountMeta(account: account, paths: paths) { meta in
+                meta.lastUsedAt = Self.nowISO()
+            }
+
+            MultiCodexLog.log(
+                .switching,
+                level: .info,
+                "Account switch completed",
+                metadata: ["currentAccount": account]
+            )
+
+            return SwitchAccountPayload(currentAccount: account)
         }
-
-        MultiCodexLog.log(
-            .switching,
-            level: .info,
-            "Switching account",
-            metadata: [
-                "from": config.currentAccount ?? "none",
-                "to": account,
-            ]
-        )
-
-        let lock = try acquireAuthLock(account: account, force: false, paths: paths)
-        defer { lock.release() }
-        try AuthSwapService.switchToAccount(
-            named: account,
-            previousAccountName: config.currentAccount,
-            paths: paths
-        )
-        config.currentAccount = account
-        try saveConfig(config, paths: paths)
-        _ = try updateAccountMeta(account: account, paths: paths) { meta in
-            meta.lastUsedAt = Self.nowISO()
-        }
-
-        MultiCodexLog.log(
-            .switching,
-            level: .info,
-            "Account switch completed",
-            metadata: ["currentAccount": account]
-        )
-
-        return SwitchAccountPayload(currentAccount: account)
     }
 
     func forceSwitchAccountNow(name: String) throws -> SwitchAccountPayload {
-        let account = normalizeAccountName(name)
-        let paths = currentPaths()
-        var config = try loadConfig(paths: paths)
+        try withConfigMutationLock {
+            let account = normalizeAccountName(name)
+            let paths = currentPaths()
+            var config = try loadConfig(paths: paths)
 
-        guard config.accounts.contains(account) else {
-            throw CodexAccountServiceError(message: "Unknown account: \(account)")
+            guard config.accounts.contains(account) else {
+                throw CodexAccountServiceError(message: "Unknown account: \(account)")
+            }
+
+            MultiCodexLog.log(
+                .switching,
+                level: .info,
+                "Force-switching account",
+                metadata: [
+                    "from": config.currentAccount ?? "none",
+                    "to": account,
+                ]
+            )
+
+            let lock = try acquireAuthLock(account: account, force: true, paths: paths)
+            defer { lock.release() }
+            try AuthSwapService.switchToAccount(
+                named: account,
+                previousAccountName: config.currentAccount,
+                paths: paths,
+                force: true
+            )
+            config.currentAccount = account
+            try saveConfig(config, paths: paths)
+            _ = try updateAccountMeta(account: account, paths: paths) { meta in
+                meta.lastUsedAt = Self.nowISO()
+            }
+
+            MultiCodexLog.log(
+                .switching,
+                level: .info,
+                "Force switch completed",
+                metadata: ["currentAccount": account]
+            )
+
+            return SwitchAccountPayload(currentAccount: account)
         }
-
-        MultiCodexLog.log(
-            .switching,
-            level: .info,
-            "Force-switching account",
-            metadata: [
-                "from": config.currentAccount ?? "none",
-                "to": account,
-            ]
-        )
-
-        let lock = try acquireAuthLock(account: account, force: true, paths: paths)
-        defer { lock.release() }
-        try AuthSwapService.switchToAccount(
-            named: account,
-            previousAccountName: config.currentAccount,
-            paths: paths,
-            force: true
-        )
-        config.currentAccount = account
-        try saveConfig(config, paths: paths)
-        _ = try updateAccountMeta(account: account, paths: paths) { meta in
-            meta.lastUsedAt = Self.nowISO()
-        }
-
-        MultiCodexLog.log(
-            .switching,
-            level: .info,
-            "Force switch completed",
-            metadata: ["currentAccount": account]
-        )
-
-        return SwitchAccountPayload(currentAccount: account)
     }
 
     func removeAccountNow(name: String, deleteData: Bool) throws -> RemoveAccountPayload {
-        let account = normalizeAccountName(name)
-        let paths = currentPaths()
-        var config = try loadConfig(paths: paths)
+        try withConfigMutationLock {
+            let account = normalizeAccountName(name)
+            let paths = currentPaths()
+            var config = try loadConfig(paths: paths)
 
-        guard config.accounts.contains(account) else {
-            throw CodexAccountServiceError(message: "Unknown account: \(account)")
-        }
-
-        MultiCodexLog.log(
-            .config,
-            level: .info,
-            "Removing account",
-            metadata: ["account": account, "deleteData": deleteData ? "yes" : "no"]
-        )
-
-        let removedCurrentAccount = config.currentAccount == account
-        config.accounts.remove(account)
-        if removedCurrentAccount {
-            config.currentAccount = config.accounts.sorted().first
-        }
-
-        if removedCurrentAccount {
-            if let nextAccount = config.currentAccount {
-                try applyAccountAuthToDefault(account: nextAccount, forceLock: false, paths: paths)
-            } else {
-                try AuthSwapService.clearSystemAuth(paths: paths)
+            guard config.accounts.contains(account) else {
+                throw CodexAccountServiceError(message: "Unknown account: \(account)")
             }
+
+            MultiCodexLog.log(
+                .config,
+                level: .info,
+                "Removing account",
+                metadata: ["account": account, "deleteData": deleteData ? "yes" : "no"]
+            )
+
+            let removedCurrentAccount = config.currentAccount == account
+            config.accounts.remove(account)
+            if removedCurrentAccount {
+                config.currentAccount = config.accounts.sorted().first
+            }
+
+            if removedCurrentAccount {
+                if let nextAccount = config.currentAccount {
+                    try applyAccountAuthToDefault(account: nextAccount, forceLock: false, paths: paths)
+                } else {
+                    try AuthSwapService.clearSystemAuth(paths: paths)
+                }
+            }
+
+            try saveConfig(config, paths: paths)
+
+            if deleteData {
+                try? fileManager.removeItem(atPath: paths.accountDir(account))
+                removeManagedHomeIfNeeded(account: account, paths: paths)
+            }
+
+            return RemoveAccountPayload(removedAccount: account, currentAccount: config.currentAccount)
         }
-
-        try saveConfig(config, paths: paths)
-
-        if deleteData {
-            try? fileManager.removeItem(atPath: paths.accountDir(account))
-            removeManagedHomeIfNeeded(account: account, paths: paths)
-        }
-
-        return RemoveAccountPayload(removedAccount: account, currentAccount: config.currentAccount)
     }
 
     func renameAccountNow(from oldName: String, to newName: String) throws -> RenameAccountPayload {
-        let source = normalizeAccountName(oldName)
-        let target = try validatedAccountName(newName)
+        try withConfigMutationLock {
+            let source = normalizeAccountName(oldName)
+            let target = try validatedAccountName(newName)
 
-        MultiCodexLog.log(
-            .config,
-            level: .info,
-            "Renaming account",
-            metadata: ["from": source, "to": target]
-        )
+            MultiCodexLog.log(
+                .config,
+                level: .info,
+                "Renaming account",
+                metadata: ["from": source, "to": target]
+            )
 
-        let paths = currentPaths()
-        var config = try loadConfig(paths: paths)
+            let paths = currentPaths()
+            var config = try loadConfig(paths: paths)
 
-        guard config.accounts.contains(source) else {
-            throw CodexAccountServiceError(message: "Unknown account: \(source)")
+            guard config.accounts.contains(source) else {
+                throw CodexAccountServiceError(message: "Unknown account: \(source)")
+            }
+            guard !config.accounts.contains(target) else {
+                throw CodexAccountServiceError(message: "Account already exists: \(target)")
+            }
+
+            let srcDir = paths.accountDir(source)
+            let dstDir = paths.accountDir(target)
+            if fileManager.fileExists(atPath: srcDir) {
+                try fileManager.moveItem(atPath: srcDir, toPath: dstDir)
+            } else {
+                try createDirectory(path: dstDir, mode: 0o700)
+            }
+            renameManagedHomeIfNeeded(from: source, to: target, paths: paths)
+
+            config.accounts.remove(source)
+            config.accounts.insert(target)
+            if config.currentAccount == source {
+                config.currentAccount = target
+            }
+
+            try saveConfig(config, paths: paths)
+            _ = try updateAccountMeta(account: target, paths: paths) { meta in
+                meta.lastUsedAt = Self.nowISO()
+            }
+
+            return RenameAccountPayload(from: source, to: target, currentAccount: config.currentAccount)
         }
-        guard !config.accounts.contains(target) else {
-            throw CodexAccountServiceError(message: "Account already exists: \(target)")
-        }
-
-        let srcDir = paths.accountDir(source)
-        let dstDir = paths.accountDir(target)
-        if fileManager.fileExists(atPath: srcDir) {
-            try fileManager.moveItem(atPath: srcDir, toPath: dstDir)
-        } else {
-            try createDirectory(path: dstDir, mode: 0o700)
-        }
-        renameManagedHomeIfNeeded(from: source, to: target, paths: paths)
-
-        config.accounts.remove(source)
-        config.accounts.insert(target)
-        if config.currentAccount == source {
-            config.currentAccount = target
-        }
-
-        try saveConfig(config, paths: paths)
-        _ = try updateAccountMeta(account: target, paths: paths) { meta in
-            meta.lastUsedAt = Self.nowISO()
-        }
-
-        return RenameAccountPayload(from: source, to: target, currentAccount: config.currentAccount)
     }
 
     func persistCurrentAccountIfKnown(_ name: String) throws {
-        let account = normalizeAccountName(name)
-        let paths = currentPaths()
-        var config = try loadConfig(paths: paths)
-        guard config.accounts.contains(account) else {
-            throw CodexAccountServiceError(message: "Unknown account: \(account)")
+        try withConfigMutationLock {
+            let account = normalizeAccountName(name)
+            let paths = currentPaths()
+            var config = try loadConfig(paths: paths)
+            guard config.accounts.contains(account) else {
+                throw CodexAccountServiceError(message: "Unknown account: \(account)")
+            }
+            config.currentAccount = account
+            try saveConfig(config, paths: paths)
         }
-        config.currentAccount = account
-        try saveConfig(config, paths: paths)
     }
 
     private func renameManagedHomeIfNeeded(from source: String, to target: String, paths: PathContext) {

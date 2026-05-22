@@ -5,6 +5,20 @@ struct AccountConfigRecord {
     var accounts: Set<String>
 }
 
+enum AccountConfigStoreError: LocalizedError {
+    case invalidConfig
+    case unsupportedVersion(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidConfig:
+            return "MultiCodex account config is invalid."
+        case .unsupportedVersion(let version):
+            return "Unsupported MultiCodex account config version: \(version)."
+        }
+    }
+}
+
 enum AccountConfigStore {
     private struct VersionedConfigRecord: Codable {
         let version: Int
@@ -21,10 +35,15 @@ enum AccountConfigStore {
             return AccountConfigRecord(currentAccount: nil, accounts: [])
         }
 
-        guard let decoded = try? JSONDecoder().decode(VersionedConfigRecord.self, from: data),
-              decoded.version == supportedVersion
-        else {
-            return AccountConfigRecord(currentAccount: nil, accounts: [])
+        let decoded: VersionedConfigRecord
+        do {
+            decoded = try JSONDecoder().decode(VersionedConfigRecord.self, from: data)
+        } catch {
+            throw AccountConfigStoreError.invalidConfig
+        }
+
+        guard decoded.version == supportedVersion else {
+            throw AccountConfigStoreError.unsupportedVersion(decoded.version)
         }
 
         return AccountConfigRecord(

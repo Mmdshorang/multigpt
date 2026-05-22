@@ -124,6 +124,8 @@ final class CodexAccountService {
 
     var resolutionHint: String?
 
+    let configMutationLock = NSLock()
+
     private var cachedLoginShellPath: String?
     private var hasResolvedLoginShellPath = false
 
