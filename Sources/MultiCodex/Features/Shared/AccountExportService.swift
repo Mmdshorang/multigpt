@@ -115,47 +115,52 @@ enum AccountExportService {
         }
 
         let paths = accountService.currentPaths()
-        let existingConfig = try accountService.loadConfig(paths: paths)
         var imported = 0
         var skipped = 0
         let failed = 0
         var conflicts: [String] = []
 
-        for account in payload.accounts {
-            let validatedName = try accountService.validatedAccountName(account.name)
-            guard validatedName == account.name else {
-                throw ExportError.invalidAccountName(account.name)
-            }
-            let exists = existingConfig.accounts.contains(account.name)
+        try accountService.withConfigMutationLock {
+            var config = try accountService.loadConfig(paths: paths)
 
-            if exists {
-                switch mergeStrategy {
-                case .skipExisting:
-                    skipped += 1
-                    conflicts.append(account.name)
-                    continue
-                case .overwrite:
-                    break
+            for account in payload.accounts {
+                let validatedName = try accountService.validatedAccountName(account.name)
+                guard validatedName == account.name else {
+                    throw ExportError.invalidAccountName(account.name)
                 }
-            }
-            let dir = paths.accountDir(validatedName)
-            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-            let authPath = paths.accountAuthPath(validatedName)
-            try account.auth.write(to: URL(fileURLWithPath: authPath), options: .atomic)
-            try FileManager.default.setAttributes(
-                [.posixPermissions: NSNumber(value: Int16(0o600))],
-                ofItemAtPath: authPath
-            )
+                let exists = config.accounts.contains(validatedName)
 
-            // Register in config if new
-            if !exists {
-                var config = try accountService.loadConfig(paths: paths)
-                config.accounts.insert(validatedName)
-                try accountService.saveConfig(config, paths: paths)
-            }
+                if exists {
+                    switch mergeStrategy {
+                    case .skipExisting:
+                        skipped += 1
+                        conflicts.append(account.name)
+                        continue
+                    case .overwrite:
+                        break
+                    }
+                }
 
-            imported += 1
-            MultiCodexLog.log(.config, level: .info, "Imported account \(account.name)")
+                let dir = paths.accountDir(validatedName)
+                try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+                let authPath = paths.accountAuthPath(validatedName)
+                try account.auth.write(to: URL(fileURLWithPath: authPath), options: .atomic)
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: NSNumber(value: Int16(0o600))],
+                    ofItemAtPath: authPath
+                )
+                if let managedHome = accountService.managedHomeForMutatingAuth(account: validatedName, paths: paths) {
+                    try ManagedCodexHomeFactory.writeAuthData(account.auth, to: managedHome)
+                }
+
+                if !exists {
+                    config.accounts.insert(validatedName)
+                    try accountService.saveConfig(config, paths: paths)
+                }
+
+                imported += 1
+                MultiCodexLog.log(.config, level: .info, "Imported account \(account.name)")
+            }
         }
 
         // Restore preferences
