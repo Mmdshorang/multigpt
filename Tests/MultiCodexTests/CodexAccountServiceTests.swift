@@ -122,10 +122,101 @@ final class CodexAccountServiceTests: XCTestCase {
           }
         }
         """
-        let record = try AccountConfigStore.decodeConfig(from: Data(json.utf8))
 
-        XCTAssertNil(record.currentAccount)
-        XCTAssertEqual(record.accounts, [])
+        XCTAssertThrowsError(try AccountConfigStore.decodeConfig(from: Data(json.utf8)))
+    }
+
+    func testLoadConfigRecoversStoredAccountsWhenConfigIsInvalid() async throws {
+        let service = makeSandboxedService()
+        let paths = service.currentPaths()
+
+        try writeText("{ invalid json", to: paths.configPath)
+        try writeText("{}", to: paths.accountMetaPath("alpha"))
+        try writeText("{\"tokens\":{\"access_token\":\"alpha\"}}\n", to: paths.accountAuthPath("alpha"))
+        try writeText("{\"tokens\":{\"access_token\":\"beta\"}}\n", to: paths.accountAuthPath("beta"))
+
+        let recovered = try service.loadConfig(paths: paths)
+        XCTAssertEqual(recovered.accounts, Set(["alpha", "beta"]))
+
+        _ = try await service.addAccount(name: "gamma")
+
+        let saved = try AccountConfigStore.decodeConfig(from: try XCTUnwrap(FileManager.default.contents(atPath: paths.configPath)))
+        XCTAssertEqual(saved.accounts, Set(["alpha", "beta", "gamma"]))
+    }
+
+    func testLoadConfigRecoveryPreservesReadableCurrentAccount() throws {
+        let service = makeSandboxedService()
+        let paths = service.currentPaths()
+
+        try writeText(
+            """
+            {
+              "version": 1,
+              "currentAccount": "beta",
+              "accounts": {
+                "alpha": {},
+                "beta": {}
+              }
+            }
+            """,
+            to: paths.configPath
+        )
+        try writeText("{\"tokens\":{\"access_token\":\"alpha\"}}\n", to: paths.accountAuthPath("alpha"))
+        try writeText("{\"tokens\":{\"access_token\":\"beta\"}}\n", to: paths.accountAuthPath("beta"))
+
+        let recovered = try service.loadConfig(paths: paths)
+
+        XCTAssertEqual(recovered.accounts, Set(["alpha", "beta"]))
+        XCTAssertEqual(recovered.currentAccount, "beta")
+    }
+
+    func testLoadConfigRecoversValidNamesFromUnsupportedConfigWithoutDirectories() throws {
+        let service = makeSandboxedService()
+        let paths = service.currentPaths()
+
+        try writeText(
+            """
+            {
+              "version": 1,
+              "currentAccount": "beta",
+              "accounts": {
+                "alpha": {},
+                "beta": {},
+                "../escape": {}
+              }
+            }
+            """,
+            to: paths.configPath
+        )
+
+        let recovered = try service.loadConfig(paths: paths)
+
+        XCTAssertEqual(recovered.accounts, Set(["alpha", "beta"]))
+        XCTAssertEqual(recovered.currentAccount, "beta")
+    }
+
+    func testConcurrentAccountAddsDoNotLoseConfigUpdates() throws {
+        let service = makeSandboxedService()
+        let total = 80
+        let failureLock = NSLock()
+        var failures: [String] = []
+
+        DispatchQueue.concurrentPerform(iterations: total) { index in
+            do {
+                _ = try service.addAccountNow(name: "account-\(index)")
+            } catch {
+                failureLock.lock()
+                failures.append(error.localizedDescription)
+                failureLock.unlock()
+            }
+        }
+
+        XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))
+        let config = try service.loadConfig(paths: service.currentPaths())
+        XCTAssertEqual(config.accounts.count, total)
+        for index in 0..<total {
+            XCTAssertTrue(config.accounts.contains("account-\(index)"))
+        }
     }
 
     func testFetchLimitsUsesCachedSnapshotWhenTTLIsValid() async throws {

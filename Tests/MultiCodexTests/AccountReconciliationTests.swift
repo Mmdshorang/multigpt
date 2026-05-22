@@ -78,4 +78,39 @@ final class AccountReconciliationTests: XCTestCase {
         XCTAssertFalse(result.isInSync)
         XCTAssertFalse(result.systemAuthChangedExternally)
     }
+
+    func testAmbiguousEmailIdentityDoesNotSelectArbitraryAccount() {
+        let result = AccountReconciliation.reconcile(
+            configCurrentAccount: "Work",
+            systemAuthLastModified: Date().addingTimeInterval(60),
+            knownAccountLastModified: Date(),
+            systemIdentity: ResolvedAccountIdentity(email: "dev@example.com", plan: "plus", accountId: nil, authMethod: .oauth),
+            accountIdentities: [
+                "Work": .emailOnly(normalizedEmail: "dev@example.com"),
+                "Personal": .emailOnly(normalizedEmail: "dev@example.com"),
+            ]
+        )
+
+        XCTAssertFalse(result.isInSync)
+        XCTAssertNil(result.detectedAccountName)
+        XCTAssertEqual(result.detectedEmail, "dev@example.com")
+        XCTAssertTrue(result.systemAuthChangedExternally)
+    }
+
+    func testAmbiguousIdentityIsOutOfSyncEvenWithoutConfiguredCurrentAccount() {
+        let result = AccountReconciliation.reconcile(
+            configCurrentAccount: nil,
+            systemAuthLastModified: Date().addingTimeInterval(60),
+            knownAccountLastModified: nil,
+            systemIdentity: ResolvedAccountIdentity(email: "dev@example.com", plan: "plus", accountId: nil, authMethod: .oauth),
+            accountIdentities: [
+                "Work": .emailOnly(normalizedEmail: "dev@example.com"),
+                "Personal": .emailOnly(normalizedEmail: "dev@example.com"),
+            ]
+        )
+
+        XCTAssertFalse(result.isInSync)
+        XCTAssertNil(result.detectedAccountName)
+        XCTAssertTrue(result.isAmbiguous)
+    }
 }

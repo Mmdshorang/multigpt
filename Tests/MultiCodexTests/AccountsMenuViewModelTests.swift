@@ -262,6 +262,12 @@ final class AccountsMenuViewModelTests: XCTestCase {
         XCTAssertEqual(persisted.selectedSettingsSection, .accounts)
     }
 
+    func testSettingsSectionsIncludeDataPane() {
+        let viewModel = AccountsMenuViewModel(accountService: MockCodexAccountService(), startImmediately: false)
+
+        XCTAssertTrue(viewModel.settingsSections.contains(.data))
+    }
+
     func testResetOnboardingWizardReturnsToGeneralAndClearsSelectedAccount() {
         let defaults = makeEphemeralDefaults()
         defaults.set("beta", forKey: AppPreferencesStore.Keys.selectedSettingsAccountName)
@@ -1127,6 +1133,7 @@ final class AccountsMenuViewModelTests: XCTestCase {
         service.loginInAppError = NSError(domain: "test", code: 42, userInfo: [NSLocalizedDescriptionKey: "stdin not interactive"])
         service.loginHomeStatusExitCode = 1
         service.loginHomeStatusOutput = "authorization failed"
+        service.importError = CodexAccountServiceError(message: "Login did not produce a usable auth session.")
 
         let notifier = MockAutoSwitchNotifier()
         let viewModel = AccountsMenuViewModel(
@@ -1155,7 +1162,36 @@ final class AccountsMenuViewModelTests: XCTestCase {
         } else {
             XCTFail("Expected retained sandbox for retryable terminal login session.")
         }
-        XCTAssertTrue(service.importFromHomeCalls.isEmpty)
+    }
+
+    func testStartLoginFlowKeepsAuthenticatedAccountWhenStatusFailsAfterLogin() async {
+        let defaults = makeEphemeralDefaults()
+        let service = MockCodexAccountService()
+        service.stubbedAccounts = [
+            makeAccountEntry(name: "alpha", isCurrent: true),
+        ]
+        service.loginHomeStatusExitCode = 1
+        service.loginHomeStatusOutput = "subscription inactive"
+
+        let notifier = MockAutoSwitchNotifier()
+        let viewModel = AccountsMenuViewModel(
+            accountService: service,
+            fileManager: .default,
+            autoSwitchNotifier: { notifier },
+            preferences: AppPreferencesStore(defaults: defaults),
+            startImmediately: false
+        )
+
+        viewModel.startLoginFlow(accountName: "fresh", createIfNeeded: true)
+
+        await waitUntil(timeoutSeconds: 1.0) {
+            service.importFromHomeCalls.contains(where: { $0.name == "fresh" })
+        }
+
+        XCTAssertTrue(service.importFromHomeCalls.contains(where: { $0.name == "fresh" }))
+        XCTAssertFalse(service.removeCalls.contains(where: { $0.name == "fresh" }))
+        XCTAssertTrue(viewModel.accounts.contains(where: { $0.name == "fresh" && $0.hasAuth }))
+        XCTAssertTrue((viewModel.accountActionError ?? "").contains("subscription inactive"))
     }
 
     func testReloginKeepsExistingPendingSessionWhenPreviousSessionIsStillWaiting() async {
