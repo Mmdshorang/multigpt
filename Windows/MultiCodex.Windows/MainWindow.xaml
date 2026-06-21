@@ -47,6 +47,6 @@
         </DataGrid>
 
         <TextBlock x:Name="FooterText" Grid.Row="3" Margin="0,14,0,0" Foreground="{StaticResource MutedBrush}"
-                   Text="First run: install Codex CLI, click Log in account, then enter the one-time code in your browser."/>
+                   Text="First run: install Codex CLI, click Log in account, then choose Device Code or Normal browser login."/>
     </Grid>
 </Window>

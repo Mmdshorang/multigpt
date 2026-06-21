@@ -2,11 +2,19 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace MultiCodex.Windows;
+
+public enum CodexLoginMethod
+{
+    DeviceCode,
+    BrowserCallback
+}
 
 public sealed class AccountService
 {
@@ -145,24 +153,22 @@ public sealed class AccountService
     {
         try
         {
-            var startInfo = new ProcessStartInfo(codexExecutable, "--version")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+            var startInfo = CreateCodexStartInfo(["--version"]);
             using var process = Process.Start(startInfo)!;
             var output = await process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
-            return process.ExitCode == 0 ? output.Trim() : "Codex unavailable";
+            var label = string.IsNullOrWhiteSpace(output) ? error : output;
+            return process.ExitCode == 0 ? label.Trim() : "Codex unavailable";
         }
         catch { return "Codex unavailable"; }
     }
 
-    public LoginLaunch CreateLogin(string name)
+    public LoginLaunch CreateLogin(string name, CodexLoginMethod method)
     {
         name = ValidateName(name);
+        if (method == CodexLoginMethod.BrowserCallback) EnsureBrowserCallbackAvailable();
+
         var config = LoadConfig();
         if (!config.Accounts.ContainsKey(name))
         {
@@ -176,21 +182,19 @@ public sealed class AccountService
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(Path.GetDirectoryName(CodexAuthPath)!);
 
-        var startInfo = new ProcessStartInfo(codexExecutable)
+        var arguments = new List<string>
         {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
+            "login",
+            "-c",
+            "cli_auth_credentials_store=file"
         };
-        startInfo.ArgumentList.Add("login");
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add("cli_auth_credentials_store=\"file\"");
-        startInfo.ArgumentList.Add("--device-auth");
+        if (method == CodexLoginMethod.DeviceCode) arguments.Add("--device-auth");
+
+        var startInfo = CreateCodexStartInfo(arguments);
         startInfo.Environment["CODEX_HOME"] = accountHome;
         startInfo.Environment["MULTICODEX_HOME"] = DataDirectory;
 
-        return new LoginLaunch(name, startInfo);
+        return new LoginLaunch(name, method, startInfo);
     }
 
     public void CompleteLogin(string name)
@@ -199,7 +203,7 @@ public sealed class AccountService
         var authPath = AccountAuthPath(name);
         if (!File.Exists(authPath))
             throw new InvalidOperationException(
-                "Codex finished without saving a login. Device-code login may be disabled in ChatGPT Settings > Security or by your workspace administrator.");
+                "Codex finished without saving a login. Retry the login and check the Codex output for the specific authentication error.");
 
         var config = LoadConfig();
         if (!string.Equals(config.CurrentAccount, name, StringComparison.OrdinalIgnoreCase)) return;
@@ -209,6 +213,165 @@ public sealed class AccountService
         File.Copy(authPath, staged, true);
         File.Move(staged, CodexAuthPath, true);
     }
+
+    public static void EnsureBrowserCallbackAvailable()
+    {
+        TcpListener? listener = null;
+        try
+        {
+            listener = new TcpListener(IPAddress.Loopback, 1455);
+            listener.Start();
+        }
+        catch (SocketException ex)
+        {
+            var reason = ex.SocketErrorCode == SocketError.AddressAlreadyInUse
+                ? "another application is already using it"
+                : "Windows or a security policy blocked it";
+            throw new InvalidOperationException(
+                $"Normal browser login needs local callback port 1455, but {reason} ({ex.SocketErrorCode}, OS error {ex.ErrorCode}). Close other Codex login windows and retry, or use Device Code.",
+                ex);
+        }
+        finally
+        {
+            listener?.Stop();
+        }
+    }
+
+    private ProcessStartInfo CreateCodexStartInfo(IReadOnlyList<string> arguments)
+    {
+        var executable = ResolveCodexExecutable();
+        var extension = Path.GetExtension(executable);
+        ProcessStartInfo startInfo;
+
+        if (extension.Equals(".cmd", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".bat", StringComparison.OrdinalIgnoreCase))
+        {
+            var commandInterpreter = Environment.GetEnvironmentVariable("ComSpec");
+            if (string.IsNullOrWhiteSpace(commandInterpreter) || !File.Exists(commandInterpreter))
+                commandInterpreter = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+
+            var command = string.Join(" ", new[] { QuoteCommandArgument(executable) }
+                .Concat(arguments.Select(QuoteCommandArgument)));
+            startInfo = new ProcessStartInfo(commandInterpreter)
+            {
+                // cmd.exe requires the command to be wrapped in an additional pair of quotes
+                // when the executable path itself is quoted.
+                Arguments = $"/d /s /c \"{command}\""
+            };
+        }
+        else
+        {
+            startInfo = new ProcessStartInfo(executable);
+            foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
+        }
+
+        startInfo.RedirectStandardOutput = true;
+        startInfo.RedirectStandardError = true;
+        startInfo.UseShellExecute = false;
+        startInfo.CreateNoWindow = true;
+        return startInfo;
+    }
+
+    private string ResolveCodexExecutable()
+    {
+        var configured = Environment.ExpandEnvironmentVariables(codexExecutable.Trim().Trim('"'));
+        if (string.IsNullOrWhiteSpace(configured)) configured = "codex";
+
+        if (Path.IsPathFullyQualified(configured) ||
+            configured.Contains(Path.DirectorySeparatorChar) ||
+            configured.Contains(Path.AltDirectorySeparatorChar))
+        {
+            if (TryResolveCommandPath(configured, out var explicitPath)) return explicitPath;
+            throw CodexNotFound(configured);
+        }
+
+        foreach (var directory in CodexSearchDirectories())
+        {
+            if (TryResolveCommandPath(Path.Combine(directory, configured), out var resolved))
+                return resolved;
+        }
+
+        throw CodexNotFound(configured);
+    }
+
+    private IEnumerable<string> CodexSearchDirectories()
+    {
+        var directories = new List<string>();
+        var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+        directories.AddRange(path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
+
+        var roamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (!string.IsNullOrWhiteSpace(roamingAppData)) directories.Add(Path.Combine(roamingAppData, "npm"));
+
+        AddEditorCodexDirectories(directories, Path.Combine(userProfileDirectory, ".vscode", "extensions"));
+        AddEditorCodexDirectories(directories, Path.Combine(userProfileDirectory, ".cursor", "extensions"));
+
+        return directories
+            .Select(directory => Environment.ExpandEnvironmentVariables(directory.Trim().Trim('"')))
+            .Where(directory => !string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static void AddEditorCodexDirectories(List<string> directories, string extensionsDirectory)
+    {
+        if (!Directory.Exists(extensionsDirectory)) return;
+
+        try
+        {
+            directories.AddRange(Directory.EnumerateDirectories(extensionsDirectory, "openai.chatgpt-*")
+                .OrderByDescending(Directory.GetLastWriteTimeUtc)
+                .Select(directory => Path.Combine(directory, "bin", "windows-x86_64")));
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private static bool TryResolveCommandPath(string basePath, out string resolved)
+    {
+        resolved = "";
+        var extension = Path.GetExtension(basePath);
+        if (!string.IsNullOrWhiteSpace(extension))
+        {
+            if (!File.Exists(basePath)) return false;
+            resolved = Path.GetFullPath(basePath);
+            return true;
+        }
+
+        foreach (var candidateExtension in new[] { ".exe", ".com", ".cmd", ".bat" })
+        {
+            var candidate = basePath + candidateExtension;
+            if (!File.Exists(candidate)) continue;
+            resolved = Path.GetFullPath(candidate);
+            return true;
+        }
+
+        if (!File.Exists(basePath) || !HasPortableExecutableHeader(basePath)) return false;
+        resolved = Path.GetFullPath(basePath);
+        return true;
+    }
+
+    private static bool HasPortableExecutableHeader(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            return stream.ReadByte() == 'M' && stream.ReadByte() == 'Z';
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string QuoteCommandArgument(string value)
+    {
+        if (value.Contains('"'))
+            throw new InvalidOperationException("The Codex executable path contains an unsupported quote character.");
+        return $"\"{value}\"";
+    }
+
+    private static InvalidOperationException CodexNotFound(string configured) => new(
+        $"Codex CLI was not found (configured command: {configured}). Install it with 'npm install -g @openai/codex', then restart MultiCodex.");
 
     private void SwitchAccountAndSave(string name, ConfigFile config)
     {
@@ -323,5 +486,8 @@ public sealed class AccountService
             new(StringComparer.OrdinalIgnoreCase);
     }
 
-    public sealed record LoginLaunch(string AccountName, ProcessStartInfo StartInfo);
+    public sealed record LoginLaunch(
+        string AccountName,
+        CodexLoginMethod Method,
+        ProcessStartInfo StartInfo);
 }

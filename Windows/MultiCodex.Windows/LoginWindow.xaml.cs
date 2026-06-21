@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 
@@ -15,8 +16,10 @@ public partial class LoginWindow : Window
 
     private readonly AccountService service;
     private readonly string accountName;
-    private readonly CancellationTokenSource cancellation = new();
+    private readonly StringBuilder outputLog = new();
+    private CancellationTokenSource? cancellation;
     private Process? loginProcess;
+    private CodexLoginMethod? activeMethod;
     private string? signInUrl;
     private string? deviceCode;
     private bool isRunning;
@@ -30,30 +33,31 @@ public partial class LoginWindow : Window
         this.service = service;
         this.accountName = accountName;
         TitleText.Text = $"Sign in: {accountName}";
-        Loaded += async (_, _) => await RunLoginAsync();
         Closing += LoginWindow_Closing;
     }
 
-    private async Task RunLoginAsync()
+    private async Task RunLoginAsync(CodexLoginMethod method)
     {
         if (isRunning) return;
+        PrepareLoginAttempt(method);
         isRunning = true;
 
         try
         {
-            var launch = service.CreateLogin(accountName);
+            var launch = service.CreateLogin(accountName, method);
             loginProcess = new Process { StartInfo = launch.StartInfo };
             if (!loginProcess.Start()) throw new InvalidOperationException("Could not start Codex CLI.");
 
-            AppendOutput($"Starting device-code login for {accountName}...{Environment.NewLine}");
-            var standardOutput = PumpOutputAsync(loginProcess.StandardOutput, cancellation.Token);
-            var standardError = PumpOutputAsync(loginProcess.StandardError, cancellation.Token);
-            await loginProcess.WaitForExitAsync(cancellation.Token);
+            var methodName = method == CodexLoginMethod.DeviceCode ? "device-code" : "normal browser";
+            AppendOutput($"Starting {methodName} login for {accountName}...{Environment.NewLine}");
+            var token = cancellation!.Token;
+            var standardOutput = PumpOutputAsync(loginProcess.StandardOutput, token);
+            var standardError = PumpOutputAsync(loginProcess.StandardError, token);
+            await loginProcess.WaitForExitAsync(token);
             await Task.WhenAll(standardOutput, standardError);
 
             if (loginProcess.ExitCode != 0)
-                throw new InvalidOperationException(
-                    $"Codex login stopped with exit code {loginProcess.ExitCode}. Check the output above. If device-code login is blocked, enable it in ChatGPT Settings > Security or ask your workspace administrator.");
+                throw new InvalidOperationException(LoginFailureMessage(method, loginProcess.ExitCode));
 
             service.CompleteLogin(accountName);
             LoginSucceeded = true;
@@ -77,7 +81,46 @@ public partial class LoginWindow : Window
             CloseButton.IsEnabled = true;
             loginProcess?.Dispose();
             loginProcess = null;
+            cancellation?.Dispose();
+            cancellation = null;
+            if (!LoginSucceeded)
+            {
+                MethodPanel.IsEnabled = true;
+                CancelButton.IsEnabled = true;
+            }
         }
+    }
+
+    private void PrepareLoginAttempt(CodexLoginMethod method)
+    {
+        activeMethod = method;
+        cancellation?.Dispose();
+        cancellation = new CancellationTokenSource();
+        signInUrl = null;
+        deviceCode = null;
+        browserOpened = false;
+        outputLog.Clear();
+        OutputBox.Clear();
+        CodeText.Text = "waiting...";
+        CopyCodeButton.IsEnabled = false;
+        OpenPageButton.IsEnabled = false;
+        DeviceCodePanel.Visibility = Visibility.Visible;
+        CodeDisplayBorder.Visibility = method == CodexLoginMethod.DeviceCode
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CopyCodeButton.Visibility = method == CodexLoginMethod.DeviceCode
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        MethodPanel.IsEnabled = false;
+        CancelButton.IsEnabled = true;
+        CloseButton.IsEnabled = false;
+        StatusText.Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush");
+        StatusText.Text = method == CodexLoginMethod.DeviceCode
+            ? "Requesting a one-time code..."
+            : "Checking callback port 1455 and starting browser login...";
+        MethodHelpText.Text = method == CodexLoginMethod.DeviceCode
+            ? "Enter the one-time code on the ChatGPT page in your browser, not in a terminal."
+            : "Codex will open the browser and receive the result on localhost:1455. Keep this window open until login finishes.";
     }
 
     private async Task PumpOutputAsync(StreamReader reader, CancellationToken cancellationToken)
@@ -89,6 +132,7 @@ public partial class LoginWindow : Window
     private void AppendOutput(string text)
     {
         var clean = AnsiPattern.Replace(text, "").Replace("\r", "");
+        outputLog.Append(clean);
         OutputBox.AppendText(clean);
         OutputBox.ScrollToEnd();
 
@@ -103,8 +147,28 @@ public partial class LoginWindow : Window
         {
             signInUrl = urlMatch.Value.TrimEnd('.', ',', ')', ']', '`');
             OpenPageButton.IsEnabled = true;
-            if (!browserOpened) OpenSignInPage();
+            if (activeMethod == CodexLoginMethod.DeviceCode && !browserOpened) OpenSignInPage();
         }
+    }
+
+    private string LoginFailureMessage(CodexLoginMethod method, int exitCode)
+    {
+        var output = outputLog.ToString();
+        if (method == CodexLoginMethod.BrowserCallback &&
+            (output.Contains("10013", StringComparison.OrdinalIgnoreCase) ||
+             output.Contains("address already in use", StringComparison.OrdinalIgnoreCase) ||
+             output.Contains("access permissions", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "Windows blocked local callback port 1455. Close other Codex login windows and retry, or choose Device Code above.";
+        }
+
+        if (method == CodexLoginMethod.DeviceCode &&
+            output.Contains("device code login is not enabled", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Device Code is disabled for this account or workspace. Enable it in ChatGPT Settings > Security, or choose Normal browser login above.";
+        }
+
+        return $"Codex login stopped with exit code {exitCode}. Check the output above, then retry with either sign-in method.";
     }
 
     private void OpenSignInPage()
@@ -114,7 +178,9 @@ public partial class LoginWindow : Window
         {
             Process.Start(new ProcessStartInfo(signInUrl) { UseShellExecute = true });
             browserOpened = true;
-            StatusText.Text = "Complete sign-in in the browser. Enter the code there, not here.";
+            StatusText.Text = activeMethod == CodexLoginMethod.DeviceCode
+                ? "Complete sign-in in the browser. Enter the code there, not here."
+                : "Complete sign-in in the browser and return here.";
         }
         catch (Exception ex)
         {
@@ -129,10 +195,23 @@ public partial class LoginWindow : Window
 
     private void OpenPage_Click(object sender, RoutedEventArgs e) => OpenSignInPage();
 
+    private async void DeviceCode_Click(object sender, RoutedEventArgs e) =>
+        await RunLoginAsync(CodexLoginMethod.DeviceCode);
+
+    private async void BrowserCallback_Click(object sender, RoutedEventArgs e) =>
+        await RunLoginAsync(CodexLoginMethod.BrowserCallback);
+
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
-        CancelLogin();
-        StatusText.Text = "Cancelling login...";
+        if (isRunning)
+        {
+            CancelLogin();
+            StatusText.Text = "Cancelling login...";
+        }
+        else
+        {
+            Close();
+        }
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
@@ -142,7 +221,7 @@ public partial class LoginWindow : Window
     private void CancelLogin()
     {
         if (!isRunning) return;
-        cancellation.Cancel();
+        cancellation?.Cancel();
         try
         {
             if (loginProcess is { HasExited: false }) loginProcess.Kill(true);

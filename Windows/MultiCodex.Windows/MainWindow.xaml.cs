@@ -32,7 +32,7 @@ public partial class MainWindow : Window
                 AccountsGrid.SelectedItem = Accounts.FirstOrDefault(x =>
                     string.Equals(x.Name, selectedName, StringComparison.OrdinalIgnoreCase));
             FooterText.Text = accounts.Count == 0
-                ? "No saved accounts. Click Log in account, then enter the one-time code in your browser."
+                ? "No saved accounts. Click Log in account, then choose a sign-in method."
                 : $"{accounts.Count} account(s). Usage refreshed at {DateTime.Now:t}.";
             UpdateSelectionButtons();
 
