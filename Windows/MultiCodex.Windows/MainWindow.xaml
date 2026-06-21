@@ -11,7 +11,7 @@
         <DockPanel>
             <StackPanel>
                 <TextBlock Text="MultiCodex" FontSize="28" FontWeight="Bold"/>
-                <TextBlock Text="Multiple Codex accounts, one Windows tray app" Foreground="{StaticResource MutedBrush}"/>
+                <TextBlock Text="Multiple Codex accounts, in-app device login, one Windows tray app" Foreground="{StaticResource MutedBrush}"/>
             </StackPanel>
             <Border DockPanel.Dock="Right" Background="{StaticResource PanelBrush}" CornerRadius="12" Padding="14,8">
                 <TextBlock x:Name="RuntimeText" Text="Checking Codex..."/>
@@ -19,29 +19,34 @@
         </DockPanel>
 
         <WrapPanel Grid.Row="1" Margin="-4,18,-4,14">
-            <Button Content="Refresh usage" Click="Refresh_Click"/>
-            <Button Content="Run Codex login" Click="Login_Click"/>
-            <Button Content="Add current login" Click="Add_Click"/>
-            <Button Content="Switch selected" Click="Switch_Click"/>
-            <Button Content="Remove selected" Click="Remove_Click"/>
+            <Button x:Name="RefreshButton" Content="Refresh usage" Click="Refresh_Click"
+                    ToolTip="Reload saved accounts and usage limits"/>
+            <Button x:Name="LoginButton" Content="Log in account" Click="Login_Click"
+                    ToolTip="Create or relogin an account in an isolated Codex home"/>
+            <Button x:Name="ImportButton" Content="Import current login" Click="Add_Click"
+                    ToolTip="Save the currently active ~/.codex/auth.json as an account"/>
+            <Button x:Name="SwitchButton" Content="Switch selected" Click="Switch_Click" IsEnabled="False"
+                    ToolTip="Copy the selected account auth into ~/.codex/auth.json"/>
+            <Button x:Name="RemoveButton" Content="Remove selected" Click="Remove_Click" IsEnabled="False"
+                    ToolTip="Remove the selected account from MultiCodex"/>
             <Button Content="Open data folder" Click="OpenFolder_Click"/>
         </WrapPanel>
 
         <DataGrid x:Name="AccountsGrid" Grid.Row="2" ItemsSource="{Binding Accounts}" AutoGenerateColumns="False"
                   IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
                   Background="#101624" Foreground="White" RowBackground="#101624" AlternatingRowBackground="#151B27"
-                  BorderBrush="#263247" RowHeight="48">
+                  BorderBrush="#263247" RowHeight="48" SelectionChanged="AccountsGrid_SelectionChanged">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Account" Binding="{Binding Name}" Width="2*"/>
-                <DataGridTextColumn Header="" Binding="{Binding CurrentLabel}" Width="90"/>
-                <DataGridTextColumn Header="Auth" Binding="{Binding AuthLabel}" Width="110"/>
-                <DataGridTextColumn Header="5 hour" Binding="{Binding FiveHour}" Width="90"/>
-                <DataGridTextColumn Header="Weekly" Binding="{Binding Weekly}" Width="90"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="2*"/>
+                <DataGridTextColumn Header="Account" Binding="{Binding Name}" Width="2*" ElementStyle="{StaticResource GridTextCellStyle}"/>
+                <DataGridTextColumn Header="" Binding="{Binding CurrentLabel}" Width="90" ElementStyle="{StaticResource GridTextCellStyle}"/>
+                <DataGridTextColumn Header="Auth" Binding="{Binding AuthLabel}" Width="120" ElementStyle="{StaticResource GridTextCellStyle}"/>
+                <DataGridTextColumn Header="5 hour" Binding="{Binding FiveHour}" Width="90" ElementStyle="{StaticResource GridTextCellStyle}"/>
+                <DataGridTextColumn Header="Weekly" Binding="{Binding Weekly}" Width="90" ElementStyle="{StaticResource GridTextCellStyle}"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="2*" ElementStyle="{StaticResource GridTextCellStyle}"/>
             </DataGrid.Columns>
         </DataGrid>
 
         <TextBlock x:Name="FooterText" Grid.Row="3" Margin="0,14,0,0" Foreground="{StaticResource MutedBrush}"
-                   Text="First run: install Codex CLI, run login, then select Add current login."/>
+                   Text="First run: install Codex CLI, click Log in account, then enter the one-time code in your browser."/>
     </Grid>
 </Window>

@@ -16,19 +16,25 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = this;
         Loaded += async (_, _) => await RefreshAccountsAsync();
+        UpdateSelectionButtons();
     }
 
     public async Task RefreshAccountsAsync()
     {
         try
         {
+            var selectedName = (AccountsGrid.SelectedItem as AccountModel)?.Name;
             RuntimeText.Text = await service.GetRuntimeLabelAsync();
             var accounts = service.LoadAccounts();
             Accounts.Clear();
             foreach (var account in accounts) Accounts.Add(account);
+            if (!string.IsNullOrWhiteSpace(selectedName))
+                AccountsGrid.SelectedItem = Accounts.FirstOrDefault(x =>
+                    string.Equals(x.Name, selectedName, StringComparison.OrdinalIgnoreCase));
             FooterText.Text = accounts.Count == 0
-                ? "No saved accounts. Log in with Codex, then click Add current login."
+                ? "No saved accounts. Click Log in account, then enter the one-time code in your browser."
                 : $"{accounts.Count} account(s). Usage refreshed at {DateTime.Now:t}.";
+            UpdateSelectionButtons();
 
             await Task.WhenAll(Accounts.Where(x => x.HasAuth).Select(RefreshUsageAsync));
         }
@@ -56,19 +62,32 @@ public partial class MainWindow : Window
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshAccountsAsync();
 
-    private void Login_Click(object sender, RoutedEventArgs e)
+    private async void Login_Click(object sender, RoutedEventArgs e)
     {
+        var dialog = new InputDialog("Account name", "Choose a name for this Codex login", "Start login")
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() != true) return;
+
         try
         {
-            service.LaunchLogin();
-            FooterText.Text = "Finish login in the terminal, then click Add current login.";
+            var loginWindow = new LoginWindow(service, dialog.Value) { Owner = this };
+            loginWindow.ShowDialog();
+            FooterText.Text = loginWindow.LoginSucceeded
+                ? $"Login saved for {dialog.Value}. Usage is being refreshed."
+                : $"Login for {dialog.Value} was not completed.";
+            await RefreshAccountsAsync();
         }
         catch (Exception ex) { ShowError(ex); }
     }
 
     private async void Add_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new InputDialog { Owner = this };
+        var dialog = new InputDialog("Import current login", "Name for the currently active Codex login", "Import account")
+        {
+            Owner = this
+        };
         if (dialog.ShowDialog() != true) return;
         try
         {
@@ -84,6 +103,7 @@ public partial class MainWindow : Window
         try
         {
             service.SwitchAccount(account.Name);
+            FooterText.Text = $"Switched Codex to {account.Name}. New terminals will use this account.";
             await RefreshAccountsAsync();
         }
         catch (Exception ex) { ShowError(ex); }
@@ -104,6 +124,17 @@ public partial class MainWindow : Window
 
     private void OpenFolder_Click(object sender, RoutedEventArgs e) =>
         Process.Start(new ProcessStartInfo("explorer.exe", service.DataDirectory) { UseShellExecute = true });
+
+    private void AccountsGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e) =>
+        UpdateSelectionButtons();
+
+    private void UpdateSelectionButtons()
+    {
+        if (!IsLoaded && SwitchButton is null) return;
+        var selected = AccountsGrid.SelectedItem as AccountModel;
+        SwitchButton.IsEnabled = selected is { HasAuth: true, IsCurrent: false };
+        RemoveButton.IsEnabled = selected is not null;
+    }
 
     private static void ShowError(Exception ex) =>
         MessageBox.Show(ex.Message, "MultiCodex", MessageBoxButton.OK, MessageBoxImage.Error);

@@ -5,10 +5,67 @@
     <Application.Resources>
         <SolidColorBrush x:Key="PanelBrush" Color="#151B27" />
         <SolidColorBrush x:Key="MutedBrush" Color="#94A3B8" />
+        <SolidColorBrush x:Key="TextBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="ButtonBrush" Color="#1E293B" />
+        <SolidColorBrush x:Key="ButtonHoverBrush" Color="#334155" />
+        <SolidColorBrush x:Key="ButtonDisabledBrush" Color="#111827" />
+        <SolidColorBrush x:Key="BorderBrushStrong" Color="#334155" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#38BDF8" />
+
         <Style TargetType="Button">
             <Setter Property="Padding" Value="14,8" />
             <Setter Property="Margin" Value="4" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="{StaticResource ButtonBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushStrong}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource ButtonHoverBrush}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="#64748B" />
+                    <Setter Property="Background" Value="{StaticResource ButtonDisabledBrush}" />
+                    <Setter Property="BorderBrush" Value="#1F2937" />
+                    <Setter Property="Cursor" Value="Arrow" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#111827" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushStrong}" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
+            <Setter Property="Padding" Value="8,4" />
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#0F172A" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushStrong}" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style TargetType="DataGridRow">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+
+        <Style TargetType="DataGridCell">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="#263247" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+
+        <Style x:Key="GridTextCellStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="10,0" />
         </Style>
     </Application.Resources>
 </Application>

@@ -1,4 +1,5 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
+set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
 
 app_name := "MultiCodex"
 resource_bundle := "macos_MultiCodex.bundle"
@@ -21,6 +22,10 @@ help:
     @echo "Common commands:"
     @echo "  just run               Build + run debug app"
     @echo "  just build [debug|release]  Build app bundle"
+    @echo "  just win-run           Build + run Windows app"
+    @echo "  just win-build [Debug|Release]  Build Windows app"
+    @echo "  just win-publish       Publish Windows app to Windows/dist"
+    @echo "  just win-publish-self-contained  Publish Windows app with runtime"
     @echo "  just test              Run Swift tests"
     @echo "  just package           Build versioned DMG"
     @echo "  just check             Local verification (doctor + build + test)"
@@ -49,6 +54,18 @@ run:
     just build debug
     pkill -x "{{app_name}}" || true
     open "{{app_bundle}}"
+
+win-build configuration="Debug":
+    & .\Windows\build-windows.ps1 -Configuration "{{configuration}}"
+
+win-run configuration="Debug":
+    & .\Windows\build-windows.ps1 -Configuration "{{configuration}}" -Run
+
+win-publish:
+    & .\Windows\build-windows.ps1 -Publish
+
+win-publish-self-contained:
+    & .\Windows\build-windows.ps1 -SelfContained
 
 test:
     if [[ -d "Tests" ]]; then bash scripts/swift-safe.sh swift test; else echo "test: no Swift tests found"; fi

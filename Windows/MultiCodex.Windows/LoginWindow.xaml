@@ -1,0 +1,61 @@
+<Window x:Class="MultiCodex.Windows.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Codex login" Height="570" Width="760" MinHeight="500" MinWidth="620"
+        WindowStartupLocation="CenterOwner" Background="#0B1020" Foreground="White">
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock x:Name="TitleText" Text="Sign in to Codex" FontSize="24" FontWeight="Bold"/>
+            <TextBlock Text="No terminal is required. MultiCodex runs the Codex login process here."
+                       Margin="0,5,0,0" Foreground="{StaticResource MutedBrush}"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Margin="0,16,0,12" Padding="14" CornerRadius="10"
+                Background="#10243A" BorderBrush="#245170" BorderThickness="1">
+            <TextBlock TextWrapping="Wrap">
+                <Run Text="Enter the one-time code on the sign-in page in your browser — not in a terminal. "/>
+                <Run Text="Device-code login must be enabled in ChatGPT Settings &gt; Security or by your workspace administrator."/>
+            </TextBlock>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="12,8">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="One-time code: " Foreground="{StaticResource MutedBrush}"/>
+                    <TextBlock x:Name="CodeText" Text="waiting..." FontFamily="Consolas" FontWeight="Bold"/>
+                </StackPanel>
+            </Border>
+            <Button x:Name="CopyCodeButton" Grid.Column="1" Content="Copy code" Click="CopyCode_Click" IsEnabled="False"/>
+            <Button x:Name="OpenPageButton" Grid.Column="2" Content="Open sign-in page" Click="OpenPage_Click" IsEnabled="False"/>
+        </Grid>
+
+        <TextBox x:Name="OutputBox" Grid.Row="3" IsReadOnly="True" AcceptsReturn="True"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                 FontFamily="Consolas" FontSize="13" TextWrapping="NoWrap"/>
+
+        <Grid Grid.Row="4" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusText" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}"
+                       Text="Starting secure device-code login..."/>
+            <Button x:Name="CancelButton" Grid.Column="1" Content="Cancel" Click="Cancel_Click"/>
+            <Button x:Name="CloseButton" Grid.Column="2" Content="Close" Click="Close_Click" IsEnabled="False"/>
+        </Grid>
+    </Grid>
+</Window>

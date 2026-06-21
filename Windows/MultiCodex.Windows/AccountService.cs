@@ -12,36 +12,56 @@ public sealed class AccountService
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
     private static readonly Regex ValidName = new("^[A-Za-z0-9_.@-]+$", RegexOptions.Compiled);
-    private readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
+    private static readonly HashSet<string> ReservedDeviceNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
 
-    public string DataDirectory { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MultiCodex");
+    private readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
+    private readonly string codexExecutable;
+    private readonly string userProfileDirectory;
+
+    public string DataDirectory { get; }
     private string ConfigPath => Path.Combine(DataDirectory, "config.json");
     private string AccountsDirectory => Path.Combine(DataDirectory, "accounts");
-    private string CodexAuthPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "auth.json");
+    private string ManagedHomesDirectory => Path.Combine(DataDirectory, "managed-homes");
+    private string CodexAuthPath => Path.Combine(userProfileDirectory, ".codex", "auth.json");
 
-    public AccountService()
+    public AccountService(
+        string? dataDirectory = null,
+        string? userProfileDirectory = null,
+        string codexExecutable = "codex")
     {
+        DataDirectory = dataDirectory ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MultiCodex");
+        this.userProfileDirectory = userProfileDirectory ??
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        this.codexExecutable = string.IsNullOrWhiteSpace(codexExecutable) ? "codex" : codexExecutable;
+
         Directory.CreateDirectory(AccountsDirectory);
+        Directory.CreateDirectory(ManagedHomesDirectory);
     }
 
     public List<AccountModel> LoadAccounts()
     {
         var config = LoadConfig();
+        foreach (var name in config.Accounts.Keys) MigrateLegacyAuthIfNeeded(name);
+
         return config.Accounts.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(x => x == config.CurrentAccount)
+            .OrderByDescending(x => string.Equals(x, config.CurrentAccount, StringComparison.OrdinalIgnoreCase))
             .Select(name => new AccountModel
             {
                 Name = name,
-                IsCurrent = name == config.CurrentAccount,
+                IsCurrent = string.Equals(name, config.CurrentAccount, StringComparison.OrdinalIgnoreCase),
                 HasAuth = File.Exists(AccountAuthPath(name))
             }).ToList();
     }
 
     public void ImportCurrentAuth(string name)
     {
-        ValidateName(name);
+        name = ValidateName(name);
         if (!File.Exists(CodexAuthPath))
             throw new InvalidOperationException("No Codex login found. Run Codex login first.");
 
@@ -51,6 +71,7 @@ public sealed class AccountService
 
         var directory = Path.Combine(AccountsDirectory, name);
         Directory.CreateDirectory(directory);
+        Directory.CreateDirectory(AccountHomePath(name));
         File.Copy(CodexAuthPath, AccountAuthPath(name), true);
         config.Accounts[name] = new Dictionary<string, object>();
         config.CurrentAccount = name;
@@ -59,6 +80,7 @@ public sealed class AccountService
 
     public void SwitchAccount(string name)
     {
+        name = ValidateName(name);
         var config = LoadConfig();
         if (!config.Accounts.ContainsKey(name)) throw new InvalidOperationException("Unknown account.");
         var target = AccountAuthPath(name);
@@ -74,13 +96,19 @@ public sealed class AccountService
 
     public void RemoveAccount(string name)
     {
+        name = ValidateName(name);
         var config = LoadConfig();
         config.Accounts.Remove(name);
         var directory = Path.Combine(AccountsDirectory, name);
         if (Directory.Exists(directory)) Directory.Delete(directory, true);
-        if (config.CurrentAccount == name)
+        var home = AccountHomePath(name);
+        if (Directory.Exists(home)) Directory.Delete(home, true);
+        if (string.Equals(config.CurrentAccount, name, StringComparison.OrdinalIgnoreCase))
         {
-            config.CurrentAccount = config.Accounts.Keys.OrderBy(x => x).FirstOrDefault();
+            config.CurrentAccount = config.Accounts.Keys
+                .Where(accountName => File.Exists(AccountAuthPath(accountName)))
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
             if (config.CurrentAccount is { } next) SwitchAccountAndSave(next, config);
             else SaveConfig(config);
         }
@@ -89,6 +117,7 @@ public sealed class AccountService
 
     public async Task<(string FiveHour, string Weekly)> FetchUsageAsync(string name)
     {
+        name = ValidateName(name);
         var auth = JsonNode.Parse(await File.ReadAllTextAsync(AccountAuthPath(name)))?.AsObject()
                    ?? throw new InvalidOperationException("Invalid auth file.");
         if (auth["OPENAI_API_KEY"] is not null) return ("N/A", "N/A");
@@ -116,7 +145,7 @@ public sealed class AccountService
     {
         try
         {
-            var startInfo = new ProcessStartInfo("codex", "--version")
+            var startInfo = new ProcessStartInfo(codexExecutable, "--version")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -131,9 +160,54 @@ public sealed class AccountService
         catch { return "Codex unavailable"; }
     }
 
-    public void LaunchLogin()
+    public LoginLaunch CreateLogin(string name)
     {
-        Process.Start(new ProcessStartInfo("cmd.exe", "/k codex login") { UseShellExecute = true });
+        name = ValidateName(name);
+        var config = LoadConfig();
+        if (!config.Accounts.ContainsKey(name))
+        {
+            config.Accounts[name] = new Dictionary<string, object>();
+            if (string.IsNullOrWhiteSpace(config.CurrentAccount)) config.CurrentAccount = name;
+            SaveConfig(config);
+        }
+
+        var accountHome = AccountHomePath(name);
+        Directory.CreateDirectory(accountHome);
+        Directory.CreateDirectory(DataDirectory);
+        Directory.CreateDirectory(Path.GetDirectoryName(CodexAuthPath)!);
+
+        var startInfo = new ProcessStartInfo(codexExecutable)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("login");
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add("cli_auth_credentials_store=\"file\"");
+        startInfo.ArgumentList.Add("--device-auth");
+        startInfo.Environment["CODEX_HOME"] = accountHome;
+        startInfo.Environment["MULTICODEX_HOME"] = DataDirectory;
+
+        return new LoginLaunch(name, startInfo);
+    }
+
+    public void CompleteLogin(string name)
+    {
+        name = ValidateName(name);
+        var authPath = AccountAuthPath(name);
+        if (!File.Exists(authPath))
+            throw new InvalidOperationException(
+                "Codex finished without saving a login. Device-code login may be disabled in ChatGPT Settings > Security or by your workspace administrator.");
+
+        var config = LoadConfig();
+        if (!string.Equals(config.CurrentAccount, name, StringComparison.OrdinalIgnoreCase)) return;
+
+        Directory.CreateDirectory(Path.GetDirectoryName(CodexAuthPath)!);
+        var staged = CodexAuthPath + ".multicodex-" + Guid.NewGuid().ToString("N");
+        File.Copy(authPath, staged, true);
+        File.Move(staged, CodexAuthPath, true);
     }
 
     private void SwitchAccountAndSave(string name, ConfigFile config)
@@ -153,9 +227,28 @@ public sealed class AccountService
         try
         {
             var config = JsonSerializer.Deserialize<ConfigFile>(File.ReadAllText(ConfigPath));
-            return config?.Version == 2 ? config : RecoverConfig();
+            return config?.Version == 2 ? NormalizeConfig(config) : RecoverConfig();
         }
         catch { return RecoverConfig(); }
+    }
+
+    private static ConfigFile NormalizeConfig(ConfigFile config)
+    {
+        var normalized = new ConfigFile();
+        if (config.Accounts is null) return normalized;
+
+        foreach (var entry in config.Accounts)
+        {
+            if (!TryValidateName(entry.Key, out var name)) continue;
+            normalized.Accounts.TryAdd(name, entry.Value);
+            if (string.Equals(config.CurrentAccount, entry.Key, StringComparison.OrdinalIgnoreCase))
+                normalized.CurrentAccount = name;
+        }
+
+        if (normalized.CurrentAccount is not null && !normalized.Accounts.ContainsKey(normalized.CurrentAccount))
+            normalized.CurrentAccount = null;
+
+        return normalized;
     }
 
     private ConfigFile RecoverConfig()
@@ -163,7 +256,12 @@ public sealed class AccountService
         var config = new ConfigFile();
         if (Directory.Exists(AccountsDirectory))
             foreach (var directory in Directory.EnumerateDirectories(AccountsDirectory))
-                config.Accounts[Path.GetFileName(directory)] = new Dictionary<string, object>();
+                if (TryValidateName(Path.GetFileName(directory), out var name))
+                    config.Accounts[name] = new Dictionary<string, object>();
+        if (Directory.Exists(ManagedHomesDirectory))
+            foreach (var directory in Directory.EnumerateDirectories(ManagedHomesDirectory))
+                if (TryValidateName(Path.GetFileName(directory), out var name))
+                    config.Accounts.TryAdd(name, new Dictionary<string, object>());
         return config;
     }
 
@@ -175,7 +273,21 @@ public sealed class AccountService
         File.Move(temporary, ConfigPath, true);
     }
 
-    private string AccountAuthPath(string name) => Path.Combine(AccountsDirectory, name, "auth.json");
+    private string AccountHomePath(string name) => Path.Combine(ManagedHomesDirectory, name);
+
+    private string AccountAuthPath(string name) => Path.Combine(AccountHomePath(name), "auth.json");
+
+    private string LegacyAccountAuthPath(string name) => Path.Combine(AccountsDirectory, name, "auth.json");
+
+    private void MigrateLegacyAuthIfNeeded(string name)
+    {
+        var legacy = LegacyAccountAuthPath(name);
+        var current = AccountAuthPath(name);
+        if (!File.Exists(legacy) || File.Exists(current)) return;
+
+        Directory.CreateDirectory(AccountHomePath(name));
+        File.Copy(legacy, current, false);
+    }
 
     private static string Percent(JsonNode? window)
     {
@@ -183,16 +295,33 @@ public sealed class AccountService
         return value is null ? "--" : $"{value:0.#}%";
     }
 
-    private static void ValidateName(string name)
+    private static string ValidateName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name) || !ValidName.IsMatch(name))
+        if (!TryValidateName(name, out var normalized))
             throw new InvalidOperationException("Use letters, numbers, underscore, dash, dot, or @.");
+        return normalized;
+    }
+
+    private static bool TryValidateName(string? name, out string normalized)
+    {
+        normalized = name?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(normalized) || !ValidName.IsMatch(normalized))
+            return false;
+
+        if (normalized is "." or ".." || normalized.EndsWith('.'))
+            return false;
+
+        var deviceName = normalized.Split('.')[0];
+        return !ReservedDeviceNames.Contains(deviceName);
     }
 
     private sealed class ConfigFile
     {
         public int Version { get; set; } = 2;
         public string? CurrentAccount { get; set; }
-        public Dictionary<string, Dictionary<string, object>> Accounts { get; set; } = new();
+        public Dictionary<string, Dictionary<string, object>> Accounts { get; set; } =
+            new(StringComparer.OrdinalIgnoreCase);
     }
+
+    public sealed record LoginLaunch(string AccountName, ProcessStartInfo StartInfo);
 }
